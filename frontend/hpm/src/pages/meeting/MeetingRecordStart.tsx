@@ -1,12 +1,9 @@
 import { useRef, useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 import logo from "../../assets/start.png";
 import stop from "../../assets/stop.png";
 
-import { getMeetings } from "../../features/meeting/api";
-import type { Meeting } from "../../types/meeting";
 
 
 export default function MeetingRecordStartPage() {
@@ -59,12 +56,17 @@ export default function MeetingRecordStartPage() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   const uploadAudio = async (blob: Blob) => {
-    const url = URL.createObjectURL(blob);
+    const formData = new FormData();
 
-    console.log("녹음 Blob:", blob);
-    console.log("재생 URL:", url);
+    formData.append("audio", blob, `meeting-1.webm`);
 
-    setAudioUrl(url);
+    const res = await fetch(`http://localhost:8000/api/meetings/1/end/`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    console.log(data);
 
     navigate("/meeting/record/result");
   };
@@ -76,19 +78,19 @@ export default function MeetingRecordStartPage() {
         {/* 왼쪽 */}
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center text-center">
-            <p className="mb-10 text-3xl text-gray-500 cafe24-font">
-              {recording
-                ? "회의가 녹음 중 입니다."
-                : "버튼을 눌러 회의 녹음을 시작하세요"}
-            </p>
+              <p className="mb-10 text-3xl text-gray-500 cafe24-font">
+                {recording
+                  ? "회의가 녹음 중 입니다."
+                  : "버튼을 눌러 회의 녹음을 시작하세요"}
+              </p>
 
-            <button onClick={recording ? stopRecording : startRecording}>
-              <img
-                src={recording ? stop : logo}
-                alt="record-button"
-                className="h-40 w-40"
-              />
-            </button>
+              <button onClick={recording ? stopRecording : startRecording}>
+                <img
+                  src={recording ? stop : logo}
+                  alt="record-button"
+                  className="h-40 w-40"
+                />
+              </button>
 
             {audioUrl && (
               <audio controls className="mt-5">
