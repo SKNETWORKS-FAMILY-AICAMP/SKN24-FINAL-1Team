@@ -1,15 +1,19 @@
-import { Outlet } from "react-router-dom";
-
-import Header from "./Header";
+import { Outlet, Navigate } from "react-router-dom";
+import Sidebar from "./Sidebar";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Layout() {
-  return (
-    <>
-      <Header />
+  const { user, projectId } = useAuth();
 
-      <main className="min-h-[calc(100vh)] bg-[#E9E9E9]">
+  if (!user) return <Navigate to="/login" replace />;
+  if (!projectId) return <Navigate to="/projects" replace />;
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="ml-[200px] flex-1 bg-[#F5F5F5] min-h-screen">
         <Outlet />
       </main>
-    </> 
+    </div>
   );
 }

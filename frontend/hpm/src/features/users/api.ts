@@ -2,7 +2,7 @@ import axios from "axios";
 import type { User } from "../../types/user";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api",
+  baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
 export const getUserDetail = async (

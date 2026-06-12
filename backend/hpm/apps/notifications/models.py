@@ -8,5 +8,7 @@ class Notification(models.Model):
     content = models.TextField()
     is_read = models.BooleanField(default=False)
 
+    created_at = models.DateTimeField(auto_now_add=True, null=True)
+
     class Meta:
         db_table = "notification"

@@ -1,3 +1,6 @@
 from django.contrib import admin
+from .models import Users, Dept, Rank
 
-# Register your models here.
+admin.site.register(Dept)
+admin.site.register(Rank)
+admin.site.register(Users)

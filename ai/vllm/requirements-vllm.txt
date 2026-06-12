@@ -1,0 +1,8 @@
+--pre
+--extra-index-url https://wheels.vllm.ai/nightly/cu129
+--extra-index-url https://download.pytorch.org/whl/cu129
+
+# Gemma 4 Unified is newer than the torch 2.8-compatible vLLM 0.10.x stack.
+# Use the current Gemma 4-capable vLLM wheel and let it install its matching
+# torch/transformers dependencies.
+vllm==0.10.2
