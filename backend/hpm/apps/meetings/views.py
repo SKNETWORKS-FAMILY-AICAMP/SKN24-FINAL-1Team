@@ -1,6 +1,10 @@
 import os
 import requests
 from datetime import datetime
+import redis
+import json
+from django.http import StreamingHttpResponse
+from django.utils.timezone import now
 
 from django.conf import settings
 from rest_framework import status
@@ -415,3 +419,36 @@ def generate_agenda(request, meeting_id):
         "ocr_text": ocr_text,
         "agenda": MeetingAgendaSerializer(created, many=True).data,
     }, status=status.HTTP_201_CREATED)
+
+
+def meeting_stream(request, meeting_id):
+    def event_stream():
+        r =  redis.Redis(host='localhost', port=6379)
+        pubsub = r.pubsub()
+        pubsub.subscribe(f"meeting:{meeting_id}")
+
+        for message in pubsub.listen():
+            if message["type"] == "message":
+                yield f"data: {message['data'].decode()}\n\n"
+
+    return StreamingHttpResponse(
+        event_stream(),
+        content_type = "text/event-stream; charset=utf-8"
+    )
+
+@api_view(["POST"])
+def start_meeting(request, meeting_id):
+    meeting = Meeting.objects.get(meeting_id=meeting_id)
+    meeting.status = "IN_PROGRESS"
+    meeting.started_at = now()
+    meeting.save()
+
+    r = redis.Redis(host='localhost', port=6379)
+    r.publish(f"meeting:{meeting_id}", json.dumps({
+        "event": "meeting_started",
+        "meeting_id" : meeting_id,
+        "started_at" : meeting.started_at.isoformat(),
+        "status" : "회의 진행 중"
+    },ensure_ascii= False))
+
+    return Response({"succes": True})

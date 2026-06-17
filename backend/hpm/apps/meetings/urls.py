@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from .views import generate_agenda
+from .views import meeting_stream 
 
 urlpatterns = [
     # 회의 목록 / 생성
@@ -26,5 +27,8 @@ urlpatterns = [
     # Jira 등록
     path("<int:meeting_id>/jira/", views.register_jira_tasks),
     # 안건생성
-    path("<int:meeting_id>/agenda/generate/", generate_agenda)
+    path("<int:meeting_id>/agenda/generate/", generate_agenda),
+
+    path("<int:meeting_id>/stream/",meeting_stream),
+
 ]
