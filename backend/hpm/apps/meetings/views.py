@@ -147,8 +147,14 @@ def end_meeting(request, meeting_id):
 
         base_url = settings.RUNPOD_BASE_URL
         try:
+            participants = MeetingUsers.objects.filter(meeting=meeting).values_list("user__name", flat=True)
             with open(file_path, "rb") as f:
-                stt_res = requests.post(f"{base_url}/transcribe", files={"file": f}, timeout=600)
+                stt_res = requests.post(
+                    f"{base_url}/transcribe",
+                    files = {"file":f},
+                    data = {"participants" : ",".join(participants)},
+                    timeout=600
+                )
             full_text = stt_res.text
 
             record = Record.objects.filter(meeting=meeting).last()
@@ -173,7 +179,7 @@ def end_meeting(request, meeting_id):
             minutes_data = minutes_resp.json()
 
             result = minutes_data.get("result", {})
-            meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
+            meeting.meeting_document = result.get("content", "")
             meeting.save()
 
             _create_tasks_from_todo(meeting, result.get("todo_list", []))
@@ -370,7 +376,7 @@ def generate_minutes(request, meeting_id):
 
     result = data.get("result", {})
     
-    meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
+    meeting.meeting_document = result.get("content", "")
     meeting.save()
     _create_tasks_from_todo(meeting, result.get("todo_list", []))
 
