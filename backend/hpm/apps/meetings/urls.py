@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import generate_agenda
+from .views import generate_agenda, meeting_stream, speaker_mapping_list, speaker_mapping_delete
 from .views import meeting_stream 
 
 urlpatterns = [
@@ -30,5 +30,8 @@ urlpatterns = [
     path("<int:meeting_id>/agenda/generate/", generate_agenda),
 
     path("<int:meeting_id>/stream/",meeting_stream),
+
+    path("<int:meeting_id>/speakers/", speaker_mapping_list),
+    path("<int:meeting_id>/speakers/<int:mapping_id>/", speaker_mapping_delete),
 
 ]

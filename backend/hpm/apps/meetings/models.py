@@ -114,3 +114,15 @@ class MeetingTask(models.Model):
 
     class Meta:
         db_table = "meeting_task"
+
+class SpeakerMapping(models.Model):
+    meeting = models.ForeignKey(
+        Meeting, on_delete = models.CASCADE, db_column = "meeting_id"
+    )
+    speaker_label = models.CharField(max_length = 20)
+    meeting_users = models.ForeignKey(
+        MeetingUsers, on_delete= models.CASCADE, db_column = "meeting_users_id"
+    )
+
+    class Meta:
+        db_table= "speaker_mapping"
