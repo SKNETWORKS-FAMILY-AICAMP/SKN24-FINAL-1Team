@@ -69,7 +69,7 @@ services:
     container_name: hpm_frontend
     restart: unless-stopped
     ports:
-      - "3000:80"                      # 내 컴퓨터 80 → 컨테이너 80
+      - "80:80"                      # 내 컴퓨터 80 → 컨테이너 80
                                      # 사용자는 http://localhost 로 접속
     depends_on:
       - backend                      # backend 뜬 다음에 frontend 시작
