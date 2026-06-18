@@ -1,0 +1,13 @@
+# Django 핵심
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# MySQL 연결
+mysqlclient==2.2.4
+
+# HTTP 요청 (RunPod AI 서버 호출용)
+requests==2.31.0
+
+# 환경변수
+python-dotenv==1.0.0
