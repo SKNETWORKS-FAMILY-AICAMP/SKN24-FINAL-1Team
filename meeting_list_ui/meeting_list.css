@@ -44,28 +44,45 @@ tbody tr:hover {
   white-space: nowrap;
   transition: background 0.15s;
 }
-.btn-email:hover { background: #6D28D9; }
+.btn-email:hover { background: #623FB5; }
 
 /*페이지네이션 버튼 */
 .page-btn {
-  min-width: 30px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #E5E7EB;
-  border-radius: 6px;
-  background: #fff;
+  min-width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
   font-size: 15px;
-  color: #374151;
+  font-weight: 300;
+  color: #969696;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  line-height: 1;
+  padding: 0;
 }
-.page-btn:hover:not(:disabled) { border-color: #7C3AED; color: #7C3AED; }
+
+/* hover */
+.page-btn:hover:not(:disabled) {
+  color: #111827;
+}
+
+/* 현재 페이지 */
 .page-btn-active {
-  background: #111827;
-  border-color: #111827;
-  color: #fff;
+  color: #141414;
+  font-weight: 500;
 }
-.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 좌우 화살표 */
+.page-arrow {
+  color: #141414;
+  font-size: 22px;
+  font-weight: 300;
+}
+
+/* 비활성화 */
+.page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
 
 /*스크롤바*/
 ::-webkit-scrollbar { width: 5px; }

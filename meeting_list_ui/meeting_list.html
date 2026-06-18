@@ -13,18 +13,18 @@
 <div class="flex h-screen overflow-hidden">
 
   <!--왼쪽 사이드바-->
-  <aside class="w-52 bg-gray-900 text-white flex flex-col shrink-0">
+  <aside class="w-56 bg-[#141414] text-white flex flex-col shrink-0">
 
     <!-- 로고 -->
-    <div class="flex items-center gap-2.5 px-4 py-4 border-b border-white/10">
+    <div class="flex flex-col items-center gap-1.5 px-6 py-5 border-b border-white/10">
       <img src="image/logo.png"
       alt="회의피하지마 로고"
-      class="w-8 h-8 object-contain shrknk-0"/>
+      class="w-16 h-16 object-contain shrknk-0"/>
       <span class="text-sm font-bold leading-tight">회의피하지마</span>
     </div>
 
     <!--메뉴-->
-    <nav class="flex-1 py-3 px-2 space-y-0.5">
+    <nav class="flex-1 py-4 px-2 space-y-2">
 
       <!--프로젝트 목록-->
       <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-gray-800 hover:text-white text-sm transition">
@@ -45,7 +45,7 @@
       </a>
 
       <!--회의 목록-->
-      <a href="#" class="flex items-center justify-between px-3 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold">
+      <a href="#" class="flex items-center justify-between px-4 py-3 rounded-xl bg-[#623FB5] text-white text-[15px] font-semibold shadow-sm">
         <span class="flex items-center gap-3">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -250,21 +250,21 @@
 <script>
 //더미 데이터
 const MEETINGS = [
-  { id:1,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"scheduled",   creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호","최예진","한승우"] },
-  { id:2,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"in_progress", creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호","최예진"] },
-  { id:3,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호"] },
-  { id:4,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영"] },
-  { id:5,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호"] },
-  { id:6,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호","최예진"] },
-  { id:7,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영"] },
-  { id:8,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호"] },
-  { id:9,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영"] },
-  { id:10, title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지나","박수영","이민호"] },
-  { id:11, title:"UI/UX 개선안 디자인 리뷰 회의",       place:"본사 3층 대회의실",                status:"scheduled",   creator:"류지나", date:"2026-06-12 14:00", participants:["류지나","박수영","이민호"] },
-  { id:12, title:"백엔드 API 스펙 확정 회의",           place:"화상회의 (Google Meet)",           status:"in_progress", creator:"박수영", date:"2026-06-13 11:00", participants:["박수영","이민호","최예진","한승우"] },
-  { id:13, title:"스프린트 4 계획 및 회고",             place:"본사 2층 소회의실",                status:"scheduled",   creator:"이민호", date:"2026-06-18 15:00", participants:["이민호","최예진","한승우","김지원"] },
-  { id:14, title:"고객사 요구사항 분석 2차 미팅",       place:"고객사 회의실",                    status:"finished",    creator:"최예진", date:"2026-06-05 10:30", participants:["최예진","한승우","류지나"] },
-  { id:15, title:"인프라 비용 최적화 검토",             place:"화상회의 (Zoom)",                  status:"finished",    creator:"한승우", date:"2026-06-08 16:00", participants:["한승우","김지원","박수영","류지나","이민호"] },
+  { id:1,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"scheduled",   creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","김민준","김규호","황인규"] },
+  { id:2,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"in_progress", creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","김민준","김규호"] },
+  { id:3,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","김민준"] },
+  { id:4,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영"] },
+  { id:5,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","김민준"] },
+  { id:6,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","김민준","김규호"] },
+  { id:7,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영"] },
+  { id:8,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","이민호"] },
+  { id:9,  title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영"] },
+  { id:10, title:"AI 매칭 엔진 스프린트 리뷰",         place:"대림 테크노파크 9층 2호 2039 17층", status:"finished",    creator:"김지원", date:"2026-06-10 09:00", participants:["김지원","류지우","박수영","황인규"] },
+  { id:11, title:"UI/UX 개선안 디자인 리뷰 회의",       place:"본사 3층 대회의실",                status:"scheduled",   creator:"류지우", date:"2026-06-12 14:00", participants:["류지우","박수영","이민호"] },
+  { id:12, title:"백엔드 API 스펙 확정 회의",           place:"화상회의 (Google Meet)",           status:"in_progress", creator:"박수영", date:"2026-06-13 11:00", participants:["박수영","이민호","김규호","황인규"] },
+  { id:13, title:"스프린트 4 계획 및 회고",             place:"본사 2층 소회의실",                status:"scheduled",   creator:"이민호", date:"2026-06-18 15:00", participants:["황인규","박수영","김민준","김지원"] },
+  { id:14, title:"고객사 요구사항 분석 2차 미팅",       place:"고객사 회의실",                    status:"finished",    creator:"최예진", date:"2026-06-05 10:30", participants:["김규호","한승우","류지나"] },
+  { id:15, title:"인프라 비용 최적화 검토",             place:"화상회의 (Zoom)",                  status:"finished",    creator:"한승우", date:"2026-06-08 16:00", participants:["황인규","김지원","박수영","김민준","황인규"] },
 ];
 
 const STATUS_MAP = {
@@ -389,18 +389,55 @@ function render() {
 
 function renderPagination(total) {
   const el = document.getElementById("pagination");
-  if (total <= 1) { el.innerHTML = ""; return; }
-
-  let html = `<button onclick="goPage(${page-1})" ${page===1?"disabled":""} class="page-btn">‹</button>`;
-  for (let p = 1; p <= total; p++) {
-    html += `<button onclick="goPage(${p})" class="page-btn ${p===page?"page-btn-active":""}">${p}</button>`;
+  if (total <= 1) {
+    el.innerHTML = "";
+    return;
   }
-  html += `<button onclick="goPage(${page+1})" ${page===total?"disabled":""} class="page-btn">›</button>`;
+
+  const MAX_VISIBLE = 5;
+
+  // 현재 페이지가 속한 페이지 그룹 계산
+  // 1~5, 6~10, 11~15 이런 식으로 묶음
+  const currentGroup = Math.floor((page - 1) / MAX_VISIBLE);
+  const startPage = currentGroup * MAX_VISIBLE + 1;
+  const endPage = Math.min(startPage + MAX_VISIBLE - 1, total);
+
+  let html = `
+    <button 
+      onclick="goPage(${page - 1})" 
+      ${page === 1 ? "disabled" : ""} 
+      class="page-btn page-arrow"
+    >
+      ‹
+    </button>
+  `;
+
+  for (let p = startPage; p <= endPage; p++) {
+    html += `
+      <button 
+        onclick="goPage(${p})" 
+        class="page-btn ${p === page ? "page-btn-active" : ""}"
+      >
+        ${p}
+      </button>
+    `;
+  }
+
+  html += `
+    <button 
+      onclick="goPage(${page + 1})" 
+      ${page === total ? "disabled" : ""} 
+      class="page-btn page-arrow"
+    >
+      ›
+    </button>
+  `;
+
   el.innerHTML = html;
 }
 
 // 초기 렌더
-document.addEventListener("DOMContentLoaded", render);
+render();
 </script>
 </body>
 </html>
