@@ -149,10 +149,7 @@ def end_meeting(request, meeting_id):
         try:
             with open(file_path, "rb") as f:
                 stt_res = requests.post(f"{base_url}/transcribe", files={"file": f}, timeout=600)
-            stt_data = stt_res.json()         # 전체 JSON
-            result = stt_data.get("result", {}) # result 딕셔너리 꺼내기
-            full_text = result.get("text", "")  # text 꺼내기
-            # → full_text = "안녕하세요 회의를 시작하겠습니다"
+            full_text = stt_res.text
 
             record = Record.objects.filter(meeting=meeting).last()
             if record:
@@ -164,13 +161,22 @@ def end_meeting(request, meeting_id):
                 with open(os.path.join(txt_dir, f"meeting-{meeting_id}.txt"), "w", encoding="utf-8") as f:
                     f.write(full_text)
 
-            minutes_resp = requests.post(f"{base_url}/generate", json={"text": full_text}, timeout=300)
+            minutes_resp = requests.post(f"{base_url}/generate-minutes", json={
+                "text": full_text,
+                "meeting_id" : str(meeting_id),
+                "title" : meeting.title,
+                "meeting_datetime" : str(meeting.meeting_at),
+                "location" : meeting.location,
+                }, 
+                timeout=300)
             minutes_resp.raise_for_status()
             minutes_data = minutes_resp.json()
 
-            meeting.meeting_document = minutes_data.get("content", "")
+            result = minutes_data.get("result", {})
+            meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
             meeting.save()
-            _create_tasks_from_todo(meeting, minutes_data.get("todo_list", []))
+
+            _create_tasks_from_todo(meeting, result.get("todo_list", []))
         except Exception as e:
             return Response({"error": f"STT/회의록 처리 실패: {str(e)}", "meeting_id": meeting_id}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -350,18 +356,26 @@ def generate_minutes(request, meeting_id):
 
     base_url = settings.RUNPOD_BASE_URL
     try:
-        response = requests.post(f"{base_url}/generate", json={"text": record.record_row_text}, timeout=300)
+        response = requests.post(f"{base_url}/generate-minutes", json={
+            "text": record.record_row_text,
+            "meeting_id" : str(meeting_id),
+            "title" : meeting.title,
+            "meeting_datetime" : str(meeting.meeting_at),
+            "location" : meeting.location,
+            }, timeout=300)
         response.raise_for_status()
         data = response.json()
     except requests.RequestException as e:
         return Response({"error": f"RunPod 연결 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
-    meeting.meeting_document = data.get("content", "")
+    result = data.get("result", {})
+    
+    meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
     meeting.save()
-    _create_tasks_from_todo(meeting, data.get("todo_list", []))
+    _create_tasks_from_todo(meeting, result.get("todo_list", []))
 
     return Response({"message": "회의록 및 태스크 생성이 완료되었습니다.", "meeting_id": meeting_id,
-        "content": data.get("content", ""), "todo_list": data.get("todo_list", [])})
+        "content": result.get("content", ""), "todo_list": result.get("todo_list", [])})
 
 # ── OCR + 기초 안건 생성 ───────────────────────────────────────────
 @api_view(["POST"])
