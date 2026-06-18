@@ -10,13 +10,13 @@ body {
   display: inline-block;
   padding: 3px 12px;
   border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 300;
   white-space: nowrap;
 }
-.badge-scheduled  { background: #DBEAFE; color: #1D4ED8; }   /* 예정  — 파랑 */
-.badge-inprogress { background: #EDE9FE; color: #6D28D9; }   /* 진행 중 — 보라 */
-.badge-finished   { background: #F3F4F6; color: #6B7280; }   /* 종료  — 회색 */
+.badge-scheduled  { background: #0088FF; color: #FFFFFF; }   /* 예정  — 파랑 */
+.badge-inprogress { background: #623FB5; color: #FFFFFF; }   /* 진행 중 — 보라 */
+.badge-finished   { background: #969696; color: #FFFFFF; }   /* 종료  — 회색 */
 
 /*체크박스*/
 input[type="checkbox"] {
@@ -33,39 +33,56 @@ tbody tr:hover {
 
 /* 이메일 발송 버튼*/
 .btn-email {
-  background: #7C3AED;
+  background: #623FB5;
   color: #fff;
   border: none;
   border-radius: 6px;
   padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 300;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
 }
-.btn-email:hover { background: #6D28D9; }
+.btn-email:hover { background: #623FB5; }
 
 /*페이지네이션 버튼 */
 .page-btn {
-  min-width: 30px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid #E5E7EB;
-  border-radius: 6px;
-  background: #fff;
-  font-size: 13px;
-  color: #374151;
+  min-width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  font-weight: 300;
+  color: #969696;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  line-height: 1;
+  padding: 0;
 }
-.page-btn:hover:not(:disabled) { border-color: #7C3AED; color: #7C3AED; }
+
+/* hover */
+.page-btn:hover:not(:disabled) {
+  color: #111827;
+}
+
+/* 현재 페이지 */
 .page-btn-active {
-  background: #111827;
-  border-color: #111827;
-  color: #fff;
+  color: #141414;
+  font-weight: 500;
 }
-.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* 좌우 화살표 */
+.page-arrow {
+  color: #141414;
+  font-size: 22px;
+  font-weight: 300;
+}
+
+/* 비활성화 */
+.page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
 
 /*스크롤바*/
 ::-webkit-scrollbar { width: 5px; }
