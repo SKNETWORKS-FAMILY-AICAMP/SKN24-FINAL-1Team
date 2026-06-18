@@ -10,19 +10,19 @@ body {
   display: inline-block;
   padding: 3px 12px;
   border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 300;
   white-space: nowrap;
 }
-.badge-scheduled  { background: #DBEAFE; color: #1D4ED8; }   /* 예정  — 파랑 */
-.badge-inprogress { background: #EDE9FE; color: #6D28D9; }   /* 진행 중 — 보라 */
-.badge-finished   { background: #F3F4F6; color: #6B7280; }   /* 종료  — 회색 */
+.badge-scheduled  { background: #0088FF; color: #FFFFFF; }   /* 예정  — 파랑 */
+.badge-inprogress { background: #623FB5; color: #FFFFFF; }   /* 진행 중 — 보라 */
+.badge-finished   { background: #969696; color: #FFFFFF; }   /* 종료  — 회색 */
 
 /*체크박스*/
 input[type="checkbox"] {
   width: 15px;
   height: 15px;
-  accent-color: #7C3AED;
+  accent-color: #623FB5;
   cursor: pointer;
 }
 
@@ -33,13 +33,13 @@ tbody tr:hover {
 
 /* 이메일 발송 버튼*/
 .btn-email {
-  background: #7C3AED;
+  background: #623FB5;
   color: #fff;
   border: none;
   border-radius: 6px;
   padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 300;
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
@@ -54,7 +54,7 @@ tbody tr:hover {
   border: 1px solid #E5E7EB;
   border-radius: 6px;
   background: #fff;
-  font-size: 13px;
+  font-size: 15px;
   color: #374151;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
