@@ -13,8 +13,8 @@ from rest_framework.response import Response
 
 from apps.notifications.models import Notification
 from apps.users.models import Users
-from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record
-from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer
+from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record,SpeakerMapping
+from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, SpeakerMappingSerializer
 
 PRIORITY_MAP = {"High": 1, "Medium": 2, "Low": 3, "Lowest": 4}
 
@@ -119,6 +119,14 @@ def start_meeting(request, meeting_id):
     meeting.is_meeting = True
     meeting.save()
     Record.objects.create(meeting=meeting)
+
+    r = redis.Redis(host='localhost', port=6379)
+    r.publish(f"meeting:{meeting_id}", json.dumps({
+        "event" : "meeting_started",
+        "meeting_id" : meeting_id,
+        "status" : "회의 진행 중"
+    }, ensure_ascii=False))
+
     return Response({"message": "회의가 시작되었습니다.", "meeting_id": meeting_id})
 
 
@@ -147,8 +155,14 @@ def end_meeting(request, meeting_id):
 
         base_url = settings.RUNPOD_BASE_URL
         try:
+            participants = MeetingUsers.objects.filter(meeting=meeting).values_list("user__name", flat=True)
             with open(file_path, "rb") as f:
-                stt_res = requests.post(f"{base_url}/transcribe", files={"file": f}, timeout=600)
+                stt_res = requests.post(
+                    f"{base_url}/transcribe",
+                    files = {"file":f},
+                    data = {"participants" : ",".join(participants)},
+                    timeout=600
+                )
             full_text = stt_res.text
 
             record = Record.objects.filter(meeting=meeting).last()
@@ -173,7 +187,7 @@ def end_meeting(request, meeting_id):
             minutes_data = minutes_resp.json()
 
             result = minutes_data.get("result", {})
-            meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
+            meeting.meeting_document = result.get("content", "")
             meeting.save()
 
             _create_tasks_from_todo(meeting, result.get("todo_list", []))
@@ -354,10 +368,18 @@ def generate_minutes(request, meeting_id):
     if not record or not record.record_row_text:
         return Response({"error": "변환된 텍스트가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
+    
+    transcript = record.record_row_text
+    mappings = SpeakerMapping.objects.filter(meeting=meeting).select_related("meeting_users")
+    for mapping in mappings:
+        speaker_label = mapping.speaker_label          
+        real_name = mapping.meeting_users.user.name    
+        transcript = transcript.replace(speaker_label, real_name)
+
     base_url = settings.RUNPOD_BASE_URL
     try:
         response = requests.post(f"{base_url}/generate-minutes", json={
-            "text": record.record_row_text,
+            "text": transcript,
             "meeting_id" : str(meeting_id),
             "title" : meeting.title,
             "meeting_datetime" : str(meeting.meeting_at),
@@ -370,7 +392,7 @@ def generate_minutes(request, meeting_id):
 
     result = data.get("result", {})
     
-    meeting.meeting_document = result.get("content", "") or result.get("minutes", "")
+    meeting.meeting_document = result.get("content", "")
     meeting.save()
     _create_tasks_from_todo(meeting, result.get("todo_list", []))
 
@@ -450,19 +472,32 @@ def meeting_stream(request, meeting_id):
         content_type = "text/event-stream; charset=utf-8"
     )
 
-@api_view(["POST"])
-def start_meeting(request, meeting_id):
-    meeting = Meeting.objects.get(meeting_id=meeting_id)
-    meeting.status = "IN_PROGRESS"
-    meeting.started_at = now()
-    meeting.save()
 
-    r = redis.Redis(host='localhost', port=6379)
-    r.publish(f"meeting:{meeting_id}", json.dumps({
-        "event": "meeting_started",
-        "meeting_id" : meeting_id,
-        "started_at" : meeting.started_at.isoformat(),
-        "status" : "회의 진행 중"
-    },ensure_ascii= False))
+# -- 발화자 매핑
 
-    return Response({"succes": True})
+@api_view(["GET", "POST"])
+def speaker_mapping_list(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error" : "회의를 찾을 수 없습니다"}, status = status.HTTP_404_NOT_FOUND)
+    
+    if request.method == "GET":
+        mappings = SpeakerMapping.objects.filter(meeting=meeting)
+        return Response(SpeakerMappingSerializer(mappings, many=True).data)
+    
+    mapping = SpeakerMapping.objects.create(
+        meeting=meeting,
+        speaker_label = request.data.get("speaker_label"),
+        meeting_users_id =  request.data.get("meeting_users_id"),
+    )
+    return Response(SpeakerMappingSerializer(mapping).data, status = status.HTTP_201_CREATED)
+
+@api_view(["DELETE"])
+def speaker_mapping_delete(request, meeting_id, mapping_id):
+    try:
+        mapping = SpeakerMapping.objects.get(pk=mapping_id, meeting_id=meeting_id)
+    except SpeakerMapping.DoesNotExist:
+        return Response({"error": "매핑을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    mapping.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
