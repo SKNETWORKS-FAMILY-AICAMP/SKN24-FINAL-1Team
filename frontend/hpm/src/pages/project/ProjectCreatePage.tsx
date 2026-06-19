@@ -82,7 +82,7 @@ export default function ProjectCreatePage() {
   }, [jiraConnected, user]);
 
   const handleJiraConnect = () => {
-  window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user?.users_id}`;
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user?.users_id}`;
 };
 
   const handleSearch = () => {
