@@ -52,7 +52,7 @@ class Meeting(models.Model):
 
 class Record(models.Model):
     record_id       = models.AutoField(primary_key=True)
-    meeting         = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
+    meeting         = models.OneToOneField(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
     record_path     = models.TextField(null=True, blank=True)
     record_row_text = models.TextField(null=True, blank=True)
 

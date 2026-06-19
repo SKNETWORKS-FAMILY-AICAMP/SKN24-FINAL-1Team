@@ -165,7 +165,7 @@ def end_meeting(request, meeting_id):
                 )
             full_text = stt_res.text
 
-            record = Record.objects.filter(meeting=meeting).last()
+            record = Record.objects.get(meeting=meeting)
             if record:
                 record.record_path = file_path
                 record.record_row_text = full_text
@@ -364,7 +364,7 @@ def generate_minutes(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    record = Record.objects.filter(meeting=meeting).last()
+    record = Record.objects.get(meeting=meeting)
     if not record or not record.record_row_text:
         return Response({"error": "변환된 텍스트가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
