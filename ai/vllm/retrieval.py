@@ -478,6 +478,7 @@ def hit_to_preparation_document(hit: Any, category: str, *, project_id: Any = No
                 "storage_key",
                 "s3_key",
                 "s3_url",
+                "source",
                 "file_name",
                 "source_filename",
                 "page",
