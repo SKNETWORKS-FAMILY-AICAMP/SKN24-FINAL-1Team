@@ -13,6 +13,24 @@ from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, 
 from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, SpeakerMappingSerializer
 
 
+def _minutes_payload(meeting, text):
+    return {
+        "text": text,
+        "meeting_id": str(meeting.meeting_id),
+        "project_id": str(meeting.project_id),
+        "title": meeting.title or "",
+        "meeting_datetime": str(meeting.meeting_at or ""),
+        "location": meeting.location or "",
+    }
+
+
+def _minutes_result(data):
+    if not isinstance(data, dict):
+        return {}
+    result = data.get("result")
+    return result if isinstance(result, dict) else data
+
+
 # ── 회의 목록 / 생성 ─────────────────────────────────────────────
 @api_view(["GET", "POST"])
 def meeting_list(request):
@@ -170,9 +188,13 @@ def end_meeting(request, meeting_id):
             with open(os.path.join(txt_dir, f"meeting-{meeting_id}.txt"), "w", encoding="utf-8") as f:
                 f.write(full_text)
 
-            minutes_resp = requests.post(f"{base_url}/generate", json={"text": full_text}, timeout=300)
+            minutes_resp = requests.post(
+                f"{base_url}/generate-minutes",
+                json=_minutes_payload(meeting, full_text),
+                timeout=300,
+            )
             minutes_resp.raise_for_status()
-            minutes_data = minutes_resp.json()
+            minutes_data = _minutes_result(minutes_resp.json())
 
             meeting.meeting_document = minutes_data.get("content", "")
             meeting.save()
@@ -432,9 +454,13 @@ def generate_minutes(request, meeting_id):
 
     base_url = settings.RUNPOD_BASE_URL
     try:
-        response = requests.post(f"{base_url}/generate", json={"text": record.record_row_text}, timeout=300)
+        response = requests.post(
+            f"{base_url}/generate-minutes",
+            json=_minutes_payload(meeting, record.record_row_text),
+            timeout=300,
+        )
         response.raise_for_status()
-        data = response.json()
+        data = _minutes_result(response.json())
     except requests.RequestException as e:
         return Response({"error": f"RunPod 연결 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
