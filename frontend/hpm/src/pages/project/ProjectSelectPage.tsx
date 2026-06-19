@@ -14,7 +14,6 @@ interface Project {
 
 export default function ProjectSelectPage() {
   const navigate = useNavigate();
-
   const { user, selectProject, } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);

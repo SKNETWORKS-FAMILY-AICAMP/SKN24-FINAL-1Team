@@ -13,7 +13,6 @@ class Chatbot(models.Model):
         "meetings.MeetingUsers",
         on_delete=models.CASCADE,
         db_column="meeting_users_id",
-        null= True, blank=True,
         verbose_name="회의 참여자"
     )
 
