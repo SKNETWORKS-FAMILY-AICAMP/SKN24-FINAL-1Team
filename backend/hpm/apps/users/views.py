@@ -14,6 +14,10 @@ from django.utils import timezone
 from datetime import timedelta
 from django.http import HttpResponse
 
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
 JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET", "")
@@ -24,8 +28,19 @@ JIRA_SCOPES = "read:jira-work write:jira-work"
 def _hash_pw(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
+def get_tokens_for_user(user):
+    refresh = RefreshToken()
+    refresh['user_id'] = user.users_id
+    refresh['email'] = user.email
+    refresh['name'] = user.name
+    return {
+        'refresh' : str(refresh),
+        'access' : str(refresh.access_token),
+    }
+
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def login(request):
     """아이디(이메일) + 비밀번호 로그인 (JWT 없이 user_id 반환)"""
     email = request.data.get("email", "")
@@ -48,7 +63,9 @@ def login(request):
 
     data = UserSerializer(user).data
     data["is_initial_password"] = (user.password == "abc123")
-    return Response(data)
+    tokens = get_tokens_for_user(user)
+    data.update(tokens)
+    return  Response(data)
 
 
 @api_view(["GET"])
@@ -84,6 +101,7 @@ def user_detail(request, users_id):
 # ── Step 1: Jira 로그인 시작 ───────────────────────────────────────────────
 # GET /api/jira/start/
 # 세션에서 user_id를 읽어서 Atlassian 로그인 페이지로 리다이렉트
+@permission_classes([AllowAny])
 def jira_oauth_start(request):
     user_id = request.GET.get("user_id")
     if not user_id:
@@ -105,6 +123,7 @@ def jira_oauth_start(request):
 # ── Step 2: Jira 로그인 콜백 ──────────────────────────────────────────────
 # GET /api/jira/callback/?code=...&state=user_id
 # Atlassian이 인증 후 이 URL로 code를 보내줌
+@permission_classes([AllowAny])
 def jira_oauth_callback(request):
     code = request.GET.get("code")
     user_id = request.GET.get("state")  # start에서 넣었던 user_id
@@ -204,13 +223,10 @@ def get_valid_access_token(user: Users) -> str | None:
 
 
 # ── Jira 연동 상태 확인 ───────────────────────────────────────────────────
-# GET /api/jira/status/
-# 세션에서 user_id를 읽어서 Jira 연동 상태 반환
+
 @api_view(["GET"])
 def jira_oauth_status(request):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+    user_id = request.auth['user_id']
 
     try:
         user = Users.objects.get(users_id=user_id)
@@ -226,9 +242,7 @@ def jira_oauth_status(request):
 # GET /api/jira/projects/
 @api_view(["GET"])
 def jira_projects(request):
-    user_id = request.query_params.get("user_id")
-    if not user_id:
-        return Response({"error": "user_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+    user_id = request.auth['user_id']
 
     try:
         user = Users.objects.get(users_id=user_id)

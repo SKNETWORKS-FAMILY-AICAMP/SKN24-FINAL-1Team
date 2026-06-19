@@ -48,18 +48,21 @@ def meeting_list(request):
     except Exception:
         return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
+
+    user_id = request.auth['user_id']
+    creator = Users.objects.get(pk=user_id)
     meeting = Meeting.objects.create(
         project=project,
         title=data.get("title", ""),
         location=data.get("location", ""),
         meeting_at=data.get("meeting_at"),
-        # end_at 제거 (모델에 없음)
         status=Meeting.STATUS_SCHEDULED,
+        creator = creator,
     )
 
-    for user_id in data.get("participants", []):
+    for participant_id in data.get("participants", []):
         try:
-            MeetingUsers.objects.create(meeting=meeting, user=Users.objects.get(pk=user_id))
+            MeetingUsers.objects.create(meeting=meeting, user=Users.objects.get(pk=participant_id))
         except Users.DoesNotExist:
             pass
 

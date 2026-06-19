@@ -12,7 +12,7 @@ from .serializers import ChatHistorySerializer
 def chat(request, meeting_id):
     """실시간 챗봇 질의"""
     question = request.data.get("question", "").strip()
-    user_id  = request.data.get("user_id")
+    user_id  = request.auth["user_id"]
 
     if len(question) < 2:
         return Response({"error": "2자 이상 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
@@ -25,9 +25,7 @@ def chat(request, meeting_id):
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     # 챗봇 세션 가져오기 / 생성
-    meeting_user = None
-    if user_id:
-        meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
+    meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
 
     chatbot, _ = Chatbot.objects.get_or_create(
         meeting=meeting,
@@ -63,15 +61,13 @@ def chat(request, meeting_id):
 @api_view(["GET"])
 def chat_history(request, meeting_id):
     """챗봇 질의·답변 내역 조회 (회의 종료 후)"""
-    user_id = request.query_params.get("user_id")
+    user_id = request.auth["user_id"]
     try:
         meeting = Meeting.objects.get(meeting_id=meeting_id)
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    meeting_user = None
-    if user_id:
-        meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
+    meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
 
     chatbot = Chatbot.objects.filter(meeting=meeting, meeting_users=meeting_user).first()
     if not chatbot:

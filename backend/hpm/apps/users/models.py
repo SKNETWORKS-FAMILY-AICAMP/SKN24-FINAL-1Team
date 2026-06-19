@@ -45,7 +45,13 @@ class Users(models.Model):
     jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Jira 토큰 만료 일시")
     jira_cloud_id = models.CharField(max_length=255, null=True, blank=True, verbose_name="Jira 클라우드 ID")
 
+    @property
+    def is_authenticated(self):
+        return True
+
+
     class Meta:
         verbose_name="유저"
         verbose_name_plural = "유저"
         db_table = "users"
+
