@@ -2,8 +2,8 @@ from django.db import models
 
 
 class Dept(models.Model):
-    dept_id = models.AutoField(primary_key=True)
-    dept_name = models.CharField(max_length=20)
+    dept_id = models.AutoField(primary_key=True, verbose_name="부서 식별 번호")
+    dept_name = models.CharField(max_length=20, verbose_name="부서명")
 
     class Meta:
         verbose_name="부서"
@@ -12,8 +12,8 @@ class Dept(models.Model):
 
 
 class Rank(models.Model):
-    rank_id = models.AutoField(primary_key=True)
-    rank_name = models.CharField(max_length=20)
+    rank_id = models.AutoField(primary_key=True, verbose_name="직급 식별 번호")
+    rank_name = models.CharField(max_length=20, verbose_name="직급명")
 
     class Meta:
         verbose_name="직급"
@@ -22,7 +22,7 @@ class Rank(models.Model):
 
 
 class Users(models.Model):
-    users_id = models.AutoField(primary_key=True)
+    users_id = models.AutoField(primary_key=True, verbose_name="유저 식별 번호")
     dept = models.ForeignKey(Dept, on_delete=models.PROTECT, db_column="dept_id", verbose_name="부서")
     rank = models.ForeignKey(Rank, on_delete=models.PROTECT, db_column="rank_id", verbose_name="직급")
 
@@ -37,17 +37,15 @@ class Users(models.Model):
     account_id = models.CharField(max_length=255, null=True, blank=True, db_column="account_Id", verbose_name="아이디")
     role = models.CharField(max_length=20, default="USER", verbose_name="관리자/사용자")
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="계정 생성 일시")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="계정 수정 일시")
 
-    jira_access_token = models.TextField(null=True, blank=True, verbose_name=" Jira API ")
-    jira_refresh_token = models.TextField(null=True, blank=True, verbose_name="access_token 재발급 필요 여부")
-    jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="만료 여부")
-    jira_cloud_id = models.CharField(max_length=255, null=True, blank=True, verbose_name="")
+    jira_access_token = models.TextField(null=True, blank=True, verbose_name="Jira 액세스 토큰")
+    jira_refresh_token = models.TextField(null=True, blank=True, verbose_name="Jira 리프레시 토큰")
+    jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Jira 토큰 만료 일시")
+    jira_cloud_id = models.CharField(max_length=255, null=True, blank=True, verbose_name="Jira 클라우드 ID")
 
     class Meta:
         verbose_name="유저"
         verbose_name_plural = "유저"
         db_table = "users"
-
-print("USER MODEL OK")

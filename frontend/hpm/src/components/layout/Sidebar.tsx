@@ -17,7 +17,9 @@ interface Project {
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, projectId, projectName, selectProject, logout } = useAuth();
+
+  const { user, projectId, selectProject, logout } = useAuth();
+
 
   const [projectOpen, setProjectOpen] = useState(false);
   const [meetingOpen, setMeetingOpen] = useState(true);

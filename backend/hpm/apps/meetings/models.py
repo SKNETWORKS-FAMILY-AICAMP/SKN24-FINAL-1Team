@@ -13,116 +13,126 @@ class Meeting(models.Model):
     ]
 
     MINUTES_DRAFT     = "draft"
+    MINUTES_BEFORE_REVIEW = "before_review"
     MINUTES_REVIEWING = "reviewing"
     MINUTES_APPROVED  = "approved"
     MINUTES_REJECTED  = "rejected"
+    MINUTES_COMPLETED = "completed"
     MINUTES_CHOICES = [
         (MINUTES_DRAFT,     "초안"),
+        (MINUTES_BEFORE_REVIEW, "검토 전"),
         (MINUTES_REVIEWING, "검토중"),
         (MINUTES_APPROVED,  "승인"),
         (MINUTES_REJECTED,  "거절"),
+        (MINUTES_COMPLETED, "완료")
     ]
 
-    meeting_id = models.AutoField(primary_key=True)
+    meeting_id = models.AutoField(primary_key=True, verbose_name="회의 식별 번호")
     project = models.ForeignKey(
-        "projects.Project", on_delete=models.CASCADE, db_column="project_id"
+        "projects.Project", on_delete=models.CASCADE, db_column="project_id", verbose_name="프로젝트"
     )
     creator = models.ForeignKey(
         Users, on_delete=models.PROTECT, db_column="creator_id",
-        related_name="created_meetings", null=True, blank=True
+        related_name="created_meetings", null=True, blank=True, verbose_name="회의 생성자"
     )
 
-    title         = models.CharField(max_length=90)
-    location      = models.CharField(max_length=150, blank=True)
-    meeting_at    = models.DateTimeField()
-    end_at        = models.DateTimeField(null=True, blank=True)
-    meeting_document = models.TextField(null=True, blank=True)
+    title         = models.CharField(max_length=90, verbose_name="회의 주제")
+    location      = models.CharField(max_length=150, blank=True, verbose_name="회의 장소")
+    meeting_at    = models.DateTimeField(verbose_name="회의 일시")
+    end_at        = models.DateTimeField(null=True, blank=True, verbose_name="회의 종료 일시")
+    meeting_document = models.TextField(null=True, blank=True, verbose_name="회의록")
 
     # 기존 is_meeting 유지 + 새 status 추가
-    is_meeting     = models.BooleanField(default=False)
-    status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SCHEDULED)
-    minutes_status = models.CharField(max_length=20, choices=MINUTES_CHOICES, null=True, blank=True)
-    special_note   = models.TextField(null=True, blank=True)
+    is_meeting     = models.BooleanField(default=False, verbose_name="회의 진행 여부")
+    status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, verbose_name="회의 상태")
+    minutes_status = models.CharField(max_length=20, choices=MINUTES_CHOICES, null=True, blank=True, verbose_name="회의록 승인 상태")
+    special_note   = models.TextField(null=True, blank=True, verbose_name="특이 사항")
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 일시")
 
     class Meta:
         db_table = "meeting"
 
 
 class Record(models.Model):
-    record_id       = models.AutoField(primary_key=True)
-    meeting         = models.OneToOneField(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
-    record_path     = models.TextField(null=True, blank=True)
-    record_row_text = models.TextField(null=True, blank=True)
+    record_id       = models.AutoField(primary_key=True, verbose_name="녹음 식별 번호")
+    meeting         = models.OneToOneField(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
+    record_path     = models.TextField(null=True, blank=True, verbose_name="녹음 파일 경로")
+    record_row_text = models.TextField(null=True, blank=True, verbose_name="녹음 원본 텍스트")
 
     class Meta:
         db_table = "record"
 
 
 class MeetingUsers(models.Model):
-    meeting_users_id = models.AutoField(primary_key=True)
-    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
-    user    = models.ForeignKey(Users,   on_delete=models.CASCADE, db_column="user_id")
+    meeting_users_id = models.AutoField(primary_key=True, verbose_name="회의 참여자 식별 번호")
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
+    user    = models.ForeignKey(Users,   on_delete=models.CASCADE, db_column="user_id", verbose_name="참여자")
 
     class Meta:
         db_table = "meeting_users"
 
 
 class MeetingAgendas(models.Model):
-    agenda_id = models.AutoField(primary_key=True)
-    meeting   = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
-    content   = models.TextField()
-    reason    = models.TextField(null=True, blank=True)
-    is_confirmed = models.BooleanField(default=False)
+    agenda_id = models.AutoField(primary_key=True, verbose_name="안건 식별 번호")
+    meeting   = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의 식별 번호")
+    content   = models.TextField(verbose_name="안건 내용")
+    reason    = models.TextField(null=True, blank=True, verbose_name="안건 사유")
+    is_confirmed = models.BooleanField(default=False, verbose_name="안건 확정 여부")
 
     class Meta:
         db_table = "meeting_agendas"
 
 
 class MeetingPreparation(models.Model):
-    meeting  = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
-    document = models.TextField()
+    meeting  = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
+    document = models.TextField(verbose_name="준비 자료 내용")
 
     class Meta:
         db_table = "meeting_preparation"
 
 
 class OuterDocument(models.Model):
-    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
-    path    = models.TextField()
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의 식별 번호")
+    path    = models.TextField(verbose_name="OCR 파일 경로")
 
     class Meta:
         db_table = "outer_document"
 
 
 class MeetingTask(models.Model):
-    meeting_task_id = models.AutoField(primary_key=True)
-    meeting         = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id")
+    meeting_task_id = models.AutoField(primary_key=True, verbose_name="태스크 식별 번호")
+    meeting         = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
     meeting_users   = models.ForeignKey(
         MeetingUsers, on_delete=models.CASCADE, db_column="meeting_users_id",
-        null=True, blank=True
+        null=True, blank=True, verbose_name="담당자"
     )
-    title    = models.CharField(max_length=255)
-    content  = models.TextField(blank=True)
-    owner    = models.CharField(max_length=90, blank=True)  # 이름 직접 저장
-    due_date = models.DateField(null=True, blank=True)
-    priority = models.CharField(max_length=20, blank=True)  # High/Medium/Low/Lowest
-    status   = models.IntegerField(default=0)               # 0=미완료, 1=진행중, 2=완료
-    jira_key = models.CharField(max_length=100, null=True, blank=True)
-    is_jira_synced = models.BooleanField(default=False)
+    title    = models.CharField(max_length=255, verbose_name="업무 제목")
+    content  = models.TextField(blank=True, verbose_name="업무 내용")
+    owner    = models.CharField(max_length=90, blank=True, verbose_name="담당자 이름")
+    due_date = models.DateField(null=True, blank=True, verbose_name="업무 마감 기한")
+    priority = models.CharField(max_length=20, blank=True, verbose_name="업무 우선순위(High/Medium/Low/Lowest)")
+    status   = models.IntegerField(default=0, verbose_name="업무 상태(0=미완료, 1=진행중, 2=완료)")
+    jira_key = models.CharField(max_length=100, null=True, blank=True, verbose_name="Jira 이슈 키")
+    is_jira_synced = models.BooleanField(default=False, verbose_name="Jira 등록 여부")
 
     class Meta:
         db_table = "meeting_task"
 
 class SpeakerMapping(models.Model):
-    meeting = models.ForeignKey(
-        Meeting, on_delete = models.CASCADE, db_column = "meeting_id"
+    meeting       = models.ForeignKey(
+        Meeting,
+        on_delete=models.CASCADE,
+        db_column="meeting_id",
+        verbose_name="회의"
     )
-    speaker_label = models.CharField(max_length = 20)
+    speaker_label = models.CharField(max_length=20, verbose_name="발화자 라벨")  # "SPEAKER_01"
     meeting_users = models.ForeignKey(
-        MeetingUsers, on_delete= models.CASCADE, db_column = "meeting_users_id"
+        MeetingUsers,
+        on_delete=models.CASCADE,
+        db_column="meeting_users_id",
+        verbose_name="실제 참여자"
     )
 
     class Meta:
-        db_table= "speaker_mapping"
+        db_table = "speaker_mapping"

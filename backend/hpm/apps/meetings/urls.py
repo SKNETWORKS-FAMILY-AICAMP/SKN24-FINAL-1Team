@@ -3,6 +3,7 @@ from . import views
 from .views import generate_agenda, meeting_stream, speaker_mapping_list, speaker_mapping_delete
 from .views import meeting_stream 
 
+
 urlpatterns = [
     # 회의 목록 / 생성
     path("", views.meeting_list),
@@ -17,10 +18,6 @@ urlpatterns = [
     # 기초 안건
     path("<int:meeting_id>/agenda/", views.agenda_list),
     path("<int:meeting_id>/agenda/confirm/", views.confirm_agenda),
-    # 회의록 승인 플로우
-    path("<int:meeting_id>/minutes/request/", views.request_minutes_approval),
-    path("<int:meeting_id>/minutes/approve/", views.approve_minutes),
-    path("<int:meeting_id>/minutes/reject/", views.reject_minutes),
     # 태스크
     path("<int:meeting_id>/tasks/", views.task_list),
     path("<int:meeting_id>/tasks/<int:task_id>/", views.task_detail),
@@ -34,4 +31,5 @@ urlpatterns = [
     path("<int:meeting_id>/speakers/", speaker_mapping_list),
     path("<int:meeting_id>/speakers/<int:mapping_id>/", speaker_mapping_delete),
 
+    path("<int:meeting_id>/minutes/complete/", views.complete_minutes_review),
 ]

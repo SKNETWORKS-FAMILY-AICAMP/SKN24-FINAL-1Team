@@ -8,7 +8,7 @@ import torch
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 
-from config import (
+from config import (    
     STT_BATCH_SIZE,
     STT_COMPUTE_TYPE,
     STT_DEVICE,

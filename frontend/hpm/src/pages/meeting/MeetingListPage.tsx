@@ -11,7 +11,9 @@ const STATUS_MAP = {
 
 export default function MeetingListPage() {
   const navigate = useNavigate();
-  const { projectId, user } = useAuth();
+
+  const { projectId, } = useAuth();
+
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

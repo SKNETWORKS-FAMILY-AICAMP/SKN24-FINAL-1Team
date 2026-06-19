@@ -6,6 +6,7 @@ import json
 from django.http import StreamingHttpResponse
 from django.utils.timezone import now
 
+
 from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -15,6 +16,7 @@ from apps.notifications.models import Notification
 from apps.users.models import Users
 from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record,SpeakerMapping
 from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, SpeakerMappingSerializer
+
 
 PRIORITY_MAP = {"High": 1, "Medium": 2, "Low": 3, "Lowest": 4}
 
@@ -120,12 +122,14 @@ def start_meeting(request, meeting_id):
     meeting.save()
     Record.objects.create(meeting=meeting)
 
+
     r = redis.Redis(host='localhost', port=6379)
     r.publish(f"meeting:{meeting_id}", json.dumps({
         "event" : "meeting_started",
         "meeting_id" : meeting_id,
         "status" : "회의 진행 중"
     }, ensure_ascii=False))
+
 
     return Response({"message": "회의가 시작되었습니다.", "meeting_id": meeting_id})
 
@@ -166,6 +170,7 @@ def end_meeting(request, meeting_id):
             full_text = stt_res.text
 
             record = Record.objects.get(meeting=meeting)
+
             if record:
                 record.record_path = file_path
                 record.record_row_text = full_text
@@ -174,6 +179,7 @@ def end_meeting(request, meeting_id):
                 os.makedirs(txt_dir, exist_ok=True)
                 with open(os.path.join(txt_dir, f"meeting-{meeting_id}.txt"), "w", encoding="utf-8") as f:
                     f.write(full_text)
+
 
             minutes_resp = requests.post(f"{base_url}/generate-minutes", json={
                 "text": full_text,
@@ -210,59 +216,6 @@ def _create_tasks_from_todo(meeting, todo_list):
         )
 
 
-# ── 회의록 승인 플로우 ───────────────────────────────────────────
-@api_view(["POST"])
-def request_minutes_approval(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    if meeting.minutes_status not in [None, Meeting.MINUTES_DRAFT, Meeting.MINUTES_REJECTED]:
-        return Response({"error": "승인 요청 불가 상태입니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    meeting.minutes_status = Meeting.MINUTES_REVIEWING
-    meeting.save()
-
-    try:
-        creator = meeting.project.project_owner
-        Notification.objects.create(user=creator, content=f"[{meeting.title}] 회의록 확정 승인 요청이 있습니다.", is_read=False)
-    except Exception:
-        pass
-
-    return Response({"message": "승인 요청이 전송되었습니다.", "minutes_status": "reviewing"})
-
-
-@api_view(["POST"])
-def approve_minutes(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    if meeting.minutes_status != Meeting.MINUTES_REVIEWING:
-        return Response({"error": "검토 중 상태가 아닙니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    meeting.minutes_status = Meeting.MINUTES_APPROVED
-    meeting.save()
-    _notify_meeting_users(meeting, f"[{meeting.title}] 회의록이 승인되었습니다.")
-    return Response({"message": "회의록이 승인되었습니다.", "minutes_status": "approved"})
-
-
-@api_view(["POST"])
-def reject_minutes(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    if meeting.minutes_status != Meeting.MINUTES_REVIEWING:
-        return Response({"error": "검토 중 상태가 아닙니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    meeting.minutes_status = Meeting.MINUTES_REJECTED
-    meeting.save()
-    _notify_meeting_users(meeting, f"[{meeting.title}] 회의록 승인이 거절되었습니다. 수정 후 재요청해 주세요.")
-    return Response({"message": "회의록 승인이 거절되었습니다.", "minutes_status": "rejected"})
 
 
 def _notify_meeting_users(meeting, content):
@@ -364,6 +317,7 @@ def generate_minutes(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
+
     record = Record.objects.get(meeting=meeting)
     if not record or not record.record_row_text:
         return Response({"error": "변환된 텍스트가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -385,6 +339,7 @@ def generate_minutes(request, meeting_id):
             "meeting_datetime" : str(meeting.meeting_at),
             "location" : meeting.location,
             }, timeout=300)
+        
         response.raise_for_status()
         data = response.json()
     except requests.RequestException as e:
@@ -398,6 +353,7 @@ def generate_minutes(request, meeting_id):
 
     return Response({"message": "회의록 및 태스크 생성이 완료되었습니다.", "meeting_id": meeting_id,
         "content": result.get("content", ""), "todo_list": result.get("todo_list", [])})
+
 
 # ── OCR + 기초 안건 생성 ───────────────────────────────────────────
 @api_view(["POST"])
@@ -501,3 +457,15 @@ def speaker_mapping_delete(request, meeting_id, mapping_id):
         return Response({"error": "매핑을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
     mapping.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["PATCH"])
+def complete_minutes_review(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=404)
+    
+    meeting.minutes_status = Meeting.MINUTES_COMPLETED
+    meeting.save()
+    return Response({"minutes_status": meeting.minutes_status})
