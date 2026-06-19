@@ -69,9 +69,12 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"                      # 내 컴퓨터 80 → 컨테이너 80
-                                     # 사용자는 http://localhost 로 접속
+      - "443:443"
     depends_on:
       - backend                      # backend 뜬 다음에 frontend 시작
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # ← 인증서 마운트 추가
 
 
 # # ── 볼륨 ──────────────────────────────────────────────────────
