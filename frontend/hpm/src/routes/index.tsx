@@ -9,6 +9,7 @@ import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
 import MeetingDetailPage from "../pages/meeting/MeetingDetailPage";
 import MeetingMinutesPage from "../pages/meeting/MeetingMinutesPage";
 import JiraTaskPage from "../pages/meeting/JiraTaskPage";
+import UserManagementPage from "../pages/admin/UserManagementPage";
 
 const router = createBrowserRouter([
   // 인증 없는 페이지
@@ -32,6 +33,8 @@ const router = createBrowserRouter([
       { path: "/members", element: <MeetingListPage /> },
     ],
   },
+  // 관리자 페이지 (사이드바 없음)
+  { path: "/admin/users", element: <UserManagementPage /> },
 ]);
 
 export default router;
