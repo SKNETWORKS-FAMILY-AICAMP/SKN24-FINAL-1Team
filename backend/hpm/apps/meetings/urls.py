@@ -1,8 +1,6 @@
 from django.urls import path
 from . import views
-from .views import generate_agenda, meeting_stream, speaker_mapping_list, speaker_mapping_delete
-from .views import meeting_stream 
-
+from .views import generate_agenda
 
 urlpatterns = [
     # 회의 목록 / 생성
@@ -18,6 +16,8 @@ urlpatterns = [
     # 기초 안건
     path("<int:meeting_id>/agenda/", views.agenda_list),
     path("<int:meeting_id>/agenda/confirm/", views.confirm_agenda),
+    # 회의록 승인 플로우
+    path("<int:meeting_id>/minutes/complete/", views.complete_minutes_review),
     # 태스크
     path("<int:meeting_id>/tasks/", views.task_list),
     path("<int:meeting_id>/tasks/<int:task_id>/", views.task_detail),
@@ -25,11 +25,6 @@ urlpatterns = [
     path("<int:meeting_id>/jira/", views.register_jira_tasks),
     # 안건생성
     path("<int:meeting_id>/agenda/generate/", generate_agenda),
-
-    path("<int:meeting_id>/stream/",meeting_stream),
-
-    path("<int:meeting_id>/speakers/", speaker_mapping_list),
-    path("<int:meeting_id>/speakers/<int:mapping_id>/", speaker_mapping_delete),
-
-    path("<int:meeting_id>/minutes/complete/", views.complete_minutes_review),
+    # speaker_mapping_list
+    path("<int:meeting_id>/speaker-mapping/", views.speaker_mapping_list),
 ]

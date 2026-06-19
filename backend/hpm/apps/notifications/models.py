@@ -3,7 +3,6 @@ from apps.users.models import Users
 
 
 class Notification(models.Model):
-
     notification_id = models.AutoField(primary_key=True, verbose_name="알림 식별 번호")
     user = models.ForeignKey(Users, on_delete=models.CASCADE, db_column="user_id", verbose_name="알림 수신자 식별 번호")
     content = models.TextField(verbose_name="알림 내용")

@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Chatbot(models.Model):
     chatbot_id = models.AutoField(primary_key=True, verbose_name="챗봇 식별 번호")
     meeting = models.ForeignKey(
@@ -20,7 +21,6 @@ class Chatbot(models.Model):
 
 
 class ChatHistory(models.Model):
-
     chat_history_id = models.AutoField(primary_key=True, verbose_name="챗봇 내역 식별 번호")
     chat = models.ForeignKey(Chatbot, on_delete=models.CASCADE, db_column="chat_id", verbose_name="챗봇 식별 번호")
     type = models.IntegerField(verbose_name="유형(1:질문, 2:답변)")

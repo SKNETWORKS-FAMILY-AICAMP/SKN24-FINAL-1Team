@@ -13,18 +13,11 @@ class Meeting(models.Model):
     ]
 
     MINUTES_DRAFT     = "draft"
-    MINUTES_BEFORE_REVIEW = "before_review"
-    MINUTES_REVIEWING = "reviewing"
     MINUTES_APPROVED  = "approved"
-    MINUTES_REJECTED  = "rejected"
-    MINUTES_COMPLETED = "completed"
     MINUTES_CHOICES = [
-        (MINUTES_DRAFT,     "초안"),
-        (MINUTES_BEFORE_REVIEW, "검토 전"),
-        (MINUTES_REVIEWING, "검토중"),
-        (MINUTES_APPROVED,  "승인"),
-        (MINUTES_REJECTED,  "거절"),
-        (MINUTES_COMPLETED, "완료")
+        (MINUTES_DRAFT,     "검토 전"),      # 회의 종료 직후
+        (MINUTES_APPROVED,  "검토 완료")     # 본인이 검토 완료 누름
+
     ]
 
     meeting_id = models.AutoField(primary_key=True, verbose_name="회의 식별 번호")
@@ -39,14 +32,12 @@ class Meeting(models.Model):
     title         = models.CharField(max_length=90, verbose_name="회의 주제")
     location      = models.CharField(max_length=150, blank=True, verbose_name="회의 장소")
     meeting_at    = models.DateTimeField(verbose_name="회의 일시")
-    end_at        = models.DateTimeField(null=True, blank=True, verbose_name="회의 종료 일시")
     meeting_document = models.TextField(null=True, blank=True, verbose_name="회의록")
 
     # 기존 is_meeting 유지 + 새 status 추가
     is_meeting     = models.BooleanField(default=False, verbose_name="회의 진행 여부")
     status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_SCHEDULED, verbose_name="회의 상태")
     minutes_status = models.CharField(max_length=20, choices=MINUTES_CHOICES, null=True, blank=True, verbose_name="회의록 승인 상태")
-    special_note   = models.TextField(null=True, blank=True, verbose_name="특이 사항")
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 일시")
 
@@ -55,9 +46,7 @@ class Meeting(models.Model):
 
 
 class Record(models.Model):
-    record_id       = models.AutoField(primary_key=True, verbose_name="녹음 식별 번호")
-    meeting         = models.OneToOneField(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
-    record_path     = models.TextField(null=True, blank=True, verbose_name="녹음 파일 경로")
+    meeting         = models.OneToOneField(Meeting, on_delete=models.CASCADE, db_column="meeting_id", primary_key=True, verbose_name="회의")
     record_row_text = models.TextField(null=True, blank=True, verbose_name="녹음 원본 텍스트")
 
     class Meta:
@@ -77,8 +66,6 @@ class MeetingAgendas(models.Model):
     agenda_id = models.AutoField(primary_key=True, verbose_name="안건 식별 번호")
     meeting   = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의 식별 번호")
     content   = models.TextField(verbose_name="안건 내용")
-    reason    = models.TextField(null=True, blank=True, verbose_name="안건 사유")
-    is_confirmed = models.BooleanField(default=False, verbose_name="안건 확정 여부")
 
     class Meta:
         db_table = "meeting_agendas"
@@ -103,17 +90,18 @@ class OuterDocument(models.Model):
 class MeetingTask(models.Model):
     meeting_task_id = models.AutoField(primary_key=True, verbose_name="태스크 식별 번호")
     meeting         = models.ForeignKey(Meeting, on_delete=models.CASCADE, db_column="meeting_id", verbose_name="회의")
-    meeting_users   = models.ForeignKey(
-        MeetingUsers, on_delete=models.CASCADE, db_column="meeting_users_id",
-        null=True, blank=True, verbose_name="담당자"
-    )
     title    = models.CharField(max_length=255, verbose_name="업무 제목")
     content  = models.TextField(blank=True, verbose_name="업무 내용")
-    owner    = models.CharField(max_length=90, blank=True, verbose_name="담당자 이름")
+    meeting_users   = models.ForeignKey(
+        MeetingUsers,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        db_column="meeting_users_id",
+        verbose_name="담당자"
+    )
     due_date = models.DateField(null=True, blank=True, verbose_name="업무 마감 기한")
-    priority = models.CharField(max_length=20, blank=True, verbose_name="업무 우선순위(High/Medium/Low/Lowest)")
+    priority = models.CharField(max_length=20, blank=True, verbose_name="업무 우선순위(# High/Medium/Low/Lowest)")
     status   = models.IntegerField(default=0, verbose_name="업무 상태(0=미완료, 1=진행중, 2=완료)")
-    jira_key = models.CharField(max_length=100, null=True, blank=True, verbose_name="Jira 이슈 키")
     is_jira_synced = models.BooleanField(default=False, verbose_name="Jira 등록 여부")
 
     class Meta:
