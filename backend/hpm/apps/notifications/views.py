@@ -8,10 +8,9 @@ from .serializers import NotificationSerializer
 @api_view(["GET"])
 def notification_list(request):
     """로그인 사용자 알림 목록 (user_id 쿼리파라미터로 필터)"""
-    user_id = request.query_params.get("user_id")
-    qs = Notification.objects.all().order_by("-notification_id")
-    if user_id:
-        qs = qs.filter(user_id=user_id)
+    user_id = request.auth['user_id']
+    qs = Notification.objects.filter(user_id = user_id).order_by("-notification_id")
+
     return Response(NotificationSerializer(qs, many=True).data)
 
 
@@ -41,9 +40,7 @@ def notification_delete(request, notification_id):
 @api_view(["DELETE"])
 def notification_delete_all(request):
     """전체 삭제 (user_id 쿼리파라미터)"""
-    user_id = request.query_params.get("user_id")
-    qs = Notification.objects.all()
-    if user_id:
-        qs = qs.filter(user_id=user_id)
+    user_id = request.auth['user_id']
+    qs = Notification.objects.filter(user_id = user_id)
     qs.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

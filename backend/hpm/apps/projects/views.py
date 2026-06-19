@@ -5,25 +5,24 @@ from apps.users.models import Users
 from apps.notifications.models import Notification
 from .models import Project, ProjectUsers
 from .serializers import ProjectSerializer, ProjectUsersSerializer
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
 
 
 @api_view(["GET", "POST"])
 def project_list(request):
+    user_id = request.auth['user_id']
     if request.method == "GET":
-        user_id = request.query_params.get("user_id")
-        if user_id:
-            # 생성자이거나 구성원인 프로젝트만
-            owned = Project.objects.filter(project_owner_id=user_id)
-            joined = Project.objects.filter(projectusers__user_id=user_id)
-            qs = (owned | joined).distinct().order_by("-created_at")
-        else:
-            qs = Project.objects.all().order_by("-created_at")
+        owned = Project.objects.filter(project_owner_id = user_id)
+        joined = Project.objects.filter(projectusers__user_id=user_id)
+        qs = (owned | joined).distinct().order_by("-created_at")
+
         return Response(ProjectSerializer(qs, many=True).data)
 
     # POST - 프로젝트 생성
     data = request.data
     try:
-        owner = Users.objects.get(pk=data.get("owner_id"))
+        owner = Users.objects.get(pk=user_id)
     except Users.DoesNotExist:
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 

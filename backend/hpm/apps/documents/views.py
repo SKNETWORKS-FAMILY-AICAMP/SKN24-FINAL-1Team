@@ -24,9 +24,9 @@ def document_list(request, project_id):
     if len(files) > 10:
         return Response({"error": "한 번에 최대 10개까지 업로드 가능합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    uploader_id = request.data.get("uploader_id")
+    user_id = request.auth["user_id"]
     try:
-        uploader = ProjectUsers.objects.get(project_id=project_id, user_id=uploader_id)
+        uploader = ProjectUsers.objects.get(project_id=project_id, user_id=user_id)
     except ProjectUsers.DoesNotExist:
         return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
 
