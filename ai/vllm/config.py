@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import importlib.util
+import re
 from pathlib import Path
 
 
@@ -68,28 +69,15 @@ PRELOAD_OCR_MODEL = os.getenv("PRELOAD_OCR_MODEL", "false").lower() == "true"
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY") or None
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "mineru_pdf_chunks_ko_sroberta")
+QDRANT_COLLECTION_PROJECT_MODE = os.getenv("QDRANT_COLLECTION_PROJECT_MODE", "true").lower() == "true"
+QDRANT_COLLECTION_PREFIX = os.getenv("QDRANT_COLLECTION_PREFIX", "hpm_project")
 EMBEDDING_MODEL_ID = os.getenv("EMBEDDING_MODEL_ID", "jhgan/ko-sroberta-multitask")
 EMBEDDING_BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
+PRELOAD_EMBEDDING_MODEL = os.getenv("PRELOAD_EMBEDDING_MODEL", "true").lower() == "true"
 
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "650"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
-CHUNK_VERSION = os.getenv("CHUNK_VERSION", "mineru_v3_650")
-CHUNK_ENCODING = os.getenv("CHUNK_ENCODING", "cl100k_base")
-CHUNK_MIN_CHARS = int(os.getenv("CHUNK_MIN_CHARS", "30"))
-CHUNK_MAX_TABLE_TOKENS = int(os.getenv("CHUNK_MAX_TABLE_TOKENS", "500"))
 CHAT_RAG_TOP_K = int(os.getenv("CHAT_RAG_TOP_K", "5"))
 CHAT_RAG_MAX_CONTEXT_CHARS = int(os.getenv("CHAT_RAG_MAX_CONTEXT_CHARS", "6000"))
-
-MINERU_BACKEND = os.getenv("MINERU_BACKEND", "hybrid-auto-engine")
-MINERU_METHOD = os.getenv("MINERU_METHOD", "auto")
-MINERU_LANG = os.getenv("MINERU_LANG", "korean")
-MINERU_FORMULA = os.getenv("MINERU_FORMULA", "true")
-MINERU_TABLE = os.getenv("MINERU_TABLE", "true")
-MINERU_TIMEOUT_SEC = int(os.getenv("MINERU_TIMEOUT_SEC", "1800"))
 PIPELINE_TIMEOUT_SEC = int(os.getenv("PIPELINE_TIMEOUT_SEC", "2400"))
-
-PARSER_SCRIPT_PATH = Path(os.getenv("PARSER_SCRIPT_PATH", str(APP_DIR / "pdf_parser.py")))
-CHUNK_SCRIPT_PATH = Path(os.getenv("CHUNK_SCRIPT_PATH", str(APP_DIR / "chunker.py")))
 
 
 def default_feature_chat_dir() -> Path:
@@ -109,3 +97,14 @@ def default_feature_chat_dir() -> Path:
 
 
 FEATURE_CHAT_DIR = Path(os.getenv("FEATURE_CHAT_DIR", str(default_feature_chat_dir())))
+
+
+def qdrant_collection_for_project(project_id: str | int | None) -> str:
+    text = str(project_id or "").strip()
+    if not QDRANT_COLLECTION_PROJECT_MODE or not text:
+        return QDRANT_COLLECTION
+    safe_project_id = re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+    if not safe_project_id:
+        return QDRANT_COLLECTION
+    safe_prefix = re.sub(r"[^A-Za-z0-9_-]+", "_", QDRANT_COLLECTION_PREFIX).strip("_")
+    return f"{safe_prefix or 'project'}_{safe_project_id}"

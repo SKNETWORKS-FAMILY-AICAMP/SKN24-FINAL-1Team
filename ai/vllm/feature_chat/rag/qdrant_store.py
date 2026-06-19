@@ -127,17 +127,69 @@ def existing_chunk_ids(client: QdrantClient, collection: str, chunk_ids: list[st
     return existing
 
 
-def make_filter(doc_id: str | None = None) -> models.Filter | None:
-    if not doc_id:
+def _match_values(value: str | int | None) -> list[str | int]:
+    if value is None:
+        return []
+    text = str(value).strip()
+    if not text:
+        return []
+    values: list[str | int] = [text]
+    if text.isdigit():
+        values.append(int(text))
+    return values
+
+
+def _match_condition(key: str, value: str | int | None) -> models.FieldCondition | None:
+    values = _match_values(value)
+    if not values:
         return None
-    return models.Filter(
-        must=[
-            models.FieldCondition(
-                key="metadata.doc_id",
-                match=models.MatchValue(value=doc_id),
-            )
-        ]
-    )
+    if len(values) == 1:
+        return models.FieldCondition(key=key, match=models.MatchValue(value=values[0]))
+    try:
+        return models.FieldCondition(key=key, match=models.MatchAny(any=values))
+    except Exception:
+        return models.FieldCondition(key=key, match=models.MatchValue(value=values[0]))
+
+
+def _match_any_condition(key: str, values: list[str] | None) -> models.FieldCondition | None:
+    clean_values = [str(value).strip() for value in values or [] if str(value).strip()]
+    if not clean_values:
+        return None
+    if len(clean_values) == 1:
+        return models.FieldCondition(key=key, match=models.MatchValue(value=clean_values[0]))
+    try:
+        return models.FieldCondition(key=key, match=models.MatchAny(any=clean_values))
+    except Exception:
+        return None
+
+
+def make_filter(
+    doc_id: str | None = None,
+    *,
+    project_id: str | int | None = None,
+    meeting_id: str | int | None = None,
+    exclude_meeting_id: str | int | None = None,
+    source_types: list[str] | None = None,
+) -> models.Filter | None:
+    must: list[Any] = []
+    must_not: list[Any] = []
+
+    for condition in [
+        _match_condition("metadata.doc_id", doc_id),
+        _match_condition("metadata.project_id", project_id),
+        _match_condition("metadata.meeting_id", meeting_id),
+        _match_any_condition("metadata.source_type", source_types),
+    ]:
+        if condition is not None:
+            must.append(condition)
+
+    exclude_condition = _match_condition("metadata.meeting_id", exclude_meeting_id)
+    if exclude_condition is not None:
+        must_not.append(exclude_condition)
+
+    if not must and not must_not:
+        return None
+    return models.Filter(must=must or None, must_not=must_not or None)
 
 
 def search_points(
@@ -146,8 +198,18 @@ def search_points(
     query_vector: list[float],
     limit: int,
     doc_id: str | None = None,
+    project_id: str | int | None = None,
+    meeting_id: str | int | None = None,
+    exclude_meeting_id: str | int | None = None,
+    source_types: list[str] | None = None,
 ) -> list[Any]:
-    query_filter = make_filter(doc_id)
+    query_filter = make_filter(
+        doc_id,
+        project_id=project_id,
+        meeting_id=meeting_id,
+        exclude_meeting_id=exclude_meeting_id,
+        source_types=source_types,
+    )
     if hasattr(client, "query_points"):
         result = client.query_points(
             collection_name=collection,

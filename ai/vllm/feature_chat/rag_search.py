@@ -11,6 +11,7 @@ import re
 import sys
 import time
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -74,8 +75,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--qdrant-api-key", default=None)
     parser.add_argument("--collection", type=str, default=None)
     parser.add_argument("--prefer-grpc", action="store_true")
-    parser.add_argument("--embedding-provider", choices=["huggingface", "openai"], default="huggingface")
-    parser.add_argument("--embedding-model", "--model", dest="embedding_model", default=DEFAULT_HF_EMBEDDING_MODEL)
+    parser.add_argument(
+        "--embedding-provider",
+        choices=["huggingface", "openai"],
+        default=os.getenv("RAG_EMBEDDING_PROVIDER") or os.getenv("EMBEDDING_PROVIDER", "huggingface"),
+    )
+    parser.add_argument(
+        "--embedding-model",
+        "--model",
+        dest="embedding_model",
+        default=os.getenv("RAG_EMBEDDING_MODEL") or os.getenv("EMBEDDING_MODEL_ID", DEFAULT_HF_EMBEDDING_MODEL),
+    )
     parser.add_argument(
         "--embedding-backend",
         choices=["sentence-transformers", "transformers"],
@@ -112,6 +122,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--preview-chars", type=int, default=700)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--skip-rerank", action="store_true")
+    parser.add_argument("--where-project-id", default=None)
+    parser.add_argument("--where-meeting-id", default=None)
+    parser.add_argument("--exclude-meeting-id", default=None)
+    parser.add_argument("--source-types", default=None)
+    parser.add_argument("--max-previous-meetings", type=int, default=int(os.getenv("RAG_MAX_PREVIOUS_MEETINGS", "5")))
+    parser.add_argument("--meeting-date-from", default=None)
+    parser.add_argument("--meeting-date-to", default=None)
+    parser.add_argument("--min-relevance-score", type=float, default=float(os.getenv("RAG_MIN_RELEVANCE_SCORE", "0")))
     parser.add_argument("--no-answer", action="store_true")
     parser.add_argument("--hide-context", action="store_true")
     parser.add_argument("--news-mode", choices=["fallback", "always", "off"], default="fallback")
@@ -377,6 +395,119 @@ def chunk_type_allowed(meta: dict[str, Any], excluded_types: set[str]) -> bool:
     return str(meta.get("chunk_type") or meta.get("block_type") or "") not in excluded_types
 
 
+def metadata_text(meta: dict[str, Any], key: str) -> str:
+    value = meta.get(key)
+    return "" if value is None else str(value).strip()
+
+
+def parse_optional_csv(value: str | None) -> set[str]:
+    return parse_csv(value or "")
+
+
+def source_type_allowed(meta: dict[str, Any], allowed_types: set[str]) -> bool:
+    if not allowed_types:
+        return True
+    aliases = {
+        "previous_meeting": "meeting_minutes",
+        "previous_meetings": "meeting_minutes",
+        "internal_documents": "internal_document",
+        "document": "internal_document",
+    }
+    normalized_allowed = {aliases.get(value, value) for value in allowed_types}
+    values = [
+        metadata_text(meta, "source_type"),
+        metadata_text(meta, "doc_type"),
+        metadata_text(meta, "document_type"),
+        metadata_text(meta, "category"),
+    ]
+    return any(aliases.get(value, value) in normalized_allowed for value in values if value)
+
+
+def recent_meeting_ids(records: list[CorpusRecord], args: argparse.Namespace) -> set[str]:
+    limit = int(getattr(args, "max_previous_meetings", 0) or 0)
+    if limit <= 0:
+        return set()
+
+    meetings: dict[str, tuple[str, str]] = {}
+    project_id = str(getattr(args, "where_project_id", "") or "").strip()
+    exclude_meeting_id = str(getattr(args, "exclude_meeting_id", "") or "").strip()
+    for record in records:
+        meta = record.metadata
+        if metadata_text(meta, "source_type") != "meeting_minutes":
+            continue
+        meeting_id = metadata_text(meta, "meeting_id")
+        if not meeting_id or (exclude_meeting_id and meeting_id == exclude_meeting_id):
+            continue
+        if project_id and metadata_text(meta, "project_id") != project_id:
+            continue
+        meeting_datetime = metadata_text(meta, "meeting_datetime")
+        title = metadata_text(meta, "meeting_topic") or metadata_text(meta, "title")
+        current = meetings.get(meeting_id)
+        if current is None or meeting_datetime > current[0]:
+            meetings[meeting_id] = (meeting_datetime, title)
+
+    ordered = sorted(meetings.items(), key=lambda item: item[1][0], reverse=True)
+    return {meeting_id for meeting_id, _ in ordered[:limit]}
+
+
+def parse_iso_date(value: str | None) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    match = re.search(r"(\d{4})[-./](\d{1,2})[-./](\d{1,2})", text)
+    if not match:
+        return None
+    try:
+        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return None
+
+
+def meeting_date_allowed(meta: dict[str, Any], args: argparse.Namespace) -> bool:
+    date_from = parse_iso_date(getattr(args, "meeting_date_from", None))
+    date_to = parse_iso_date(getattr(args, "meeting_date_to", None))
+    if date_from is None and date_to is None:
+        return True
+    if metadata_text(meta, "source_type") != "meeting_minutes":
+        return True
+    meeting_date = parse_iso_date(metadata_text(meta, "meeting_datetime"))
+    if meeting_date is None:
+        return False
+    if date_from is not None and meeting_date < date_from:
+        return False
+    if date_to is not None and meeting_date > date_to:
+        return False
+    return True
+
+
+def record_allowed(meta: dict[str, Any], args: argparse.Namespace, excluded_types: set[str]) -> bool:
+    if not source_matches(meta, getattr(args, "where_source_contains", None)):
+        return False
+    if not chunk_type_allowed(meta, excluded_types):
+        return False
+    doc_id = str(getattr(args, "where_doc_id", "") or "").strip()
+    if doc_id and metadata_text(meta, "doc_id") != doc_id:
+        return False
+    project_id = str(getattr(args, "where_project_id", "") or "").strip()
+    if project_id and metadata_text(meta, "project_id") != project_id:
+        return False
+    meeting_id = str(getattr(args, "where_meeting_id", "") or "").strip()
+    if meeting_id and metadata_text(meta, "meeting_id") != meeting_id:
+        return False
+    exclude_meeting_id = str(getattr(args, "exclude_meeting_id", "") or "").strip()
+    if exclude_meeting_id and metadata_text(meta, "meeting_id") == exclude_meeting_id:
+        return False
+    allowed_source_types = parse_optional_csv(getattr(args, "source_types", None))
+    if not source_type_allowed(meta, allowed_source_types):
+        return False
+    if not meeting_date_allowed(meta, args):
+        return False
+    allowed_meeting_ids = getattr(args, "allowed_meeting_ids", None) or set()
+    if allowed_meeting_ids and metadata_text(meta, "source_type") == "meeting_minutes":
+        return metadata_text(meta, "meeting_id") in allowed_meeting_ids
+    return True
+
+
 def normalize_context_text(text: str) -> str:
     return " ".join((text or "").split())
 
@@ -423,15 +554,17 @@ def dense_search(client: Any, collection: str, query_embedding: list[float], arg
         query_embedding,
         limit=max(args.dense_fetch_k, args.dense_k),
         doc_id=args.where_doc_id,
+        project_id=getattr(args, "where_project_id", None),
+        meeting_id=getattr(args, "where_meeting_id", None),
+        exclude_meeting_id=getattr(args, "exclude_meeting_id", None),
+        source_types=list(parse_optional_csv(getattr(args, "source_types", None))),
     )
     hits: list[SearchHit] = []
     for point in points:
         payload = getattr(point, "payload", None) or {}
         raw_meta = payload.get("metadata") if isinstance(payload, dict) else {}
         clean_meta = normalize_metadata(raw_meta if isinstance(raw_meta, dict) else {})
-        if not source_matches(clean_meta, args.where_source_contains):
-            continue
-        if not chunk_type_allowed(clean_meta, excluded_types):
+        if not record_allowed(clean_meta, args, excluded_types):
             continue
         rank = len(hits) + 1
         raw_score = getattr(point, "score", None)
@@ -449,9 +582,7 @@ def bm25_search(records: list[CorpusRecord], bm25: BM25Okapi, query: str, args: 
     candidate_indices = [
         i
         for i, record in enumerate(records)
-        if source_matches(record.metadata, args.where_source_contains)
-        and chunk_type_allowed(record.metadata, excluded_types)
-        and (not args.where_doc_id or record.metadata.get("doc_id") == args.where_doc_id)
+        if record_allowed(record.metadata, args, excluded_types)
     ]
     candidate_indices.sort(key=lambda i: float(scores[i]), reverse=True)
     hits: list[SearchHit] = []
@@ -558,6 +689,13 @@ def cohere_rerank(co_client: Any, query: str, candidates: list[SearchHit], args:
 
 def fmt_score(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.4f}"
+
+
+def hit_relevance_score(hit: SearchHit) -> float:
+    for value in [hit.rerank_score, hit.dense_score, hit.score]:
+        if value is not None:
+            return float(value)
+    return 0.0
 
 
 def build_context(hits: list[SearchHit], max_chars: int) -> str:
@@ -736,6 +874,10 @@ def print_hits(hits: list[SearchHit], preview_chars: int, hide_context: bool) ->
 def retrieve(args: argparse.Namespace, embedder: Any, client: Any, collection: str, records: list[CorpusRecord], bm25: BM25Okapi) -> list[SearchHit]:
     total_started = time.perf_counter()
     excluded_types = parse_csv(args.exclude_chunk_types)
+    args.allowed_meeting_ids = recent_meeting_ids(records, args)
+    if getattr(args, "meeting_date_from", None) or getattr(args, "meeting_date_to", None):
+        args.dense_fetch_k = max(int(args.dense_fetch_k), int(os.getenv("RAG_DATE_DENSE_FETCH_K", "200")))
+        args.dense_k = max(int(args.dense_k), int(os.getenv("RAG_DATE_DENSE_K", "80")))
     started = time.perf_counter()
     query_embedding = embedder.embed_query(args.query)
     embed_sec = time.perf_counter() - started
@@ -756,6 +898,9 @@ def retrieve(args: argparse.Namespace, embedder: Any, client: Any, collection: s
     else:
         final_candidates = rrf_hits
         rerank_sec = 0.0
+    min_relevance_score = float(getattr(args, "min_relevance_score", 0.0) or 0.0)
+    if min_relevance_score > 0:
+        final_candidates = [hit for hit in final_candidates if hit_relevance_score(hit) >= min_relevance_score]
     final_hits = final_candidates[: args.top_k]
     total_sec = time.perf_counter() - total_started
     context_chars = sum(len(normalize_context_text(hit.document)) for hit in final_hits)

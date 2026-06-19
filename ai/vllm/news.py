@@ -3,14 +3,15 @@ from __future__ import annotations
 import os
 import sys
 
+from config import FEATURE_CHAT_DIR
+
 
 def search_preparation_news(query: str) -> list[dict[str, str]]:
     if not query.strip():
         return []
 
-    from retrieval import load_feature_chat_rag
-
-    load_feature_chat_rag()
+    if str(FEATURE_CHAT_DIR) not in sys.path:
+        sys.path.insert(0, str(FEATURE_CHAT_DIR))
     from rag.naver_news import search_naver_news
 
     try:

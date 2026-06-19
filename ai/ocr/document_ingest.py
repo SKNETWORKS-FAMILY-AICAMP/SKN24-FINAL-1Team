@@ -18,7 +18,6 @@ from config import (
     CHUNK_SCRIPT_PATH,
     CHUNK_SIZE,
     CHUNK_VERSION,
-    EMBEDDING_MODEL_ID,
     MINERU_BACKEND,
     MINERU_FORMULA,
     MINERU_LANG,
@@ -29,6 +28,7 @@ from config import (
     QDRANT_API_KEY,
     QDRANT_COLLECTION,
     QDRANT_URL,
+    qdrant_collection_for_project,
 )
 from model_runtime import embed_texts, load_embedding_model
 
@@ -58,11 +58,11 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def run_parser(input_dir: Path, output_dir: Path) -> dict[str, Any]:
+def run_parser(input_dir: Path, output_dir: Path, require_cuda: bool = True) -> dict[str, Any]:
     if not PARSER_SCRIPT_PATH.exists():
         raise RuntimeError(f"Parser script was not found: {PARSER_SCRIPT_PATH}")
     started = time.perf_counter()
-    parser_module = load_script_module(PARSER_SCRIPT_PATH, "runpod_parse_pdfs_module")
+    parser_module = load_script_module(PARSER_SCRIPT_PATH, "ocr_parse_pdfs_module")
     args = parser_module.argparse.Namespace(
         input_dir=input_dir,
         output_dir=output_dir,
@@ -80,7 +80,7 @@ def run_parser(input_dir: Path, output_dir: Path) -> dict[str, Any]:
         keep_raw=False,
         timeout=MINERU_TIMEOUT_SEC,
         cuda="0",
-        require_cuda=True,
+        require_cuda=require_cuda,
         formula=MINERU_FORMULA,
         table=MINERU_TABLE,
         api_url=None,
@@ -154,7 +154,7 @@ def run_chunker(parsed_dir: Path, pdf_dir: Path, chunks_dir: Path) -> dict[str, 
     if not CHUNK_SCRIPT_PATH.exists():
         raise RuntimeError(f"Chunk script was not found: {CHUNK_SCRIPT_PATH}")
     started = time.perf_counter()
-    chunk_module = load_script_module(CHUNK_SCRIPT_PATH, "runpod_make_chunks_module")
+    chunk_module = load_script_module(CHUNK_SCRIPT_PATH, "ocr_make_chunks_module")
     args = chunk_module.argparse.Namespace(
         input=input_path,
         pdf_dir=pdf_dir,
@@ -206,49 +206,234 @@ def read_chunks_jsonl(path: Path) -> list[dict[str, Any]]:
     return chunks
 
 
+def make_text_chunks(text: str, metadata: dict[str, Any], *, chunk_size: int | None = None, overlap: int | None = None) -> list[dict[str, Any]]:
+    text = clean_text(text)
+    if not text:
+        return []
+
+    chunk_size = chunk_size or CHUNK_SIZE
+    overlap = min(overlap if overlap is not None else CHUNK_OVERLAP, max(0, chunk_size - 1))
+    chunk_version = f"text_v1_{chunk_size}"
+    source = str(metadata.get("source_path") or metadata.get("title") or metadata.get("source_filename") or "text")
+    doc_ref = str(metadata.get("document_id") or metadata.get("doc_id") or hashlib.sha1(source.encode("utf-8")).hexdigest()[:12])
+
+    try:
+        tokenizer_module = load_script_module(CHUNK_SCRIPT_PATH, "ocr_text_chunk_module")
+        tokenizer = tokenizer_module.Tokenizer(CHUNK_ENCODING)
+    except Exception:
+        tokenizer = None
+
+    def token_count(value: str) -> int:
+        if tokenizer is not None:
+            return int(tokenizer.count(value))
+        return max(1, len(value) // 2)
+
+    def split_long(value: str) -> list[str]:
+        if tokenizer is not None:
+            return tokenizer.split(value, chunk_size, overlap)
+        max_chars = max(1, chunk_size * 2)
+        overlap_chars = max(0, overlap * 2)
+        pieces: list[str] = []
+        start = 0
+        while start < len(value):
+            end = min(len(value), start + max_chars)
+            piece = value[start:end].strip()
+            if piece:
+                pieces.append(piece)
+            if end >= len(value):
+                break
+            start = max(0, end - overlap_chars)
+        return pieces
+
+    paragraphs = [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+    groups: list[str] = []
+    current = ""
+    for paragraph in paragraphs or [text]:
+        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
+        if token_count(candidate) <= chunk_size:
+            current = candidate
+            continue
+        if current:
+            groups.extend(split_long(current))
+        current = paragraph
+    if current:
+        groups.extend(split_long(current))
+
+    chunks: list[dict[str, Any]] = []
+    total = len(groups)
+    for index, chunk_text in enumerate(groups):
+        digest = hashlib.sha1(f"{doc_ref}:{index}:{chunk_text}".encode("utf-8")).hexdigest()[:10]
+        chunk_id = f"document_{doc_ref}::text_chunk_{index:07d}_{digest}"
+        chunk_metadata = {
+            **metadata,
+            "chunk_id": chunk_id,
+            "chunk_version": chunk_version,
+            "chunk_type": "text",
+            "page": 1,
+            "page_start": 1,
+            "page_end": 1,
+            "chunk_index": index,
+            "chunk_index_in_group": index + 1,
+            "chunk_count_in_group": total,
+            "chunk_seq_global": index + 1,
+            "token_count": token_count(chunk_text),
+            "char_count": len(chunk_text),
+            "parser": "text",
+        }
+        chunks.append({"chunk_id": chunk_id, "document": chunk_text, "metadata": chunk_metadata})
+    return chunks
+
+
 def qdrant_point_id(chunk_id: str) -> str:
     return str(uuid5(NAMESPACE_URL, f"hpm-mineru:{chunk_id}"))
 
 
-def upsert_chunks_to_qdrant(chunks: list[dict[str, Any]], metadata: dict[str, Any]) -> int:
+def ensure_payload_indexes(client: Any, collection_name: str) -> None:
+    from qdrant_client import models
+
+    for field_name in [
+        "metadata.source_type",
+        "metadata.project_id",
+        "metadata.document_id",
+        "metadata.doc_id",
+    ]:
+        try:
+            client.create_payload_index(
+                collection_name=collection_name,
+                field_name=field_name,
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
+        except Exception as exc:
+            message = str(exc).lower()
+            if "already exists" not in message and "already has" not in message:
+                raise
+
+
+def _int_or_none(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _first_value(data: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _canonical_chunk_payload(chunk: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
+    chunk_metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
+    combined_metadata = {
+        **metadata,
+        **chunk_metadata,
+        "chunk_id": chunk["chunk_id"],
+        "parser": "mineru",
+    }
+
+    page = _int_or_none(
+        _first_value(combined_metadata, "page", "page_no", "page_number", "page_start")
+    )
+    chunk_index = _int_or_none(_first_value(combined_metadata, "chunk_index"))
+    if chunk_index is None:
+        sequence = _int_or_none(_first_value(combined_metadata, "chunk_seq_global"))
+        group_index = _int_or_none(_first_value(combined_metadata, "chunk_index_in_group"))
+        if sequence is not None:
+            chunk_index = max(0, sequence - 1)
+        elif group_index is not None:
+            chunk_index = max(0, group_index - 1)
+
+    title = _first_value(combined_metadata, "title", "source_filename", "file_name")
+    source_path = _first_value(
+        combined_metadata,
+        "source_path",
+        "document_path",
+        "s3_uri",
+        "s3_url",
+        "storage_key",
+        "source_pdf",
+    )
+
+    canonical = {
+        "document_id": _first_value(combined_metadata, "document_id"),
+        "project_id": _first_value(combined_metadata, "project_id"),
+        "title": title,
+        "page": page,
+        "chunk_index": chunk_index,
+        "source_path": source_path,
+        "source_type": _first_value(combined_metadata, "source_type", "document_type", "doc_type"),
+        "viewer_type": _first_value(combined_metadata, "viewer_type"),
+        "viewer_id": _first_value(combined_metadata, "viewer_id", "document_id"),
+    }
+    for key, value in canonical.items():
+        if value is not None:
+            combined_metadata.setdefault(key, value)
+
+    payload = {
+        "chunk_id": chunk["chunk_id"],
+        "document": chunk["document"],
+        "content": chunk["document"],
+        "metadata": combined_metadata,
+    }
+    payload.update({key: value for key, value in canonical.items() if value is not None})
+    return payload
+
+
+def upsert_chunks_to_qdrant(
+    chunks: list[dict[str, Any]],
+    metadata: dict[str, Any],
+    qdrant_url: str | None = None,
+    qdrant_api_key: str | None = None,
+    collection: str | None = None,
+) -> int:
     if not chunks:
         return 0
     from qdrant_client import QdrantClient, models
 
     bundle = load_embedding_model()
     vectors = embed_texts([chunk["document"] for chunk in chunks])
-    client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    client = QdrantClient(url=qdrant_url or QDRANT_URL, api_key=qdrant_api_key if qdrant_api_key is not None else QDRANT_API_KEY)
+    collection_name = collection or qdrant_collection_for_project(metadata.get("project_id"))
     try:
-        exists = bool(client.collection_exists(QDRANT_COLLECTION))
+        exists = bool(client.collection_exists(collection_name))
     except AttributeError:
-        exists = QDRANT_COLLECTION in {item.name for item in client.get_collections().collections}
+        exists = collection_name in {item.name for item in client.get_collections().collections}
     if not exists:
         client.create_collection(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=collection_name,
             vectors_config=models.VectorParams(size=bundle.dimensions, distance=models.Distance.COSINE),
         )
+    ensure_payload_indexes(client, collection_name)
     points = []
     for chunk, vector in zip(chunks, vectors, strict=True):
-        payload_metadata = {
-            **metadata,
-            **(chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}),
-            "chunk_id": chunk["chunk_id"],
-            "parser": "mineru",
-        }
         points.append(
             models.PointStruct(
                 id=qdrant_point_id(chunk["chunk_id"]),
                 vector=vector,
-                payload={"chunk_id": chunk["chunk_id"], "document": chunk["document"], "metadata": payload_metadata},
+                payload=_canonical_chunk_payload(chunk, metadata),
             )
         )
-    client.upsert(collection_name=QDRANT_COLLECTION, points=points)
+    client.upsert(collection_name=collection_name, points=points)
     return len(points)
 
 
-def ingest_pdf_chunks(pdf_dir: Path, parsed_dir: Path, chunks_dir: Path, metadata: dict[str, Any]) -> dict[str, Any]:
-    parser_info = run_parser(pdf_dir, parsed_dir)
+def ingest_pdf_chunks(
+    pdf_dir: Path,
+    parsed_dir: Path,
+    chunks_dir: Path,
+    metadata: dict[str, Any],
+    *,
+    require_cuda: bool = True,
+    qdrant_url: str | None = None,
+    qdrant_api_key: str | None = None,
+    collection: str | None = None,
+) -> dict[str, Any]:
+    parser_info = run_parser(pdf_dir, parsed_dir, require_cuda=require_cuda)
     chunker_info = run_chunker(parsed_dir, pdf_dir, chunks_dir)
     chunks = read_chunks_jsonl(Path(str(chunker_info["output"])))
-    upserted = upsert_chunks_to_qdrant(chunks, metadata)
+    upserted = upsert_chunks_to_qdrant(chunks, metadata, qdrant_url=qdrant_url, qdrant_api_key=qdrant_api_key, collection=collection)
     return {"parser": parser_info, "chunker": chunker_info, "chunks": chunks, "upserted": upserted}

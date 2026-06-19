@@ -4,7 +4,7 @@ import re
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-from config import QDRANT_API_KEY, QDRANT_COLLECTION, QDRANT_URL
+from config import QDRANT_API_KEY, QDRANT_COLLECTION, QDRANT_URL, qdrant_collection_for_project
 from model_runtime import embed_texts, load_embedding_model
 
 
@@ -57,7 +57,7 @@ def point_id(chunk_id: str) -> str:
 def ensure_payload_indexes(client: Any, collection_name: str) -> None:
     from qdrant_client import models
 
-    for field_name in ["metadata.source_type", "metadata.meeting_id"]:
+    for field_name in ["metadata.source_type", "metadata.project_id", "metadata.meeting_id"]:
         try:
             client.create_payload_index(
                 collection_name=collection_name,
@@ -79,18 +79,13 @@ def base_metadata(req: Any, result: dict[str, Any]) -> dict[str, Any]:
         source = f"{source} / {meeting_datetime}"
     return {
         "source_type": "meeting_minutes",
-        "doc_type": "meeting_minutes",
         "meeting_id": str(getattr(req, "meeting_id", "") or ""),
         "project_id": str(getattr(req, "project_id", "") or ""),
         "viewer_type": "meeting_minutes",
         "viewer_id": str(getattr(req, "meeting_id", "") or ""),
         "title": title,
-        "meeting_topic": title,
         "meeting_datetime": meeting_datetime,
-        "location": getattr(req, "location", "") or minutes.get("location") or "미정",
-        "source": source,
         "source_filename": source,
-        "parser": "meeting_text",
     }
 
 
@@ -99,25 +94,50 @@ def make_chunks(req: Any, result: dict[str, Any]) -> list[dict[str, Any]]:
     meeting_id = metadata["meeting_id"] or "unknown"
     chunks: list[dict[str, Any]] = []
 
-    document = result.get("cotent") or result.get("content") or ""
-    for index, chunk_text in enumerate(split_text(str(document)), 1):
-        chunk_id = f"meeting::{meeting_id}::meeting_document::{index:04d}"
-        chunks.append(
-            {
-                "chunk_id": chunk_id,
-                "document": chunk_text,
-                "metadata": {
-                    **metadata,
+    def append_section(section_type: str, text: str) -> None:
+        for index, chunk_text in enumerate(split_text(text), 1):
+            chunk_id = f"meeting::{meeting_id}::{section_type}::{index:04d}"
+            chunks.append(
+                {
                     "chunk_id": chunk_id,
-                    "chunk_type": "meeting_document",
-                    "chunk_index_in_group": index,
-                },
-            }
+                    "document": chunk_text,
+                    "metadata": {
+                        **metadata,
+                        "chunk_type": section_type,
+                    },
+                }
+            )
+
+    summary = clean_text(str(result.get("summary") or ""))
+    if summary:
+        append_section("meeting_summary", f"회의 요약\n{summary}")
+
+    document = clean_text(str(result.get("cotent") or result.get("content") or result.get("document") or ""))
+    if document:
+        append_section("meeting_document", document)
+
+    todo_items = result.get("todo_list") if isinstance(result.get("todo_list"), list) else []
+    todo_lines: list[str] = []
+    for index, todo in enumerate(todo_items, 1):
+        if not isinstance(todo, dict):
+            continue
+        todo_lines.append(
+            "\n".join(
+                [
+                    f"{index}. {todo.get('title') or '할 일'}",
+                    f"- 담당자: {todo.get('owner') or '미정'}",
+                    f"- 마감일: {todo.get('due_date') or '미정'}",
+                    f"- 우선순위: {todo.get('priority') or '미정'}",
+                    f"- 내용: {todo.get('content') or '미정'}",
+                ]
+            )
         )
+    if todo_lines:
+        append_section("meeting_todo", "회의 할 일\n" + "\n\n".join(todo_lines))
     return chunks
 
 
-def upsert_meeting_chunks(chunks: list[dict[str, Any]]) -> int:
+def upsert_meeting_chunks(chunks: list[dict[str, Any]], *, collection_name: str | None = None) -> int:
     if not chunks:
         return 0
 
@@ -126,21 +146,25 @@ def upsert_meeting_chunks(chunks: list[dict[str, Any]]) -> int:
     bundle = load_embedding_model()
     vectors = embed_texts([chunk["document"] for chunk in chunks])
     client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+    metadata = chunks[0].get("metadata", {})
+    collection = collection_name or qdrant_collection_for_project(
+        metadata.get("project_id") if isinstance(metadata, dict) else None
+    )
     try:
-        exists = bool(client.collection_exists(QDRANT_COLLECTION))
+        exists = bool(client.collection_exists(collection))
     except AttributeError:
-        exists = QDRANT_COLLECTION in {item.name for item in client.get_collections().collections}
+        exists = collection in {item.name for item in client.get_collections().collections}
     if not exists:
         client.create_collection(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=collection,
             vectors_config=models.VectorParams(size=bundle.dimensions, distance=models.Distance.COSINE),
         )
 
-    ensure_payload_indexes(client, QDRANT_COLLECTION)
+    ensure_payload_indexes(client, collection)
     meeting_id = str(chunks[0].get("metadata", {}).get("meeting_id") or "")
     if meeting_id:
         client.delete(
-            collection_name=QDRANT_COLLECTION,
+            collection_name=collection,
             points_selector=models.FilterSelector(
                 filter=models.Filter(
                     must=[
@@ -169,16 +193,18 @@ def upsert_meeting_chunks(chunks: list[dict[str, Any]]) -> int:
         )
         for chunk, vector in zip(chunks, vectors, strict=True)
     ]
-    client.upsert(collection_name=QDRANT_COLLECTION, points=points)
+    client.upsert(collection_name=collection, points=points)
     return len(points)
 
 
 def ingest_meeting_minutes(req: Any, result: dict[str, Any]) -> dict[str, Any]:
     chunks = make_chunks(req, result)
-    upserted = upsert_meeting_chunks(chunks)
+    collection = qdrant_collection_for_project(getattr(req, "project_id", ""))
+    upserted = upsert_meeting_chunks(chunks, collection_name=collection)
     return {
         "chunk_count": len(chunks),
         "upserted_points": upserted,
-        "qdrant_collection": QDRANT_COLLECTION,
+        "qdrant_collection": collection,
+        "fallback_qdrant_collection": QDRANT_COLLECTION,
         "source_type": "meeting_minutes",
     }

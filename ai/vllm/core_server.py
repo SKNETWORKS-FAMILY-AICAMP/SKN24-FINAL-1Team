@@ -11,19 +11,23 @@ from config import (
     EMBEDDING_MODEL_ID,
     FEATURE_CHAT_DIR,
     LLAMA_N_GPU_LAYERS,
+    PRELOAD_EMBEDDING_MODEL,
     PRELOAD_TEXT_MODEL,
     QDRANT_COLLECTION,
+    QDRANT_COLLECTION_PREFIX,
+    QDRANT_COLLECTION_PROJECT_MODE,
     QDRANT_URL,
     TEXT_BACKEND,
     TEXT_GGUF_FILENAME,
     TEXT_GGUF_REPO,
     TEXT_MODEL_ID,
+    qdrant_collection_for_project,
 )
 from meeting_ingest import ingest_meeting_minutes
-from model_runtime import cleanup_cuda, generate_json, load_text_model
+from model_runtime import cleanup_cuda, generate_json, load_embedding_model, load_text_model
 from news import search_preparation_news
 from prompts import agenda_messages, chat_messages, minutes_messages, preparation_messages
-from retrieval import feature_chat_retrieve, load_feature_chat_rag, select_preparation_documents
+from retrieval import feature_chat_retrieve, invalidate_feature_chat_rag, load_feature_chat_rag, select_preparation_documents
 from schemas import AgendaRequest, ChatRequest, MinutesRequest, PreparationRequest, TextResponse
 
 
@@ -46,6 +50,34 @@ def compact_documents(items: list[dict[str, Any]], *, limit: int = 3, text_chars
             }
         )
     return compacted
+
+
+def build_news_context(items: list[dict[str, Any]], *, max_chars: int = 3000) -> str:
+    parts: list[str] = []
+    used = 0
+    for index, item in enumerate(items, 1):
+        title = str(item.get("title") or item.get("source") or "뉴스")
+        text = str(item.get("text") or item.get("description") or "")
+        url = str(item.get("url") or item.get("link") or item.get("source") or "")
+        pub_date = str(item.get("pub_date") or item.get("pubDate") or "")
+        block = f"[N{index}] 뉴스: {title}\n날짜: {pub_date or '미정'}\n요약: {text}\nURL: {url}"
+        if used + len(block) > max_chars:
+            block = block[: max(0, max_chars - used)].rstrip()
+        if block:
+            parts.append(block)
+            used += len(block) + 2
+        if used >= max_chars:
+            break
+    return "\n\n".join(parts)
+
+
+def news_source_references(items: list[dict[str, Any]]) -> list[str]:
+    refs: list[str] = []
+    for index, item in enumerate(items, 1):
+        title = str(item.get("title") or "뉴스")
+        url = str(item.get("url") or item.get("link") or item.get("source") or "")
+        refs.append(f"[{index}] {title} | {url}".strip())
+    return refs
 
 
 def preparation_sources(selected_documents: dict[str, Any]) -> list[dict[str, Any]]:
@@ -174,22 +206,32 @@ def fallback_preparation_result(
     }
 
 
-def ensure_chat_sources(result: Any, sources: list[str]) -> Any:
+def strip_answer_source_section(answer: str) -> str:
+    text = str(answer or "")
+    for marker in ["\n출처:", "\n출처：", "\nSources:", "\nSource:"]:
+        index = text.find(marker)
+        if index >= 0:
+            return text[:index].rstrip()
+    return text
+
+
+def normalize_chat_sources(result: Any, sources: list[str], *, rag_used: bool) -> Any:
     if not isinstance(result, dict):
         return result
 
     normalized_sources = [str(source).strip() for source in sources if str(source).strip()]
-    if not normalized_sources:
+    citations = result.get("citations")
+    if not rag_used or not normalized_sources:
+        result["citations"] = []
+        if isinstance(result.get("answer"), str):
+            result["answer"] = strip_answer_source_section(result["answer"])
         return result
 
-    citations = result.get("citations")
-    if not isinstance(citations, list) or not citations:
-        result["citations"] = normalized_sources
-
-    answer = str(result.get("answer") or "").strip()
-    if answer and "출처:" not in answer:
-        source_lines = "\n".join(normalized_sources)
-        result["answer"] = f"{answer}\n\n출처:\n{source_lines}"
+    if isinstance(citations, list):
+        allowed = set(normalized_sources)
+        result["citations"] = [str(source).strip() for source in citations if str(source).strip() in allowed]
+    else:
+        result["citations"] = []
     return result
 
 
@@ -207,7 +249,11 @@ def health() -> dict[str, Any]:
         "preload_text_model": PRELOAD_TEXT_MODEL,
         "qdrant_collection": QDRANT_COLLECTION,
         "qdrant_url": QDRANT_URL,
+        "project_collection_mode": QDRANT_COLLECTION_PROJECT_MODE,
+        "project_collection_prefix": QDRANT_COLLECTION_PREFIX,
+        "project_collection_example": qdrant_collection_for_project("example"),
         "embedding_model": EMBEDDING_MODEL_ID,
+        "preload_embedding_model": PRELOAD_EMBEDDING_MODEL,
         "feature_chat_dir": str(FEATURE_CHAT_DIR),
     }
 
@@ -216,6 +262,8 @@ def health() -> dict[str, Any]:
 def preload_models() -> None:
     if PRELOAD_TEXT_MODEL:
         load_text_model()
+    if PRELOAD_EMBEDDING_MODEL:
+        load_embedding_model()
 
 
 @app.post("/generate-minutes", response_model=TextResponse)
@@ -226,6 +274,7 @@ def generate_minutes(req: MinutesRequest) -> TextResponse:
         if isinstance(result, dict):
             try:
                 result["qdrant_ingest"] = ingest_meeting_minutes(req, result)
+                invalidate_feature_chat_rag(project_id=req.project_id)
             except Exception as ingest_exc:
                 result["qdrant_ingest_error"] = str(ingest_exc)
     except Exception as exc:
@@ -320,23 +369,49 @@ def chat(req: ChatRequest) -> TextResponse:
     sources = list(req.sources)
     rag_info: dict[str, Any] | None = None
     if not context:
+        chat_source_scope = req.source_scope.strip().lower()
+        if chat_source_scope in {"external", "external_news", "news"}:
+            chat_source_scope = "project"
+        chat_source_types = [
+            item
+            for item in req.source_types
+            if str(item).strip().lower() not in {"external", "external_news", "news"}
+        ]
         try:
-            rag_info = feature_chat_retrieve(req.question)
+            rag_info = feature_chat_retrieve(
+                req.question,
+                project_id=req.project_id,
+                meeting_id=req.meeting_id,
+                source_scope=chat_source_scope,
+                source_types=chat_source_types,
+                max_previous_meetings=req.max_previous_meetings,
+                min_relevance_score=req.min_relevance_score,
+            )
             context = str(rag_info.get("context") or "")
             sources = list(rag_info.get("sources") or [])
         except Exception as exc:
             cleanup_cuda()
             raise HTTPException(status_code=500, detail=f"Feature chat Qdrant search failed: {exc}") from exc
     if not context:
-        raise HTTPException(status_code=404, detail="Qdrant search returned 0 context chunks.")
+        result = {
+            "answer": "제공된 자료에서 확인할 수 없습니다.",
+            "citations": [],
+            "used_context_ids": [],
+            "confidence": "low",
+            "rag_hit_count": 0,
+            "rag_collection": rag_info.get("collection") if isinstance(rag_info, dict) else None,
+            "rag_used": False,
+        }
+        return TextResponse(result=result, elapsed_sec=round(time.perf_counter() - started, 3), model=TEXT_MODEL_ID)
 
     try:
         result = generate_json(chat_messages(req, context, sources), max_new_tokens=1024)
     except Exception as exc:
         cleanup_cuda()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    result = ensure_chat_sources(result, sources)
+    result = normalize_chat_sources(result, sources, rag_used=bool(sources))
     if isinstance(result, dict) and rag_info is not None:
         result.setdefault("rag_hit_count", rag_info.get("hit_count", 0))
         result.setdefault("rag_collection", rag_info.get("collection"))
+        result.setdefault("rag_used", bool(sources))
     return TextResponse(result=result, elapsed_sec=round(time.perf_counter() - started, 3), model=TEXT_MODEL_ID)

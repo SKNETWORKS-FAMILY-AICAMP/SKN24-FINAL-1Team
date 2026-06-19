@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import os
+import socket
 import tempfile
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -20,12 +23,27 @@ from config import (
     PADDLEOCR_VL_TIMEOUT_SEC,
     PADDLEOCR_VL_URL,
     PADDLEOCR_VL_VISUALIZE,
+    PRELOAD_EMBEDDING_MODEL,
     PRELOAD_OCR_MODEL,
+    QDRANT_COLLECTION,
+    QDRANT_COLLECTION_PREFIX,
+    QDRANT_COLLECTION_PROJECT_MODE,
+    qdrant_collection_for_project,
 )
 from schemas import TextResponse
+from runtime_locks import GPU_TASK_LOCK
+
+from internal_docs.routes import router as internal_docs_router
+from internal_docs.service import preload_embedding_model
 
 
+logger = logging.getLogger("uvicorn.error")
 app = FastAPI(title="HPM OCR Server", version="1.0.0")
+app.include_router(internal_docs_router)
+embedding_model_info: dict[str, Any] | None = None
+embedding_model_error: str | None = None
+paddleocr_vl_ready = False
+paddleocr_vl_error: str | None = None
 
 
 def _torch_cuda_available() -> bool:
@@ -35,6 +53,24 @@ def _torch_cuda_available() -> bool:
         return bool(torch.cuda.is_available())
     except Exception:
         return False
+
+
+def _wait_for_paddleocr_vl_ready(timeout_sec: int | None = None) -> None:
+    parsed = urlparse(PADDLEOCR_VL_URL)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    deadline = time.monotonic() + (timeout_sec if timeout_sec is not None else PADDLEOCR_VL_TIMEOUT_SEC)
+    last_error = ""
+    logger.info("Waiting for PaddleOCR-VL service at %s", PADDLEOCR_VL_URL)
+    while time.monotonic() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=2):
+                logger.info("PaddleOCR-VL service is ready at %s", PADDLEOCR_VL_URL)
+                return
+        except OSError as exc:
+            last_error = str(exc)
+            time.sleep(2)
+    raise RuntimeError(f"PaddleOCR-VL service is not ready at {PADDLEOCR_VL_URL}: {last_error}")
 
 
 def _is_pdf(file: UploadFile) -> bool:
@@ -162,30 +198,81 @@ def health() -> dict[str, Any]:
         "paddleocr_vl_url": PADDLEOCR_VL_URL if OCR_BACKEND == "paddleocr_vl" else None,
         "load_in_4bit": LOAD_IN_4BIT,
         "preload_ocr_model": PRELOAD_OCR_MODEL,
+        "preload_embedding_model": PRELOAD_EMBEDDING_MODEL,
+        "embedding_model_loaded_on_startup": embedding_model_info is not None,
+        "embedding_model_info": embedding_model_info,
+        "embedding_model_error": embedding_model_error,
+        "paddleocr_vl_ready": paddleocr_vl_ready,
+        "paddleocr_vl_error": paddleocr_vl_error,
+        "qdrant_collection": QDRANT_COLLECTION,
+        "project_collection_mode": QDRANT_COLLECTION_PROJECT_MODE,
+        "project_collection_prefix": QDRANT_COLLECTION_PREFIX,
+        "project_collection_example": qdrant_collection_for_project("example"),
+        "internal_docs_ingest": True,
+        "gpu_task_locked": GPU_TASK_LOCK.locked(),
         "torch_cuda": _torch_cuda_available(),
     }
 
 
 @app.on_event("startup")
 def preload_models() -> None:
-    if OCR_BACKEND == "qwen" and PRELOAD_OCR_MODEL:
+    global embedding_model_error, embedding_model_info, paddleocr_vl_error, paddleocr_vl_ready
+
+    if PRELOAD_EMBEDDING_MODEL:
+        started = time.perf_counter()
+        logger.info("Loading embedding model for internal-docs ingest")
+        try:
+            embedding_model_info = preload_embedding_model()
+            embedding_model_error = None
+        except Exception as exc:
+            embedding_model_error = str(exc)
+            logger.exception("Embedding model preload failed")
+            raise
+        logger.info(
+            "Embedding model loaded: model=%s device=%s dimensions=%s elapsed_sec=%.3f",
+            embedding_model_info.get("model"),
+            embedding_model_info.get("device"),
+            embedding_model_info.get("dimensions"),
+            time.perf_counter() - started,
+        )
+    else:
+        logger.info("Embedding model preload disabled; first /internal-docs/ingest request will load it")
+
+    if OCR_BACKEND == "paddleocr_vl":
+        try:
+            _wait_for_paddleocr_vl_ready(timeout_sec=3)
+            paddleocr_vl_ready = True
+            paddleocr_vl_error = None
+        except RuntimeError as exc:
+            paddleocr_vl_ready = False
+            paddleocr_vl_error = str(exc)
+            logger.warning("PaddleOCR-VL is not ready; /ocr will fail until it is started: %s", exc)
+    elif OCR_BACKEND == "qwen":
         from model_runtime import load_ocr_model
 
+        logger.info("Loading OCR model: %s", OCR_MODEL_ID)
         load_ocr_model()
+        logger.info("OCR model loaded: %s", OCR_MODEL_ID)
+    else:
+        raise RuntimeError(f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
 
 
 @app.post("/ocr", response_model=TextResponse)
 async def ocr(file: UploadFile = File(...)) -> TextResponse:
     started = time.perf_counter()
 
-    if OCR_BACKEND == "paddleocr_vl":
-        extracted = await _ocr_with_paddleocr_vl(file)
-        model_name = "PaddleOCR-VL"
-    elif OCR_BACKEND == "qwen":
-        extracted = await _ocr_with_qwen(file)
-        model_name = OCR_MODEL_ID
-    else:
-        raise HTTPException(status_code=500, detail=f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
+    await run_in_threadpool(GPU_TASK_LOCK.acquire)
+    try:
+        if OCR_BACKEND == "paddleocr_vl":
+            extracted = await _ocr_with_paddleocr_vl(file)
+            model_name = "PaddleOCR-VL"
+        elif OCR_BACKEND == "qwen":
+            extracted = await _ocr_with_qwen(file)
+            model_name = OCR_MODEL_ID
+        else:
+            raise HTTPException(status_code=500, detail=f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
+    finally:
+        GPU_TASK_LOCK.release()
 
     return TextResponse(
         result={"text": extracted.strip()},

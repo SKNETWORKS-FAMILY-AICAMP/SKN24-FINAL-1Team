@@ -48,7 +48,7 @@ def minutes_messages(req: MinutesRequest) -> list[dict[str, str]]:
 [출력 형식]
 {{
   "summary": "회의 핵심 내용을 1~2문장으로 요약",
-  "content": "회의록내용을 정리해줘. 누가 봐도 한눈에 이해할 정도로 써야해. 너무 간략하게 쓰면 이해하기 어렵다. 줄바꿈은 \\n으로 표현하고 JSON 문자열 안에서 실제 줄바꿈 금지. 형식: 큰 주제\\n1. 세부 내용\\n  - 더 구체적인 내용.",
+  "cotent": "회의록내용을 정리해줘. 누가 봐도 한눈에 이해할 정도로 써야해. 너무 간략하게 쓰면 이해하기 어렵다. 줄바꿈은 \\n으로 표현하고 JSON 문자열 안에서 실제 줄바꿈 금지. 형식: 큰 주제\\n1. 세부 내용\\n  - 더 구체적인 내용.",
   "todo_list": [
     {{
       "title": "해당 담당자가 해야 할 업무 내용(태스크 명)",
@@ -101,16 +101,19 @@ OCR 참고 텍스트: {req.ocr_text}
 def preparation_messages(req: PreparationRequest, selected_documents: dict[str, Any]) -> list[dict[str, str]]:
     prompt = f"""
 당신은 프로젝트 문서 분석 및 회의 준비 자료 작성 전문가입니다.
-제공된 문서를 바탕으로 객관적인 '회의 준비 자료'를 작성하십시오.
+제공된 근거를 바탕으로 회의 참석자가 바로 읽고 회의에 들어갈 수 있는 '회의 준비 자료'를 작성하십시오.
 
 [핵심 규칙]
 1. 제공된 자료([프로젝트 히스토리], [내부 문서], [외부 뉴스])에 명시된 내용만 사용합니다. 사실을 추정하거나 지어내지 마십시오.
 2. 문서에서 확인되지 않거나 누락된 정보는 반드시 "확인 필요"로 표기합니다.
-3. 모든 항목의 끝에는 정보의 출처를 [문서명] 형태로 표기합니다. (프로젝트 히스토리/회의 주제는 생략 가능)
-4. 주어진 [회의 주제]와 직접 관련 없는 정보는 제외합니다.
-5. 출력은 반드시 유효한 JSON 객체 하나만 반환합니다. 마크다운 본문은 document 필드 안에 JSON 문자열로 작성합니다.
-6. JSON 밖에는 코드블록, 설명 문장, 마크다운을 절대 출력하지 마십시오.
-7. 최상위 key는 반드시 "document", "sections", "selected_documents", "source_map" 네 개만 사용합니다.
+3. 주어진 [회의 주제], [프로젝트 누적 맥락], [안건]과 직접 관련 없는 정보는 제외합니다.
+4. 이전회의록은 지난 결정사항, 미완료 todo, 담당자, 후속 논의가 필요한 사항을 파악하는 데 우선 사용합니다.
+5. 내부 문서는 정책, 절차, 요구사항, 제약조건, 기준을 확인하는 데 우선 사용합니다.
+6. 이전회의록과 내부 문서의 내용이 충돌하면 어느 쪽이 맞는지 단정하지 말고 "확인 필요"로 표시합니다.
+7. 모든 핵심 문장 끝에는 가능한 경우 [출처명] 형태로 출처를 붙입니다. 출처가 없으면 붙이지 않습니다.
+8. 출력은 반드시 유효한 JSON 객체 하나만 반환합니다. 마크다운 본문은 document 필드 안에 JSON 문자열로 작성합니다.
+9. JSON 밖에는 코드블록, 설명 문장, 마크다운을 절대 출력하지 마십시오.
+10. 최상위 key는 반드시 "document", "sections", "selected_documents", "source_map" 네 개만 사용합니다.
 
 [입력 데이터]
 - 회의 주제: {req.title}
@@ -125,11 +128,31 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
 반드시 아래 JSON 스키마만 반환하십시오.
 
 {{
-  "document": "### 회의 준비 자료\\n\\n#### 1. 회의 주제\\n- {req.title}\\n\\n#### 2. 회의 목적\\n- ...\\n\\n#### 3. 프로젝트 현재 상태\\n- **완료**: ...\\n- **진행 중**: ...\\n\\n#### 4. 관련 규정 및 제약사항\\n- ... [출처]\\n\\n#### 5. 회의 종료 후 기대 결과\\n- ...\\n\\n#### 6. 참조 문서 목록\\n- ...",
+  "document": "### 회의 준비 자료\\n\\n#### 1. 회의 주제\\n- {req.title}\\n\\n#### 2. 회의 목적\\n- 이번 회의에서 확정하거나 점검해야 할 목적을 2~3개로 정리\\n\\n#### 3. 지난 회의 맥락\\n- 결정사항, 미완료 todo, 담당자, 후속 논의 필요사항을 구분\\n\\n#### 4. 관련 내부문서 근거\\n- 정책, 절차, 요구사항, 제약조건을 정리\\n\\n#### 5. 이번 회의 논의 포인트\\n- 참석자가 실제로 논의해야 할 질문을 3~5개로 제시\\n\\n#### 6. 리스크 및 확인 필요 사항\\n- 근거가 부족하거나 충돌하는 항목을 표시\\n\\n#### 7. 회의 전 준비사항\\n- 참석자가 미리 확인하거나 준비해야 할 항목\\n\\n#### 8. 참조 문서 목록\\n- 사용한 출처 목록",
   "sections": [
     {{
       "title": "회의 주제",
       "content": "{req.title}",
+      "sources": []
+    }},
+    {{
+      "title": "지난 회의 맥락",
+      "content": "결정사항, 미완료 todo, 담당자, 후속 논의 필요사항 요약",
+      "sources": []
+    }},
+    {{
+      "title": "관련 내부문서 근거",
+      "content": "정책, 절차, 요구사항, 제약조건 요약",
+      "sources": []
+    }},
+    {{
+      "title": "이번 회의 논의 포인트",
+      "content": "회의에서 다룰 질문과 판단 포인트",
+      "sources": []
+    }},
+    {{
+      "title": "리스크 및 확인 필요 사항",
+      "content": "근거 부족, 충돌, 미확정 항목",
       "sources": []
     }}
   ],
@@ -155,6 +178,8 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
             "document, sections, selected_documents, source_map. "
             "The document field must contain Korean markdown as a JSON string. "
             "Use only the provided evidence. If evidence is missing, write '확인 필요'. "
+            "Separate previous meeting context from internal document requirements. "
+            "Prefer concrete decisions, todos, owners, dates, policy clauses, constraints, and open questions. "
             "Do not invent facts.",
         },
         {"role": "user", "content": prompt},
@@ -202,7 +227,11 @@ def legacy_preparation_messages(req: PreparationRequest) -> list[dict[str, str]]
 #     ]
 
 
-def chat_messages(req: ChatRequest, context: str, sources: list[str]) -> list[dict[str, str]]:
+def chat_messages(
+    req: ChatRequest,
+    context: str,
+    sources: list[str],
+) -> list[dict[str, str]]:
     history = "\n".join(f"{item.get('role', 'user')}: {item.get('content', '')}" for item in req.history[-8:])
     source_refs = "\n".join(str(source) for source in sources)
     prompt = f"""
@@ -215,14 +244,8 @@ def chat_messages(req: ChatRequest, context: str, sources: list[str]) -> list[di
 [내부문서 근거]
 {context or "(없음)"}
 
-[뉴스 근거]
-(없음)
-
-[사용 가능한 내부문서 출처]
+[사용 가능한 출처]
 {source_refs or "(없음)"}
-
-[사용 가능한 뉴스 출처]
-(없음)
 
 위 근거만 사용해서 한국어로 답변해줘.
 """.strip()
@@ -231,31 +254,25 @@ def chat_messages(req: ChatRequest, context: str, sources: list[str]) -> list[di
             "role": "system",
             "content": """
 너는 한국어 RAG 챗봇이다.
-제공된 내부문서 근거와 Naver 뉴스 근거 안에서만 답한다.
-내부문서 근거가 없고 뉴스 근거만 있으면 뉴스 근거만 사용한다.
-뉴스 근거가 없고 내부문서 근거만 있으면 내부문서 근거만 사용한다.
-둘 다 있는 경우에는 내부문서와 뉴스 근거를 구분해서 사용한다.
+제공된 프로젝트 내부자료 근거 안에서만 답한다.
 
 확인되지 않은 내용은 추측하지 말고, 모르면 모른다고 답한다.
 본문에는 URL을 직접 쓰지 않는다.
 본문에서 출처가 필요한 문장 끝에는 [1], [2]처럼 번호만 붙인다.
 답변 맨 아래에만 '출처:' 섹션을 만들고 전체 출처 목록을 표시한다.
+근거가 부족해서 답할 수 없으면 "제공된 자료에서 확인할 수 없습니다."라고 답하고, 출처 섹션을 만들지 않는다.
+citations에는 실제 답변에 사용한 출처만 [사용 가능한 출처]에서 그대로 복사한다.
+used_context_ids에는 실제로 사용한 [내부문서 근거] 블록 번호만 숫자로 넣는다.
+confidence는 근거가 충분하면 "high", 일부만 확인되면 "medium", 확인 불가이면 "low"로 둔다.
 
-뉴스 질의일 경우:
-- 기사 제목을 단순 나열하지 않는다.
-- 먼저 최근 흐름을 2~3문장으로 종합 요약한다.
-- 그다음 핵심 이슈를 3개 이하로 묶어서 설명한다.
-- 각 이슈 설명 끝에 관련 출처 번호를 붙인다.
-- 출처 섹션에는 '[번호] 뉴스 제목 - 언론사 - URL' 형식으로 표시한다.
-
-내부문서 질의일 경우:
-- 문서 근거를 기준으로 답한다.
+답변 작성 규칙:
+- 내부자료 근거를 기준으로 답한다.
 - 조항, 수치, 조건, 절차가 있으면 빠뜨리지 않는다.
 - 출처 섹션에는 '[번호] 문서명 p.페이지' 형식으로 표시한다.
 - 출처가 없으면 [번호]를 명시하지 않는다.
 
 반드시 유효한 JSON 하나만 반환한다.
-출력 형식은 {"answer": "답변 본문과 출처 섹션", "citations": ["실제로 사용한 출처"]} 이다.
+출력 형식은 {"answer": "답변 본문과 필요한 경우 출처 섹션", "citations": ["실제로 사용한 출처"], "used_context_ids": [1], "confidence": "high|medium|low"} 이다.
 """.strip(),
         },
         {"role": "user", "content": prompt},

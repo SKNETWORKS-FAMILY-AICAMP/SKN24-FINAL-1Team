@@ -23,9 +23,14 @@ class AgendaRequest(BaseModel):
 
 class PreparationRequest(BaseModel):
     title: str = Field(..., description="Meeting topic or title used to generate preparation material.")
+    meeting_id: str = ""
+    project_id: str = ""
+    meeting_datetime: str = ""
+    location: str = ""
     project_context: str = ""
     participants: list[dict[str, str]] = Field(default_factory=list)
     agendas: list[str] = Field(default_factory=list)
+    max_previous_meetings: int = 5
 
 
 class ChatRequest(BaseModel):
@@ -33,6 +38,12 @@ class ChatRequest(BaseModel):
     context: str = ""
     history: list[dict[str, str]] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list)
+    project_id: str = ""
+    meeting_id: str = ""
+    source_scope: str = "project"
+    source_types: list[str] = Field(default_factory=list)
+    max_previous_meetings: int = 5
+    min_relevance_score: float | None = None
 
 
 class TextResponse(BaseModel):
