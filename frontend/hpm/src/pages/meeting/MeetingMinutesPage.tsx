@@ -9,7 +9,7 @@ import {
   rejectMinutes,
   type Meeting,
   type Task,
-} from "../../features/meeting/api";
+} from "../../services/meeting";
 
 type Tab = "minutes" | "tasks" | "chat";
 
@@ -29,20 +29,87 @@ export default function MeetingMinutesPage() {
   const navigate = useNavigate();
   const meetingId = Number(id);
 
-  const [meeting, setMeeting] = useState<Meeting | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [meeting, setMeeting] = useState<Meeting | null>({
+    meeting_id: meetingId,
+    title: "2025 Q3 제품 로드맵 검토",
+    location: "3층 대회의실",
+    meeting_at: "2025-06-10T14:00:00",
+    status: "finished",
+    minutes_status: "draft",
+    meeting_document: `1. 상반기 채용 진행 상황 공유
+- 지원자 총 130명 중 백엔드 지원자가 가장 높은 비율 차지.
+- 협업 경험 부족자가 다수 관찰되므로 최종 면접에서 추가 검증 필요.
+
+2. 신규 입사자 온보딩 현황 공유
+- 기존 가이드 문서가 불명확하여 혼란스럽다는 의견 수렴.
+- 협업 툴(슬랙, 지라, 노션) 상세 사용 가이드라인과 사내 FAQ 보강 예정.
+
+3. 조직 개편 현황 공유
+- 개발팀 조직을 기능(Data/Service) 중심으로 변경 논의 중.
+- 불필요한 회의 단축을 위한 회의 규칙 제정 예정.
+
+4. 직원 만족도 조사 결과 공유
+- 유연근무 시간 확대 및 복지비 사용처 다양화 요구가 높음.
+- 개선안 실현 가능 여부 파악 예정.`,
+    is_meeting: true,
+    project: 1,
+    participants: [
+      { user_id: 1, name: "김민준(팀장)" },
+      { user_id: 2, name: "김지원" },
+      { user_id: 3, name: "김규호" },
+      { user_id: 4, name: "류지우" }
+    ]
+  });
+  const [tasks, setTasks] = useState<Task[]>([
+    {
+      meeting_task_id: 1,
+      meeting_id: meetingId,
+      title: "백엔드 최종 오프라인 면접 문항 개발 및 프로세스 정리",
+      owner: "김민준(팀장)",
+      due_date: "2025-06-17",
+      priority: "High",
+      jira_key: ""
+    },
+    {
+      meeting_task_id: 2,
+      meeting_id: meetingId,
+      title: "협업 툴 사용 매뉴얼 보강 및 사내 FAQ 문서 제작",
+      owner: "류지우",
+      due_date: "2025-06-20",
+      priority: "Medium",
+      jira_key: ""
+    },
+    {
+      meeting_task_id: 3,
+      meeting_id: meetingId,
+      title: "데이터팀/서비스팀 구조 개편안 확정 및 공표",
+      owner: "김지원",
+      due_date: "2025-06-25",
+      priority: "Medium",
+      jira_key: ""
+    },
+    {
+      meeting_task_id: 4,
+      meeting_id: meetingId,
+      title: "유연근무제 확대 운영지침 초안 마련",
+      owner: "김규호",
+      due_date: "2025-06-22",
+      priority: "Low",
+      jira_key: ""
+    }
+  ]);
   const [tab, setTab] = useState<Tab>("minutes");
   const [viewAs, setViewAs] = useState<"member" | "creator">("member");
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
-      .then(([m, t]) => { setMeeting(m); setTasks(t); })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then(([m, t]) => {
+        if (m && m.title) setMeeting(m);
+        if (t && t.length > 0) setTasks(t);
+      })
+      .catch(console.error);
   }, [meetingId]);
 
-  if (loading) return <div className="p-8 text-gray-400">불러오는 중...</div>;
   if (!meeting) return <div className="p-8 text-gray-400">회의를 찾을 수 없습니다.</div>;
 
   const minutesStatus = meeting.minutes_status || "draft";
@@ -58,7 +125,7 @@ export default function MeetingMinutesPage() {
     try {
       await approveMinutes(meetingId);
       setMeeting(m => m ? { ...m, minutes_status: "approved" } : m);
-      setTimeout(() => navigate(`/meeting/${meetingId}/jira`), 1200);
+      setTimeout(() => navigate(`/meetings/${meetingId}/jira`), 1200);
     } catch { alert("승인에 실패했습니다."); }
   };
 
@@ -237,7 +304,7 @@ export default function MeetingMinutesPage() {
 
       {/* 액션 버튼 */}
       <div className="flex justify-between items-center mt-5">
-        <button onClick={() => navigate(`/meeting/${meetingId}`)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+        <button onClick={() => navigate(`/meetings/${meetingId}`)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
           ← 회의 상세
         </button>
         <div className="flex gap-2">

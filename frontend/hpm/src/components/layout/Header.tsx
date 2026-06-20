@@ -1,20 +1,26 @@
-export default function Header() {
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 h-16 border-b border-[#E5E5E5] bg-[#FAFAFA] backdrop-blur">
-    <div className="flex h-16 w-full items-center justify-between px-4">
-        
-        <div className="flex items-center gap-2">
-        <div>
-            <h1 className="text-lg font-bold tracking-tight text-[#0A0A0A]">
-            HPM
-            </h1>
-            <p className="text-xs text-gray-500">
-            회의피하지마
-            </p>
-        </div>
-        </div>
+import * as DESIGN from "../../constants/design";
+import bell from "../../assets/header/bell.png";
+import toggle from "../../assets/header/toggle.png";
+import { useAuth } from "../../context/AuthContext";
 
-    </div>
+export default function Header() {
+  const { user } = useAuth();
+
+  return (
+    <header
+      className={`w-full h-16 border-b border-[#E6E1E6] ${DESIGN.BACKGROUND_COLORS.white}`}
+    >
+      <div className="flex h-16 w-full max-w-[1504px] items-center justify-end mx-auto px-6">
+        <div className={`flex ${DESIGN.GAP_SIZES["xl"]}`}>
+          <div className={`flex ${DESIGN.BORDER_COLORS.lightGray} w-[40px] h-[40px] flex items-center justify-center border-rad rounded-full`}>
+            <button><img src={bell} alt="" /></button>
+          </div>
+          <div className={`flex items-center justify-center ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.GAP_SIZES["xl"]} rounded-full ${DESIGN.PADDING_X_SIZES.sm}`}>
+            <p>{user?.name}</p>
+            <button><img src={toggle} alt="" /></button>
+          </div>
+        </div>
+      </div>
     </header>
   );
 }

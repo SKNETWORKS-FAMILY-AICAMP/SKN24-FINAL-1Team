@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import api from "../../features/meeting/api";
+import ServiceLogo from "../../components/ui/ServiceLogo"
+import api from "../../services/meeting";
+import * as DESIGN from "../../constants/design";
+import Input from "../../components/ui/Input";
+import Button from "../../components/ui/button";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
@@ -9,16 +13,35 @@ export default function ChangePasswordPage() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [currentError, setCurrentError] = useState("");
+  const [nextError, setNextError] = useState("");
+  const [confirmError, setConfirmError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setCurrentError("");
+    setNextError("");
+    setConfirmError("");
 
-    if (next.length < 6) { setError("새 비밀번호는 6자 이상이어야 합니다."); return; }
-    if (next !== confirm) { setError("새 비밀번호가 일치하지 않습니다."); return; }
-    if (current !== "abc123" && current.length < 1) { setError("기존 비밀번호를 입력하세요."); return; }
+    let hasError = false;
+
+    if (!current) {
+      setCurrentError("기존 비밀번호를 입력하세요.");
+      hasError = true;
+    }
+    if (next.length < 6) {
+      setNextError("새 비밀번호는 6자 이상이어야 합니다.");
+      hasError = true;
+    }
+    if (next !== confirm) {
+      setConfirmError("새 비밀번호가 일치하지 않습니다.");
+      hasError = true;
+    }
+
+    if (hasError) return;
 
     setLoading(true);
     try {
@@ -36,75 +59,60 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col">
-      <header className="h-14 bg-white border-b border-gray-200 flex items-center px-6">
-        <span className="font-bold text-lg">Meeting<span className="text-[#F5A623]">Flow</span></span>
-      </header>
+    <div className={`${DESIGN.BACKGROUND_COLORS.background} min-h-screen flex justify-center items-center`}>
+      <div className="w-[480px]">
+        <ServiceLogo/>
+        <div className={`${DESIGN.PADDING_SIZES["2xl"]} ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.MARGIN_TOP_SIZES["5xl"]} ${DESIGN.RADIUS_SIZES["2xl"]} flex justify-center items-center flex-col`}>
+          <p className={`${DESIGN.FONT_SIZES.h3} justify-center ${DESIGN.MARGIN_BOTTOM_SIZES["3xl"]}`}>비밀번호 변경</p>
+          <form onSubmit={handleSubmit} className={`flex flex-col ${DESIGN.GAP_SIZES["4xl"]} w-full`}>
+            <Input
+              id="currentPassword"
+              label="기존 비밀번호"
+              type="password"
+              value={current}
+              onChange={e => {
+                setCurrent(e.target.value);
+                if (currentError) setCurrentError("");
+              }}
+              placeholder="기존 비밀번호를 입력하세요"
+              error={currentError}
+            />
+            <Input
+              id="newPassword"
+              label="새 비밀번호"
+              type="password"
+              value={next}
+              onChange={e => {
+                setNext(e.target.value);
+                if (nextError) setNextError("");
+              }}
+              placeholder="새 비밀번호를 입력하세요 (6자 이상)"
+              error={nextError}
+            />
+            <Input
+              id="confirmPassword"
+              label="비밀번호 재확인"
+              type="password"
+              value={confirm}
+              onChange={e => {
+                setConfirm(e.target.value);
+                if (confirmError) setConfirmError("");
+              }}
+              placeholder="새 비밀번호를 다시 입력하세요"
+              error={confirmError}
+            />
 
-      <div className="flex-1 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-sm p-10 w-full max-w-md">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-full bg-[#F5A623] flex items-center justify-center text-white font-bold">
-              🔒
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">비밀번호 변경 필요</h1>
-              <p className="text-xs text-gray-400">최초 로그인 시 비밀번호를 변경해야 합니다.</p>
-            </div>
-          </div>
+            {error && (
+              <p className="text-red-500 text-sm text-center -mt-4 mb-2">{error}</p>
+            )}
 
-          <div className="my-5 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
-            보안을 위해 초기 비밀번호 <b>abc123</b>을 새 비밀번호로 변경해주세요.
-          </div>
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">기존 비밀번호 <span className="text-red-500">*</span></label>
-              <input
-                type="password"
-                value={current}
-                onChange={e => setCurrent(e.target.value)}
-                placeholder="기존 비밀번호를 입력하세요."
-                required
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#F5A623]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 <span className="text-red-500">*</span></label>
-              <input
-                type="password"
-                value={next}
-                onChange={e => setNext(e.target.value)}
-                placeholder="새 비밀번호를 입력하세요. (6자 이상)"
-                required
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#F5A623]"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호 재확인 <span className="text-red-500">*</span></label>
-              <input
-                type="password"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                placeholder="새 비밀번호를 다시 입력하세요."
-                required
-                className={`w-full border rounded-lg px-4 py-3 text-sm outline-none transition
-                  ${confirm && next !== confirm ? "border-red-400 focus:border-red-400" : "border-gray-200 focus:border-[#F5A623]"}`}
-              />
-              {confirm && next !== confirm && (
-                <p className="text-xs text-red-500 mt-1">비밀번호가 일치하지 않습니다.</p>
-              )}
-            </div>
-
-            {error && <p className="text-sm text-red-500">{error}</p>}
-
-            <button
+            <Button
               type="submit"
               disabled={loading || !current || !next || !confirm}
-              className="w-full bg-[#F5A623] text-white py-3 rounded-lg font-semibold text-sm hover:bg-[#e8951a] disabled:opacity-50 mt-2"
+              buttonClassName="w-full"
             >
               {loading ? "변경 중..." : "비밀번호 변경"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
