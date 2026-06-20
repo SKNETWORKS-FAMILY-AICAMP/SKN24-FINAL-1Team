@@ -2,25 +2,23 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../services/meeting";
-import Header from "../../components/layout/Header";
+import jiraLogo from "../../assets/jira.png"; 
 
-const STEPS = ["Jira 계정 연동", "Jira 프로젝트", "구성원 초대"];
+const STEPS = ["Jira 계정 연동", "프로젝트 선택", "구성원 초대", "프로젝트 생성"];
 
 function StepBar({ current }: { current: number }) {
   return (
-    <div className="flex items-start justify-center gap-0 mb-10">
+    <div className="flex items-start w-full mb-10">
       {STEPS.map((label, i) => (
-        <div key={i} className="flex flex-col items-center" style={{ minWidth: 160 }}>
+        <div key={i} className="flex flex-col items-center flex-1">
           <div className="flex items-center w-full">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 z-10 transition-all
-              ${i === current ? "bg-[#6B4EFF] text-white" : i < current ? "bg-gray-300 text-white" : "bg-gray-200 text-gray-400"}`}>
-              {i + 1}
-            </div>
-            {i < STEPS.length - 1 && (
-              <div className={`h-0.5 flex-1 ${i < current ? "bg-[#6B4EFF]" : "bg-gray-200"}`} />
-            )}
+            <div className={`flex-1 h-0.5 mr-[32px] ${i === 0 ? "invisible" : "bg-gray-200"}`} />
+            <div className={`w-4 h-4 rounded-full flex-shrink-0 z-10 transition-all
+              ${i === current ? "bg-[#623FB5] ring-2 ring-[#623FB5] ring-offset-2" : "bg-gray-300"}`}
+            />
+            <div className={`flex-1 h-0.5 ml-[32px] ${i === STEPS.length - 1 ? "invisible" : "bg-gray-200"}`} />
           </div>
-          <span className={`text-xs mt-2 text-center font-medium ${i === current ? "text-[#6B4EFF]" : "text-gray-400"}`}>
+          <span className={`text-xs mt-2 text-center font-medium ${i === current ? "text-[#623FB5]" : "text-gray-400"}`}>
             {label}
           </span>
         </div>
@@ -29,7 +27,7 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
-interface UserOption { users_id: number; name: string; work: string; }
+interface UserOption { users_id: number; name: string; work: string; email?: string; }
 interface JiraProject { key: string; name: string; }
 
 export default function ProjectCreatePage() {
@@ -41,15 +39,15 @@ export default function ProjectCreatePage() {
   const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([]);
   const [jiraLoading, setJiraLoading] = useState(false);
   const [selectedJiraProject, setSelectedJiraProject] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
 
   const [allUsers, setAllUsers] = useState<UserOption[]>([]);
   const [members, setMembers] = useState<(UserOption & { isJira: boolean })[]>([]);
   const [searchName, setSearchName] = useState("");
-  const [searchResult, setSearchResult] = useState<UserOption | null>(null);
   const [creating, setCreating] = useState(false);
 
-  // jira=success 감지
+  const [createdProjectId, setCreatedProjectId] = useState<number | null>(null);
+  const [createdProjectName, setCreatedProjectName] = useState("");
+  const [jiraErrorModal, setJiraErrorModal] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -57,45 +55,50 @@ export default function ProjectCreatePage() {
       setJiraConnected(true);
       setStep(1);
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.get("jira") === "error") {
+      setJiraErrorModal(true);
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
-  // 유저 목록 로드
   useEffect(() => {
     api.get("/users/").then(res => {
+      console.log("allUsers 로드됨:", res.data.length, "명", res.data[0]);
       setAllUsers(res.data);
-      if (user) {
-        const me = res.data.find((u: UserOption) => u.users_id === user.users_id);
-        if (me) setMembers([{ ...me, isJira: true }]);
-      }
-    }).catch(() => {});
+    }).catch((e) => console.error("/api/users/ 실패:", e));
   }, [user]);
 
-  // Jira 연동 완료 후 프로젝트 목록 로드
   useEffect(() => {
     if (!jiraConnected || !user) return;
     setJiraLoading(true);
     api.get(`/jira/projects/?user_id=${user.users_id}`)
       .then(res => setJiraProjects(res.data))
-      .catch(() => alert("Jira 프로젝트 목록을 불러오지 못했습니다."))
+      .catch(() => setJiraErrorModal(true))
       .finally(() => setJiraLoading(false));
   }, [jiraConnected, user]);
 
   const handleJiraConnect = () => {
-  window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user?.users_id}`;
-};
-
-  const handleSearch = () => {
-    const found = allUsers.find(u => u.name.includes(searchName));
-    setSearchResult(found ?? null);
+    if (!user?.users_id) {
+      navigate("/login");
+      return;
+    }
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user.users_id}`;
   };
 
-  const handleAddMember = (u: UserOption) => {
-    if (!members.find(m => m.users_id === u.users_id)) {
+  const filteredResults = searchName.trim().length > 0
+    ? allUsers.filter(u =>
+        u.name.includes(searchName) ||
+        (u.email || "").includes(searchName) ||
+        (u.work || "").includes(searchName)
+      )
+    : [];
+
+  const handleToggleMember = (u: UserOption) => {
+    if (members.find(m => m.users_id === u.users_id)) {
+      setMembers(prev => prev.filter(m => m.users_id !== u.users_id));
+    } else {
       setMembers(prev => [...prev, { ...u, isJira: false }]);
     }
-    setSearchResult(null);
-    setSearchName("");
   };
 
   const handleRemoveMember = (id: number) => {
@@ -113,8 +116,10 @@ export default function ProjectCreatePage() {
         owner_id: user?.users_id,
         member_ids: members.map(m => m.users_id),
       });
-      selectProject(res.data.project_id, res.data.project_name);
-      navigate("/projects");
+      setCreatedProjectId(res.data.project_id);
+      setCreatedProjectName(res.data.project_name);
+      // selectProject는 버튼 클릭 시 호출됨
+      setStep(3);
     } catch (e) {
       console.error("프로젝트 생성 실패:", e);
       alert("프로젝트 생성에 실패했습니다.");
@@ -123,180 +128,234 @@ export default function ProjectCreatePage() {
     }
   };
 
-  const visibleProjects = showAll ? jiraProjects : jiraProjects.slice(0, 3);
-
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col">
-      <div className="flex-1 flex items-center justify-center py-10 pt-24">
-        <div className="bg-white rounded-2xl shadow-sm p-10 w-full max-w-2xl">
-          <StepBar current={step} />
+    <div className="min-h-screen bg-[#F6F5FA] flex flex-col p-4">
 
-          {/* STEP 0 - Jira 계정 연동 */}
-          {step === 0 && (
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">팀의 개발 흐름을 한눈에</h2>
-              <p className="text-sm text-gray-400 mb-10">Jira와 연동하면 프로젝트 현황을 바로 파악할 수 있어요.</p>
+      {jiraErrorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="text-[#623FB5] font-medium leading-relaxed">
+                Jira 계정 연동에 실패했습니다.<br />다시 시도 해주세요
+              </p>
+            </div>
+            <div className="border-t border-gray-200 flex">
+              <button
+                onClick={() => { setJiraErrorModal(false); handleJiraConnect(); }}
+                className="flex-1 py-4 text-sm text-gray-700 hover:bg-gray-50 transition border-r border-gray-200"
+              >
+                재시도
+              </button>
+              <button
+                onClick={() => setJiraErrorModal(false)}
+                className="flex-1 py-4 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-center justify-center mb-10">
-                <div className="flex items-center gap-3">
-                  <div className="w-16 h-16 bg-[#0052CC] rounded-xl flex items-center justify-center">
-                    <span className="text-white font-bold text-2xl">J</span>
-                  </div>
-                  <span className="text-3xl font-bold text-[#0052CC]">Jira</span>
-                </div>
-              </div>
+      <div className="flex-1 bg-[#FFFDFD] rounded-2xl flex flex-col overflow-hidden">
+        <header className="h-16 border-b border-[#E5E5E5] flex-shrink-0" />
+        <div className="flex flex-col items-center py-10 px-6 flex-1 overflow-auto">
+          <div className="w-full max-w-[680px]">
+            <StepBar current={step} />
 
-              {jiraConnected ? (
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex items-center gap-2 text-green-600 font-semibold">
-                    <span className="text-xl">✅</span> Jira 연동 완료
-                  </div>
+            {step === 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+                  jira 계정 연동
+                </h2>
+
+                <div className="bg-[#ECECF2] rounded-2xl p-10 flex flex-col items-center text-center mb-6">
+                  <img src={jiraLogo} alt="Jira" className="h-16 object-contain mb-10" />
+                  <h3 className="text-2xl font-bold text-gray-900">팀의 개발 흐름을 한눈에</h3>
+                  <p className="text-sm text-gray-400 mt-7 mb-10">
+                    Jira 연동으로 프로젝트 업무 진행 상황을 한 곳에서 바로 확인하세요
+                  </p>
                   <button
-                    onClick={() => setStep(1)}
-                    className="px-8 py-3 bg-[#6B4EFF] text-white rounded-lg font-semibold hover:bg-[#5a3fee]"
+                    onClick={() => jiraConnected ? setStep(1) : handleJiraConnect()}
+                    className="px-8 py-3 bg-[#623FB5] text-white rounded-lg hover:opacity-90"
+                  >
+                    연동하기
+                  </button>
+                </div>
+
+                {/* 뒤로가기 */}
+                {!jiraConnected && (
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => navigate("/projects")}
+                      className="text-sm text-gray-400 hover:underline"
+                    >
+                      뒤로가기
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === 1 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">프로젝트 선택</h2>
+                <p className="text-sm text-gray-500 text-center mb-8 leading-relaxed">
+                  Jira에서 연동할 프로젝트를 선택해주세요.<br />
+                  선택한 프로젝트명이 서비스 프로젝트명으로 자동 설정됩니다.
+                </p>
+
+                {jiraLoading ? (
+                  <div className="text-sm text-gray-400 text-center py-10">Jira 프로젝트 불러오는 중...</div>
+                ) : (
+                  <div className="bg-[#ECECF2] rounded-2xl p-4 mb-6 max-h-[360px] overflow-y-auto">
+                    {jiraProjects.map(p => {
+                      const isSelected = selectedJiraProject === p.key;
+                      return (
+                        <div
+                          key={p.key}
+                          onClick={() => setSelectedJiraProject(p.key)}
+                          className="flex items-center justify-between px-5 py-4 mb-2 last:mb-0 rounded-xl cursor-pointer bg-white border border-[#141414] transition hover:bg-gray-50"
+                        >
+                          <span className="text-sm font-medium text-gray-700">{p.name}</span>
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <circle
+                              cx="10" cy="10" r="9"
+                              fill={isSelected ? "#623FB5" : "none"}
+                              stroke={isSelected ? "#623FB5" : "#D1D5DB"}
+                              strokeWidth="1.5"
+                            />
+                            <path
+                              d="M6 10.5l2.5 2.5 5.5-5.5"
+                              stroke={isSelected ? "#ffffff" : "#D1D5DB"}
+                              strokeWidth="1.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setStep(2)}
+                    disabled={!selectedJiraProject}
+                    className={`px-5 py-2.5 text-white rounded-lg text-sm transition
+                      ${selectedJiraProject
+                        ? "bg-[#623FB5] hover:bg-[#512fa0] cursor-pointer"
+                        : "bg-[#969696] cursor-not-allowed"}`}
                   >
                     다음
                   </button>
                 </div>
-              ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <button
-                    onClick={handleJiraConnect}
-                    className="px-8 py-3 bg-[#6B4EFF] text-white rounded-lg font-semibold hover:bg-[#5a3fee]"
-                  >
-                    Jira와 연동하기
-                  </button>
-                  <button
-                    onClick={() => setStep(1)}
-                    className="text-sm text-gray-400 hover:underline"
-                  >
-                    건너뛰기
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* STEP 1 - Jira 프로젝트 선택 */}
-          {step === 1 && (
-            <div>
-              <p className="text-sm text-gray-500 mb-5">
-                Jira에서 연동할 프로젝트를 선택해주세요. 선택한 프로젝트명이 서비스 프로젝트명으로 자동 설정됩니다.
-              </p>
+            {step === 2 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 text-center mb-[7px]">구성원 추가하기</h2>
+                <p className="text-sm text-gray-400 text-center mb-6">
+                  이름이나 이메일, 부서를 입력하여 프로젝트 구성원을 추가하세요
+                </p>
 
-              {jiraLoading ? (
-                <div className="text-sm text-gray-400 text-center py-10">Jira 프로젝트 불러오는 중...</div>
-              ) : (
-                <div className="border border-gray-200 rounded-xl overflow-hidden mb-5">
-                  {visibleProjects.map(p => (
-                    <div
-                      key={p.key}
-                      onClick={() => setSelectedJiraProject(p.key)}
-                      className={`flex items-center justify-between px-5 py-4 cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50 transition
-                        ${selectedJiraProject === p.key ? "bg-purple-50 border-l-4 border-l-[#6B4EFF]" : ""}`}
-                    >
-                      <span className={`text-sm font-medium ${selectedJiraProject === p.key ? "text-[#6B4EFF]" : "text-gray-700"}`}>
-                        {p.name}
-                      </span>
-                      {selectedJiraProject === p.key && <span className="text-[#6B4EFF] text-lg">✓</span>}
+                <div className="bg-[#ECECF2] rounded-2xl p-4 mb-6 min-h-[240px]">
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                    {members.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {members.map(m => (
+                          <span
+                            key={m.users_id}
+                            className="inline-flex items-center gap-1 bg-[#ECECF2] rounded-lg px-3 py-1 text-sm text-gray-700"
+                          >
+                            {m.name}
+                            <button
+                              onClick={() => handleRemoveMember(m.users_id)}
+                              className="text-gray-400 hover:text-gray-600 ml-1 leading-none"
+                            >×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      value={searchName}
+                      onChange={e => setSearchName(e.target.value)}
+                      placeholder={members.length === 0 ? "이름이나 이메일, 부서를 입력해주세요" : ""}
+                      className="w-full outline-none text-sm text-gray-700 placeholder-gray-400"
+                    />
+                  </div>
+
+                  {filteredResults.length > 0 && (
+                    <div className="mt-2 rounded-xl overflow-hidden border border-gray-100">
+                      {filteredResults.map(u => {
+                        const isSelected = !!members.find(m => m.users_id === u.users_id);
+                        return (
+                          <div
+                            key={u.users_id}
+                            onClick={() => handleToggleMember(u)}
+                            className={`px-4 py-3 cursor-pointer border-b border-gray-100 last:border-0 transition
+                              ${isSelected ? "bg-[#ECECF2]" : "bg-white hover:bg-gray-50"}`}
+                          >
+                            <p className="text-sm font-medium text-gray-800">
+                              {u.name}{u.email ? `(${u.email})` : ""}
+                            </p>
+                            {u.work && (
+                              <p className="text-xs text-gray-400 mt-0.5">{u.work}</p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                  {!showAll && jiraProjects.length > 3 && (
-                    <button
-                      onClick={() => setShowAll(true)}
-                      className="w-full py-3 text-sm text-gray-400 hover:text-gray-600 flex items-center justify-center gap-1"
-                    >
-                      ▽ 더보기
-                    </button>
                   )}
                 </div>
-              )}
 
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setStep(0)} className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">이전</button>
-                <button
-                  onClick={() => setStep(2)}
-                  className="px-5 py-2.5 bg-[#6B4EFF] text-white rounded-lg text-sm font-semibold hover:bg-[#5a3fee]"
-                >
-                  선택 완료
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2 - 구성원 초대 */}
-          {step === 2 && (
-            <div>
-              <p className="text-sm text-gray-500 mb-5">
-                Jira 멤버가 아닌 사용자도 추가할 수 있습니다. 단, 칸반보드 접근은 제한됩니다.
-              </p>
-
-              <div className="flex gap-3 mb-5">
-                <input
-                  value={searchName}
-                  onChange={e => setSearchName(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleSearch()}
-                  placeholder="이름을 입력하세요."
-                  className="flex-1 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:border-[#6B4EFF]"
-                />
-                <button
-                  onClick={handleSearch}
-                  className="px-5 py-2.5 bg-[#6B4EFF] text-white rounded-lg text-sm font-semibold hover:bg-[#5a3fee]"
-                >
-                  검색
-                </button>
-                {searchResult && (
-                  <div className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-2.5 min-w-[160px]">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{searchResult.name}</p>
-                      <p className="text-xs text-gray-400">{searchResult.work}</p>
-                    </div>
-                    <button
-                      onClick={() => handleAddMember(searchResult)}
-                      className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200"
-                    >+ 추가</button>
-                  </div>
-                )}
-              </div>
-
-              <div className="border border-gray-200 rounded-xl overflow-hidden mb-5">
-                <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700">구성원</span>
-                  <span className="w-5 h-5 bg-[#6B4EFF] text-white rounded-full text-xs flex items-center justify-center font-bold">
-                    {members.length}
-                  </span>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setStep(1)}
+                    className="px-6 py-2.5 bg-[#EDE9FF] text-[#623FB5] rounded-lg text-sm hover:bg-[#ddd6ff]"
+                  >
+                    이전
+                  </button>
+                  <button
+                    onClick={handleCreate}
+                    disabled={creating || members.length === 0}
+                    className={`px-6 py-2.5 text-white rounded-lg text-sm transition
+                      ${members.length > 0 && !creating
+                        ? "bg-[#623FB5] hover:bg-[#512fa0] cursor-pointer"
+                        : "bg-[#969696] cursor-not-allowed"}`}
+                  >
+                    {creating ? "생성 중..." : "프로젝트 생성"}
+                  </button>
                 </div>
-                {members.map(m => (
-                  <div key={m.users_id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{m.name}</p>
-                      <p className="text-xs text-gray-400">{m.work}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.isJira ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
-                        {m.isJira ? "Jira 구성원" : "추가됨"}
-                      </span>
-                      <button
-                        onClick={() => handleRemoveMember(m.users_id)}
-                        className="text-gray-300 hover:text-red-400 text-lg leading-none"
-                      >×</button>
-                    </div>
-                  </div>
-                ))}
               </div>
+            )}
 
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setStep(1)} className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">이전</button>
+            {step === 3 && (
+              <div className="flex flex-col items-center text-center py-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-3">프로젝트 생성 완료</h2>
+                <p className="text-sm text-gray-400 mb-12">자유롭게 프로젝트를 관리해 보세요!</p>
+
+                {/*활성화된 체크*/}
+                <div className="w-24 h-24 rounded-full bg-[#C4B5FD] flex items-center justify-center mb-12">
+                  <svg width="40" height="32" viewBox="0 0 40 32" fill="none">
+                    <path d="M3 16L14 27L37 3" stroke="#623FB5" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+
                 <button
-                  onClick={handleCreate}
-                  disabled={creating}
-                  className="px-5 py-2.5 bg-[#6B4EFF] text-white rounded-lg text-sm font-semibold hover:bg-[#5a3fee] disabled:opacity-60"
+                  onClick={() => {
+                    if (createdProjectId) selectProject(createdProjectId, createdProjectName);
+                    navigate("/projects");
+                  }}
+                  className="px-8 py-3 bg-[#623FB5] text-white rounded-lg hover:bg-[#512fa0]"
                 >
-                  {creating ? "생성 중..." : "프로젝트 생성"}
+                  프로젝트로 이동
                 </button>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

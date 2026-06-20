@@ -12,10 +12,10 @@ export default function Layout() {
   const isNoLayout = noLayoutPaths.includes(location.pathname);
 
   if (isNoLayout) {
-      const isProjectPage = location.pathname.startsWith("/projects");
+      const showHeader = location.pathname === "/projects";
       return (
         <div className="w-full min-h-screen bg-[#F6F5FA] flex flex-col">
-          {isProjectPage && <Header />}
+          {showHeader && <Header />}
           <div className="flex-1">
             <Outlet />
           </div>

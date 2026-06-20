@@ -4,6 +4,16 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
+api.interceptors.request.use((config) => {
+  try {
+    const user = JSON.parse(localStorage.getItem("hpm_user") || "null");
+    if (user?.access) {
+      config.headers.Authorization = `Bearer ${user.access}`;
+    }
+  } catch {}
+  return config;
+});
+
 // ── 타입 ──────────────────────────────────────────────────────────
 export interface AgendaItem {
   agenda_id?: number;
