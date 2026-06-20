@@ -69,7 +69,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.getenv("DB_NAME", "hpm_db"),
         'USER': os.getenv("DB_USER", "root"),
-        'PASSWORD': os.getenv("DB_PASSWORD", ""),
+        'PASSWORD': os.getenv("DB_PASSWORD", "1234"),
         'HOST': os.getenv("DB_HOST", "localhost"),
         'PORT': os.getenv("DB_PORT", "3306"),
         'OPTIONS': {'charset': 'utf8mb4'},
@@ -125,3 +125,5 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME' : timedelta(hours= 1),
     'REFRESH_TOKEN_LIFETIME' : timedelta(days=1),
 }
+
+DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
