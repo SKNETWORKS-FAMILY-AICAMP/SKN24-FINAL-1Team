@@ -22,7 +22,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
 JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET", "")
 JIRA_REDIRECT_URI = os.getenv("JIRA_REDIRECT_URI", "http://localhost:8000/api/jira/callback/")
-JIRA_SCOPES = "read:jira-work write:jira-work"
+JIRA_SCOPES = "read:jira-work write:jira-work offline_access"
 
 
 def _hash_pw(raw: str) -> str:

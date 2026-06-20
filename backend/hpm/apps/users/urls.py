@@ -6,9 +6,5 @@ urlpatterns = [
     path("login/", views.login),
     path("", views.user_list),
     path("<int:users_id>/", views.user_detail),
-    path("start/", jira_oauth_start),
-    path("callback/", jira_oauth_callback),
-    path("status/", jira_oauth_status),
-    path("projects/", jira_projects),
     path("token/refresh/", TokenRefreshView.as_view()),
 ]
