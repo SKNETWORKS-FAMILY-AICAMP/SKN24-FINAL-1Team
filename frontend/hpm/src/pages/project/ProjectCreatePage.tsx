@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import api from "../../features/meeting/api";
+import api from "../../services/meeting";
 import Header from "../../components/layout/Header";
 
 const STEPS = ["Jira 계정 연동", "Jira 프로젝트", "구성원 초대"];
@@ -82,7 +82,7 @@ export default function ProjectCreatePage() {
   }, [jiraConnected, user]);
 
   const handleJiraConnect = () => {
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user?.users_id}`;
+  window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user?.users_id}`;
 };
 
   const handleSearch = () => {
@@ -127,8 +127,6 @@ export default function ProjectCreatePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col">
-      <Header />
-
       <div className="flex-1 flex items-center justify-center py-10 pt-24">
         <div className="bg-white rounded-2xl shadow-sm p-10 w-full max-w-2xl">
           <StepBar current={step} />

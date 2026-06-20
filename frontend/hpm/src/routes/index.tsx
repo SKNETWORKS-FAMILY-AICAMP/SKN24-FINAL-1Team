@@ -1,40 +1,61 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import LoginPage from "../pages/auth/LoginPage";
 import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import ProjectSelectPage from "../pages/project/ProjectSelectPage";
 import ProjectCreatePage from "../pages/project/ProjectCreatePage";
+import DashboardPage from "../pages/project/DashboardPage";
+import KanbanBoardPage from "../pages/project/KanbanBoardPage";
 import MeetingListPage from "../pages/meeting/MeetingListPage";
 import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
 import MeetingDetailPage from "../pages/meeting/MeetingDetailPage";
 import MeetingMinutesPage from "../pages/meeting/MeetingMinutesPage";
+import SpeakerMappingPage from "../pages/meeting/SpeakerMappingPage";
 import JiraTaskPage from "../pages/meeting/JiraTaskPage";
-import UserManagementPage from "../pages/admin/UserManagementPage";
+import MeetingEmailPage from "../pages/meeting/MeetingEmailPage";
+import MeetingJiraRegisterPage from "../pages/meeting/MeetingJiraRegisterPage";
+import DocumentManagementPage from "../pages/document/DocumentManagementPage";
+import DocumentUploadPage from "../pages/document/DocumentUploadPage";
+import { DocumentManagementProvider } from "../context/DocumentManagementContext";
+import MemberManagementPage from "../pages/member/MemberManagementPage";
+
+function DocumentRoutes() {
+  return (
+    <DocumentManagementProvider>
+      <Outlet />
+    </DocumentManagementProvider>
+  );
+}
 
 const router = createBrowserRouter([
-  // 인증 없는 페이지
-  { path: "/login", element: <LoginPage /> },
-  { path: "/change-password", element: <ChangePasswordPage /> },
-  { path: "/projects", element: <ProjectSelectPage /> },
-  { path: "/projects/create", element: <ProjectCreatePage /> },
-
-  // 사이드바 있는 레이아웃
   {
     element: <Layout />,
     children: [
+      { path: "/login", element: <LoginPage /> },
+      { path: "/change-password", element: <ChangePasswordPage /> },
+      { path: "/projects", element: <ProjectSelectPage /> },
+      { path: "/projects/create", element: <ProjectCreatePage /> },
       { path: "/", element: <Navigate to="/dashboard" replace /> },
-      { path: "/dashboard", element: <MeetingListPage /> },
-      { path: "/meeting", element: <MeetingListPage /> },
-      { path: "/meeting/create", element: <MeetingCreatePage /> },
-      { path: "/meeting/:id", element: <MeetingDetailPage /> },
-      { path: "/meeting/:id/minutes", element: <MeetingMinutesPage /> },
-      { path: "/meeting/:id/jira", element: <JiraTaskPage /> },
-      { path: "/documents", element: <MeetingListPage /> },
-      { path: "/members", element: <MeetingListPage /> },
+      { path: "/dashboard", element: <KanbanBoardPage /> },
+      { path: "/meetings", element: <MeetingListPage /> },
+      { path: "/meetings/create", element: <MeetingCreatePage /> },
+      { path: "/meetings/:id", element: <MeetingDetailPage /> },
+      { path: "/meetings/:id/speaker-mapping", element: <SpeakerMappingPage /> },
+      { path: "/meetings/:id/minutes", element: <MeetingMinutesPage /> },
+      { path: "/meetings/:id/jira", element: <JiraTaskPage /> },
+      { path: "/meetings/:id/email", element: <MeetingEmailPage /> },
+      { path: "/meetings/:id/jira-register", element: <MeetingJiraRegisterPage /> },
+      {
+        path: "/documents",
+        element: <DocumentRoutes />,
+        children: [
+          { index: true, element: <DocumentManagementPage /> },
+          { path: "upload", element: <DocumentUploadPage /> },
+        ],
+      },
+      { path: "/members", element: <MemberManagementPage /> },
     ],
   },
-  // 관리자 페이지 (사이드바 없음)
-  { path: "/admin/users", element: <UserManagementPage /> },
 ]);
 
 export default router;
