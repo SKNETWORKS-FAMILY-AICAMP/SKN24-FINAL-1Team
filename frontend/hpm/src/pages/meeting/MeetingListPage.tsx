@@ -218,16 +218,16 @@ export default function MeetingListPage() {
   // 클라이언트 사이드 필터링 로직
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
-      // 1. 검색어 필터 (회의명 혹은 참여자 이름 중 첫 번째(생성자)로 필터링)
+      // 검색어 필터 
       const creatorName = m.participants?.[0]?.name || "";
       const matchSearch =
         m.title.toLowerCase().includes(search.toLowerCase()) ||
         creatorName.toLowerCase().includes(search.toLowerCase());
 
-      // 2. 상태 필터
+      // 상태 필터
       const matchStatus = statusFilter === "all" || m.status === statusFilter;
 
-      // 3. 기간 필터
+      // 기간 필터
       let matchPeriod = true;
       if (periodFilter !== "all" && m.meeting_at) {
         const meetingDate = new Date(m.meeting_at);
@@ -354,19 +354,35 @@ export default function MeetingListPage() {
       width: "110px",
       align: "center",
       render: (row) => {
-        let badgeColor = "bg-gray-100 text-gray-500";
-        let label = "종료";
         if (row.status === "scheduled") {
-          badgeColor = "bg-[#2196F3] text-white";
-          label = "예정";
-        } else if (row.status === "in_progress") {
-          badgeColor = "bg-[#623FB5] text-white";
-          label = "진행 중";
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/meetings/${row.meeting_id}`, { state: { status: "scheduled" } });
+              }}
+              className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-[#2196F3] text-white hover:opacity-80 transition cursor-pointer"
+            >
+              예정
+            </button>
+          );
         }
-
+        if (row.status === "in_progress") {
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/meetings/${row.meeting_id}`, { state: { status: "in_progress" } });
+              }}
+              className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-[#623FB5] text-white hover:opacity-80 transition cursor-pointer"
+            >
+              진행 중
+            </button>
+          );
+        }
         return (
-          <span className={`px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center ${badgeColor}`}>
-            {label}
+          <span className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-gray-100 text-gray-500">
+            종료
           </span>
         );
       },
@@ -426,7 +442,7 @@ export default function MeetingListPage() {
 
   return (
     <div className="w-full flex flex-col py-6">
-      {/* 1. 타이틀 영역 */}
+      {/* 타이틀 영역 */}
       <div className="mb-6">
         <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold`}>회의 목록</h1>
         <p className={`${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray} mt-1`}>
@@ -434,7 +450,7 @@ export default function MeetingListPage() {
         </p>
       </div>
 
-      {/* 2. 검색 및 상세 필터링 영역 */}
+      {/* 검색 및 상세 필터링 영역 */}
       <div className="flex flex-col gap-4 mb-6">
         {/* 검색 인풋 */}
         <div className="relative w-full max-w-sm">
@@ -449,7 +465,6 @@ export default function MeetingListPage() {
             className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-10 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer">
-            🔍
           </span>
         </div>
 
@@ -530,10 +545,10 @@ export default function MeetingListPage() {
         </div>
       </div>
 
-      {/* 3. 메인 테이블 영역 */}
+      {/*메인 테이블 영역 */}
       <Table data={pagedMeetings} columns={columns} isLoading={loading} />
 
-      {/* 4. 페이지네이션 영역 */}
+      {/* 페이지네이션 영역 */}
       {!loading && (
         <Pagination
           currentPage={page}
