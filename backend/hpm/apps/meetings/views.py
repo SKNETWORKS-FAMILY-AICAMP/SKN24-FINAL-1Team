@@ -31,6 +31,28 @@ def _minutes_result(data):
     return result if isinstance(result, dict) else data
 
 
+def _create_notification(user, notification_type, content, target_id=None):
+    Notification.objects.create(
+        user=user,
+        notification_type=notification_type,
+        content=content,
+        target_id=target_id,
+        is_read=False,
+    )
+
+
+def _notify_task_assigned(task):
+    if not task.meeting_users_id or not task.meeting_users:
+        return
+
+    _create_notification(
+        user=task.meeting_users.user,
+        notification_type=Notification.TASK_ASSIGNED,
+        content=f"[{task.title}] 업무가 배정되었습니다.",
+        target_id=task.meeting_task_id,
+    )
+
+
 # ── 회의 목록 / 생성 ─────────────────────────────────────────────
 @api_view(["GET", "POST"])
 def meeting_list(request):
@@ -62,7 +84,14 @@ def meeting_list(request):
 
     for participant_id in data.get("participants", []):
         try:
-            MeetingUsers.objects.create(meeting=meeting, user=Users.objects.get(pk=participant_id))
+            participant = Users.objects.get(pk=participant_id)
+            MeetingUsers.objects.create(meeting=meeting, user=participant)
+            _create_notification(
+                user=participant,
+                notification_type=Notification.MEETING_INVITED,
+                content=f"[{meeting.title}] 회의에 초대되었습니다.",
+                target_id=meeting.meeting_id,
+            )
         except Users.DoesNotExist:
             pass
 
@@ -232,7 +261,7 @@ def _create_tasks_from_todo(meeting, todo_list):
             if mapping:
                 meeting_users = mapping.meeting_users
 
-        MeetingTask.objects.create(
+        task = MeetingTask.objects.create(
             meeting=meeting,
             meeting_users=meeting_users,   # FK로 저장 (owner 문자열 제거)
             title=todo.get("title", ""),
@@ -241,6 +270,7 @@ def _create_tasks_from_todo(meeting, todo_list):
             priority=todo.get("priority", "Medium"),
             status=0,
         )
+        _notify_task_assigned(task)
 
 
 # ── 발화자 매핑 ──────────────────────────────────────────────────
@@ -293,11 +323,21 @@ def complete_minutes_review(request, meeting_id):
 
     meeting.minutes_status = Meeting.MINUTES_APPROVED
     meeting.save()
+    _notify_meeting_users(
+        meeting,
+        Notification.MINUTES_APPROVED,
+        f"[{meeting.title}] 회의록이 확정되었습니다.",
+    )
     return Response({"message": "검토 완료되었습니다.", "minutes_status": "approved"})
 
-def _notify_meeting_users(meeting, content):
+def _notify_meeting_users(meeting, notification_type, content):
     for mu in MeetingUsers.objects.filter(meeting=meeting).select_related("user"):
-        Notification.objects.create(user=mu.user, content=content, is_read=False)
+        _create_notification(
+            user=mu.user,
+            notification_type=notification_type,
+            content=content,
+            target_id=meeting.meeting_id,
+        )
 
 
 # ── 태스크 ───────────────────────────────────────────────────────
@@ -329,6 +369,7 @@ def task_list(request, meeting_id):
         priority=data.get("priority", "Medium"),
         status=0,
     )
+    _notify_task_assigned(task)
     return Response(MeetingTaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
 
@@ -338,6 +379,8 @@ def task_detail(request, meeting_id, task_id):
         task = MeetingTask.objects.get(meeting_task_id=task_id, meeting_id=meeting_id)
     except MeetingTask.DoesNotExist:
         return Response({"error": "태스크를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    old_meeting_users_id = task.meeting_users_id
 
     for field in ["title", "content", "due_date", "priority", "status"]:
         if field in request.data:
@@ -352,6 +395,8 @@ def task_detail(request, meeting_id, task_id):
             task.meeting_users = None
 
     task.save()
+    if task.meeting_users_id and task.meeting_users_id != old_meeting_users_id:
+        _notify_task_assigned(task)
     return Response(MeetingTaskSerializer(task).data)
 
 

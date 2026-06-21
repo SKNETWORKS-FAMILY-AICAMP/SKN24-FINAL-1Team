@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   HEADER_NOTIFICATION_TABS,
@@ -6,13 +6,18 @@ import {
 } from "../../constants/header";
 import {
   deleteNotification,
-  getNotifications,
   markNotificationRead,
   type Notification,
 } from "../../services/meeting";
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
+
+interface HeaderNotificationPopoverProps {
+  loading: boolean;
+  notifications: Notification[];
+  setNotifications: Dispatch<SetStateAction<Notification[]>>;
+}
 
 const TYPE_META: Record<Notification["notification_type"], { category: Exclude<NotificationTab, "전체">; kind: string }> = {
   project_member_added: { category: "프로젝트", kind: "프로젝트 추가" },
@@ -52,40 +57,29 @@ const getNotificationPath = (notification: Notification) => {
   }
 };
 
-export default function HeaderNotificationPopover() {
+export default function HeaderNotificationPopover({
+  loading,
+  notifications,
+  setNotifications,
+}: HeaderNotificationPopoverProps) {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<NotificationTab>("전체");
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadNotifications = async () => {
-      try {
-        const data = await getNotifications();
-        if (!ignore) setNotifications(data);
-      } catch {
-        if (!ignore) setNotifications([]);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    };
-
-    loadNotifications();
-
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   const visibleNotifications = useMemo(() => {
     return activeTab === "전체"
       ? notifications
       : notifications.filter((notification) => TYPE_META[notification.notification_type]?.category === activeTab);
   }, [activeTab, notifications]);
+
+  const hasUnreadInTab = (tab: NotificationTab) => {
+    return notifications.some((notification) => {
+      if (notification.is_read) return false;
+      if (tab === "전체") return true;
+      return TYPE_META[notification.notification_type]?.category === tab;
+    });
+  };
 
   const handleTabChange = (tab: NotificationTab) => {
     setActiveTab(tab);
@@ -178,13 +172,16 @@ export default function HeaderNotificationPopover() {
             type="button"
             onClick={() => handleTabChange(tab)}
             className={cn(
-              "flex h-[22px] w-[61px] items-center justify-center rounded-[5px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
+              "relative flex h-[22px] w-[61px] items-center justify-center rounded-[5px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
               activeTab === tab
                 ? "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5] hover:bg-[#C4B6E5]"
                 : "border border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
             )}
           >
             {tab}
+            {hasUnreadInTab(tab) ? (
+              <span className="absolute -right-[4px] -top-[4px] size-[8px] rounded-full border border-[#FFFDFD] bg-[#F04438]" />
+            ) : null}
           </button>
         ))}
       </div>

@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as DESIGN from "../../constants/design";
 import bell from "../../assets/header/bell.png";
 import toggle from "../../assets/header/toggle.png";
 import { useAuth } from "../../context/AuthContext";
 import type { HeaderPopover } from "../../constants/header";
+import { getNotifications, type Notification } from "../../services/meeting";
 import HeaderNotificationPopover from "./HeaderNotificationPopover";
 import HeaderProfilePopover from "./HeaderProfilePopover";
 
@@ -12,9 +13,46 @@ export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [openPopover, setOpenPopover] = useState<HeaderPopover>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+
+  const loadNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      setNotificationsLoading(false);
+      return;
+    }
+
+    setNotificationsLoading(true);
+    try {
+      const data = await getNotifications();
+      setNotifications(data);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    void loadNotifications();
+  }, [loadNotifications]);
+
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((notification) => !notification.is_read).length,
+    [notifications],
+  );
+  const unreadNotificationLabel =
+    unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
 
   const togglePopover = (popover: Exclude<HeaderPopover, null>) => {
-    setOpenPopover((current) => (current === popover ? null : popover));
+    setOpenPopover((current) => {
+      const next = current === popover ? null : popover;
+      if (popover === "notifications" && next === "notifications") {
+        void loadNotifications();
+      }
+      return next;
+    });
   };
 
   const handleChangePassword = () => {
@@ -39,10 +77,22 @@ export default function Header() {
               type="button"
               aria-label="알림"
               onClick={() => togglePopover("notifications")}
+              className="relative flex size-full items-center justify-center"
             >
               <img src={bell} alt="" />
+              {unreadNotificationCount > 0 ? (
+                <span className="absolute -right-[4px] -top-[5px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#F04438] px-[4px] text-[10px] font-semibold leading-none text-[#FFFDFD]">
+                  {unreadNotificationLabel}
+                </span>
+              ) : null}
             </button>
-            {openPopover === "notifications" ? <HeaderNotificationPopover /> : null}
+            {openPopover === "notifications" ? (
+              <HeaderNotificationPopover
+                loading={notificationsLoading}
+                notifications={notifications}
+                setNotifications={setNotifications}
+              />
+            ) : null}
           </div>
           <div className={`relative flex items-center justify-center ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.GAP_SIZES["xl"]} rounded-full ${DESIGN.PADDING_X_SIZES.sm}`}>
             <p>{user?.name}</p>
