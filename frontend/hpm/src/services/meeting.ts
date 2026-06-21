@@ -84,6 +84,31 @@ export interface MeetingCreatePayload {
   participants: number[];
 }
 
+export interface Notification {
+  notification_id: number;
+  user: number;
+  notification_type:
+    | "project_member_added"
+    | "meeting_invited"
+    | "meeting_started"
+    | "minutes_approved"
+    | "task_assigned";
+  content: string;
+  target_id: number | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface UserProfile {
+  users_id: number;
+  email: string;
+  name: string;
+  emp_no: string;
+  work: string;
+  dept_name: string;
+  rank_name: string;
+}
+
 // ── 회의 ──────────────────────────────────────────────────────────
 export const getMeetingList = async (project_id?: number): Promise<Meeting[]> => {
   const params = project_id ? { project_id } : {};
@@ -172,6 +197,11 @@ export const getUserList = async (): Promise<{ users_id: number; name: string; e
   return res.data;
 };
 
+export const getUserProfile = async (userId: number): Promise<UserProfile> => {
+  const res = await api.get(`/users/${userId}/`);
+  return res.data;
+};
+
 export default api;
 
 // ── Jira 연동 상태 ────────────────────────────────────────────────────
@@ -181,13 +211,18 @@ export const getJiraStatus = async (): Promise<{ connected: boolean }> => {
 };
 
 // ── 알림 ─────────────────────────────────────────────────────────
-export const getNotifications = async (userId: number) => {
-  const res = await api.get(`/notifications/?user_id=${userId}`);
+export const getNotifications = async (): Promise<Notification[]> => {
+  const res = await api.get("/notifications/");
   return res.data;
 };
 
-export const markNotificationRead = async (notifId: number) => {
-  await api.patch(`/notifications/${notifId}/read/`);
+export const markNotificationRead = async (notifId: number): Promise<Notification> => {
+  const res = await api.patch(`/notifications/${notifId}/read/`);
+  return res.data;
+};
+
+export const deleteNotification = async (notifId: number): Promise<void> => {
+  await api.delete(`/notifications/${notifId}/`);
 };
 
 // ── 프로젝트 ─────────────────────────────────────────────────────

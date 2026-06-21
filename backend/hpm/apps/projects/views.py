@@ -40,7 +40,9 @@ def project_list(request):
             ProjectUsers.objects.create(project=project, user=user)
             Notification.objects.create(
                 user=user,
+                notification_type=Notification.PROJECT_MEMBER_ADDED,
                 content=f"[{project.project_name}] 프로젝트에 초대되었습니다.",
+                target_id=project.project_id,
                 is_read=False,
             )
         except Users.DoesNotExist:
@@ -73,18 +75,20 @@ def project_detail(request, project_id):
         for uid in add_ids:
             try:
                 user = Users.objects.get(pk=uid)
-                ProjectUsers.objects.get_or_create(project=project, user=user)
-                Notification.objects.create(user=user, content=f"[{project.project_name}] 프로젝트에 추가되었습니다.", is_read=False)
+                _, created = ProjectUsers.objects.get_or_create(project=project, user=user)
+                if created:
+                    Notification.objects.create(
+                        user=user,
+                        notification_type=Notification.PROJECT_MEMBER_ADDED,
+                        content=f"[{project.project_name}] 프로젝트에 추가되었습니다.",
+                        target_id=project.project_id,
+                        is_read=False,
+                    )
             except Users.DoesNotExist:
                 pass
 
         for uid in remove_ids:
             ProjectUsers.objects.filter(project=project, user_id=uid).delete()
-            try:
-                user = Users.objects.get(pk=uid)
-                Notification.objects.create(user=user, content=f"[{project.project_name}] 프로젝트에서 제외되었습니다.", is_read=False)
-            except Users.DoesNotExist:
-                pass
 
         return Response(ProjectSerializer(project).data)
 
