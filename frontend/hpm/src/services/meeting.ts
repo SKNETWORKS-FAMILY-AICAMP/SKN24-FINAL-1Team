@@ -110,6 +110,33 @@ export interface UserProfile {
   rank_name: string;
 }
 
+export interface UserListItem {
+  users_id: number;
+  name: string;
+  email: string;
+  work?: string;
+  dept?: number;
+  rank?: number;
+  dept_name?: string;
+  rank_name?: string;
+}
+
+export interface ProjectMember {
+  user_id: number;
+  name: string;
+  email: string;
+  work: string;
+  dept_name: string;
+  rank_name: string;
+}
+
+export interface ProjectDetail {
+  project_id: number;
+  project_owner: number;
+  project_name: string;
+  members: ProjectMember[];
+}
+
 // ── 회의 ──────────────────────────────────────────────────────────
 export const getMeetingList = async (project_id?: number): Promise<Meeting[]> => {
   const params = project_id ? { project_id } : {};
@@ -193,7 +220,7 @@ export const sendChatMessage = async (meetingId: number, query: string): Promise
 };
 
 // ── 유저 ─────────────────────────────────────────────────────────
-export const getUserList = async (): Promise<{ users_id: number; name: string; email: string }[]> => {
+export const getUserList = async (): Promise<UserListItem[]> => {
   const res = await api.get("/users/");
   return res.data;
 };
@@ -230,6 +257,15 @@ export const deleteNotification = async (notifId: number): Promise<void> => {
 export const getProjects = async () => {
   const res = await api.get("/projects/");
   return res.data;
+};
+
+export const getProjectDetail = async (projectId: number): Promise<ProjectDetail> => {
+  const res = await api.get(`/projects/${projectId}/`);
+  return res.data;
+};
+
+export const addProjectMembers = async (projectId: number, memberIds: number[]): Promise<void> => {
+  await api.patch(`/projects/${projectId}/`, { add_member_ids: memberIds });
 };
 
 export const createProject = async (data: { name: string; description: string }) => {
