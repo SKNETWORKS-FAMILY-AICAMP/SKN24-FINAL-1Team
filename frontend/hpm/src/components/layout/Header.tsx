@@ -23,6 +23,16 @@ export default function Header() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
+  const addNotification = useCallback((notification: Notification) => {
+    setNotifications((current) => {
+      if (current.some((item) => item.notification_id === notification.notification_id)) {
+        return current;
+      }
+
+      return [notification, ...current];
+    });
+  }, []);
+
   const loadNotifications = useCallback(async () => {
     if (!user) {
       setNotifications([]);
@@ -44,6 +54,40 @@ export default function Header() {
   useEffect(() => {
     void loadNotifications();
   }, [loadNotifications]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let accessToken = "";
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("hpm_user") || "null");
+      accessToken = savedUser?.access || "";
+    } catch {
+      accessToken = "";
+    }
+
+    if (!accessToken) return;
+
+    const url = new URL(`${import.meta.env.VITE_API_BASE_URL}/notifications/stream/`);
+    url.searchParams.set("token", accessToken);
+
+    const source = new EventSource(url.toString());
+    const handleNotification = (event: Event) => {
+      try {
+        const message = event as MessageEvent<string>;
+        addNotification(JSON.parse(message.data) as Notification);
+      } catch {
+        // Ignore malformed SSE messages and keep the stream alive.
+      }
+    };
+
+    source.addEventListener("notification", handleNotification);
+
+    return () => {
+      source.removeEventListener("notification", handleNotification);
+      source.close();
+    };
+  }, [addNotification, user]);
 
   const loadProfile = useCallback(async () => {
     if (!user?.users_id) {

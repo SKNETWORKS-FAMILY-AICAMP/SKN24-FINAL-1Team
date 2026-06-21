@@ -68,28 +68,28 @@ export const INITIAL_MEMBERS: MemberRecord[] = [
 
 export const MEMBER_INVITE_CANDIDATES: MemberInviteCandidate[] = [
   {
-    id: "kim-kyuho",
+    id: 1,
     name: "김규호",
     role: "부장",
     email: "kkh@company.com",
     department: "개발 1팀",
   },
   {
-    id: "kim-jiho",
+    id: 2,
     name: "김지호",
     role: "부장",
     email: "kkh@company.com",
     department: "개발 1팀",
   },
   {
-    id: "kim-gyoho",
+    id: 3,
     name: "김교호",
     role: "부장",
     email: "kkh@company.com",
     department: "개발 1팀",
   },
   {
-    id: "kim-ho",
+    id: 4,
     name: "김호",
     role: "부장",
     email: "kkh@company.com",

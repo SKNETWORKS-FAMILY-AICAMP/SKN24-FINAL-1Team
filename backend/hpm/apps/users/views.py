@@ -61,8 +61,11 @@ def login(request):
     if user.status != 0:
         return Response({"error": "비활성화된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
 
+    if user.account_status == 2:
+        return Response({"error": "잠금 처리된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
+
     data = UserSerializer(user).data
-    data["is_initial_password"] = (user.password == "abc123")
+    data["is_initial_password"] = (user.account_status == 0)
     tokens = get_tokens_for_user(user)
     data.update(tokens)
     return  Response(data)
@@ -71,8 +74,20 @@ def login(request):
 @api_view(["GET"])
 def user_list(request):
     """전체 사용자 목록 (관리자용)"""
-    users = Users.objects.all().order_by("-created_at")
-    return Response(UserSerializer(users, many=True).data)
+    users = Users.objects.select_related("dept", "rank").all().order_by("-created_at")
+    return Response([
+        {
+            "users_id": user.users_id,
+            "email": user.email,
+            "name": user.name,
+            "work": user.work,
+            "dept": user.dept_id,
+            "rank": user.rank_id,
+            "dept_name": user.dept.dept_name,
+            "rank_name": user.rank.rank_name,
+        }
+        for user in users
+    ])
 
 
 @api_view(["GET", "PATCH"])
@@ -102,6 +117,7 @@ def user_detail(request, users_id):
     new_pw = request.data.get("password")
     if new_pw:
         user.password = _hash_pw(new_pw)
+        user.account_status = 1
 
     user.save()
     return Response(UserSerializer(user).data)

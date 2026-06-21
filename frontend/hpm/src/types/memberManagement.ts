@@ -11,7 +11,7 @@ export interface MemberRecord {
 }
 
 export interface MemberInviteCandidate {
-  id: string;
+  id: number;
   name: string;
   role: string;
   email: string;

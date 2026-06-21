@@ -1,6 +1,14 @@
+import json
+import time
+
+from django.db import close_old_connections
+from django.http import StreamingHttpResponse
 from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import AccessToken
 from .models import Notification
 from .serializers import NotificationSerializer
 
@@ -12,6 +20,46 @@ def notification_list(request):
     qs = Notification.objects.filter(user_id=user_id).order_by("-created_at", "-notification_id")
 
     return Response(NotificationSerializer(qs, many=True).data)
+
+
+@api_view(["GET"])
+@authentication_classes([])
+@permission_classes([AllowAny])
+def notification_stream(request):
+    raw_token = request.query_params.get("token")
+    if not raw_token:
+        return Response({"error": "token is required"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        token = AccessToken(raw_token)
+        user_id = token["user_id"]
+    except (KeyError, TokenError):
+        return Response({"error": "invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+
+    last_id = int(request.query_params.get("last_id") or 0)
+
+    def event_stream():
+        nonlocal last_id
+
+        while True:
+            close_old_connections()
+            qs = Notification.objects.filter(
+                user_id=user_id,
+                notification_id__gt=last_id,
+            ).order_by("notification_id")
+
+            for notif in qs:
+                last_id = max(last_id, notif.notification_id)
+                payload = json.dumps(NotificationSerializer(notif).data, ensure_ascii=False)
+                yield f"event: notification\ndata: {payload}\n\n"
+
+            yield ": keep-alive\n\n"
+            time.sleep(1)
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @api_view(["PATCH"])
