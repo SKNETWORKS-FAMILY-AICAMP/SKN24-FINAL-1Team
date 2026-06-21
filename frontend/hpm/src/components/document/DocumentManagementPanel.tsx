@@ -20,7 +20,6 @@ interface DocumentManagementPanelProps {
   uploadDates: string[];
   onCreatorFilterChange: (creator: string) => void;
   onDeleteSelected: () => void;
-  onDownloadDocument: (document: DocumentRecord) => void;
   onDownloadSelected: () => void;
   onOpenUpload: () => void;
   onQueryChange: (query: string) => void;
@@ -31,24 +30,6 @@ interface DocumentManagementPanelProps {
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
-
-function SearchIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="size-[22px] shrink-0"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="m20 20-4.1-4.1m1.35-5.15a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z"
-        stroke="#141414"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
 
 function DownloadIcon({ className = "size-[20px]" }: { className?: string }) {
   return (
@@ -79,25 +60,6 @@ function ChevronIcon({ direction }: { direction: "left" | "right" }) {
     >
       <path
         d="m9 5 7 7-7 7"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function DropdownChevronIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="pointer-events-none absolute right-[14px] top-1/2 size-[14px] -translate-y-1/2 text-[#141414]"
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="m6 9 6 6 6-6"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -155,7 +117,6 @@ export default function DocumentManagementPanel({
   uploadDates,
   onCreatorFilterChange,
   onDeleteSelected,
-  onDownloadDocument,
   onDownloadSelected,
   onOpenUpload,
   onQueryChange,

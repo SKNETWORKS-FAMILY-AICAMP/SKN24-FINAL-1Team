@@ -264,6 +264,29 @@ export const getProjectDetail = async (projectId: number): Promise<ProjectDetail
   return res.data;
 };
 
+export interface JiraBoardIssue {
+  issue_key: string;
+  title: string;
+  description: string;
+  assignee: string;
+  priority: string;
+  due_date: string;
+  created: string;
+  status: string;
+}
+
+export interface ProjectJiraBoard {
+  todo: JiraBoardIssue[];
+  progress: JiraBoardIssue[];
+  review: JiraBoardIssue[];
+  done: JiraBoardIssue[];
+}
+
+export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
+  const res = await api.get(`/projects/${projectId}/jira-board/`);
+  return res.data;
+};
+
 export const addProjectMembers = async (projectId: number, memberIds: number[]): Promise<void> => {
   await api.patch(`/projects/${projectId}/`, { add_member_ids: memberIds });
 };

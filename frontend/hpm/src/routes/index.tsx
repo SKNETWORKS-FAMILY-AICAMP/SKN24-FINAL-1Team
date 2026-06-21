@@ -21,15 +21,10 @@ import MeetingEmailPage from "../pages/meeting/MeetingEmailPage";
 import MeetingJiraRegisterPage from "../pages/meeting/MeetingJiraRegisterPage";
 import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
-import { DocumentManagementProvider } from "../context/DocumentManagementContext";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 
 function DocumentRoutes() {
-  return (
-    <DocumentManagementProvider>
-      <Outlet />
-    </DocumentManagementProvider>
-  );
+  return <Outlet />;
 }
 
 const router = createBrowserRouter([
