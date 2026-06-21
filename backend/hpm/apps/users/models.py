@@ -38,12 +38,14 @@ class Users(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="계정 생성 일시")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="계정 수정 일시")
+    is_initial_password = models.BooleanField(default=True, verbose_name="최초 비밀번호")
 
     jira_account_id = models.CharField(max_length=255, null=True, blank=True, db_column="jira_account_Id", verbose_name="아이디")
     jira_access_token = models.TextField(null=True, blank=True, verbose_name="Jira 액세스 토큰")
     jira_refresh_token = models.TextField(null=True, blank=True, verbose_name="Jira 리프레시 토큰")
     jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Jira 토큰 만료 일시")
     jira_cloud_id = models.CharField(max_length=255, null=True, blank=True, verbose_name="Jira 클라우드 ID")
+    jira_project_key = models.CharField(max_length=50, null=True, blank=True, verbose_name="Jira 프로젝트 키")
 
     @property
     def is_authenticated(self):

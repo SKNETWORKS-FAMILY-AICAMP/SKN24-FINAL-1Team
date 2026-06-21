@@ -11,6 +11,8 @@ import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
 import MeetingUploadPage from "../pages/meeting/MeetingUploadPage";
 import AgendaCreatePage from "../pages/meeting/AgendaCreatePage";
 import PrepMaterialPage from "../pages/meeting/PrepMaterialPage";
+import MeetingCompletePage from "../pages/meeting/MeetingCompletePage";
+import MeetingInviteEmailPage from "../pages/meeting/MeetingInviteEmailPage";
 import MeetingDetailPage from "../pages/meeting/MeetingDetailPage";
 import MeetingMinutesPage from "../pages/meeting/MeetingMinutesPage";
 import SpeakerMappingPage from "../pages/meeting/SpeakerMappingPage";
@@ -45,6 +47,8 @@ const router = createBrowserRouter([
       { path: "/meetings/:id/upload", element: <MeetingUploadPage /> },
       { path: "/meetings/:id/agenda", element: <AgendaCreatePage /> },
       { path: "/meetings/:id/prep-material", element: <PrepMaterialPage /> },
+      { path: "/meetings/:id/complete", element: <MeetingCompletePage /> },
+      { path: "/meetings/:id/invite-email", element: <MeetingInviteEmailPage /> },
       { path: "/meetings/:id", element: <MeetingDetailPage /> },
       { path: "/meetings/:id/speaker-mapping", element: <SpeakerMappingPage /> },
       { path: "/meetings/:id/minutes", element: <MeetingMinutesPage /> },
