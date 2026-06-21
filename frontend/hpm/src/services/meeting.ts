@@ -14,6 +14,33 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const original = error.config;
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true;
+      try {
+        const user = JSON.parse(localStorage.getItem("hpm_user") || "null");
+        if (!user?.refresh) return Promise.reject(error);
+        const res = await axios.post(
+          `${import.meta.env.VITE_API_BASE_URL}/users/token/refresh/`,
+          { refresh: user.refresh }
+        );
+        const newAccess = res.data.access;
+        user.access = newAccess;
+        localStorage.setItem("hpm_user", JSON.stringify(user));
+        original.headers.Authorization = `Bearer ${newAccess}`;
+        return api(original);
+      } catch {
+        localStorage.removeItem("hpm_user");
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ── 타입 ──────────────────────────────────────────────────────────
 export interface AgendaItem {
   agenda_id?: number;
@@ -146,6 +173,12 @@ export const getUserList = async (): Promise<{ users_id: number; name: string; e
 };
 
 export default api;
+
+// ── Jira 연동 상태 ────────────────────────────────────────────────────
+export const getJiraStatus = async (): Promise<{ connected: boolean }> => {
+  const res = await api.get("/jira/status/");
+  return res.data;
+};
 
 // ── 알림 ─────────────────────────────────────────────────────────
 export const getNotifications = async (userId: number) => {
