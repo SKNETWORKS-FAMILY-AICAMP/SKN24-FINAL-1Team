@@ -10,7 +10,7 @@ interface Project {
   project_id: number;
   project_name: string;
   startDate: string;
-  members?: string[];
+  members: string[];
 }
 
 export default function ProjectSelectPage() {
@@ -31,7 +31,14 @@ export default function ProjectSelectPage() {
     })
       .then((res) => {
         console.log("프로젝트 API 응답:", res.data);
-        setProjects(res.data);
+        setProjects(
+          res.data.map((project: Partial<Project>) => ({
+            project_id: project.project_id ?? 0,
+            project_name: project.project_name ?? "",
+            startDate: project.startDate ?? "",
+            members: project.members ?? [],
+          })),
+        );
       })
       .catch(console.error)
       .finally(() => setLoading(false));

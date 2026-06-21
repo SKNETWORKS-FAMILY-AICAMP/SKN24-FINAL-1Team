@@ -18,41 +18,6 @@ import type {
   KanbanPriority,
   KanbanTask,
 } from "../../types/kanban";
-import { getJiraBoard } from "../../services/jira";
-import type { JiraBoard } from "../../services/jira";
-
-const PRIORITY_MAP: Record<string, KanbanPriority> = {
-  Highest: "매우 높음",
-  High: "높음",
-  Medium: "중간",
-  Low: "낮음",
-  Lowest: "매우 낮음",
-};
-
-function jiraBoardToTasks(board: JiraBoard): KanbanTask[] {
-  const tasks: KanbanTask[] = [];
-  let id = 1;
-
-  (Object.keys(board) as KanbanColumnId[]).forEach((columnId) => {
-    board[columnId].forEach((issue) => {
-      tasks.push({
-        id: id++,
-        columnId,
-        title: issue.title,
-        description: "",
-        category: "서비스 기획",
-        dueDate: issue.due_date ?? "",
-        startDate: "",
-        assignee: issue.assignee,
-        priority: PRIORITY_MAP[issue.priority] ?? "중간",
-        code: issue.issue_key,
-        owner: issue.assignee,
-      });
-    });
-  });
-
-  return tasks;
-}
 
 const mapJiraPriority = (priority: string): KanbanPriority => {
   const normalized = priority.toLowerCase();
@@ -87,21 +52,6 @@ export default function KanbanBoardPage() {
   const { projectId, projectName } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    getJiraBoard()
-      .then((board) => {
-        setTasks(jiraBoardToTasks(board));
-      })
-      .catch(() => {
-        setError("Jira 보드를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
 
   useEffect(() => {
     if (!projectId) {
@@ -185,22 +135,6 @@ export default function KanbanBoardPage() {
     });
     closeModal();
   };
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-[#623FB5]">Jira 보드 불러오는 중...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-red-500">{error}</p>
-      </div>
-    );
-  }
 
   return (
     <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[80px] pt-[64px] font-pretendard">
