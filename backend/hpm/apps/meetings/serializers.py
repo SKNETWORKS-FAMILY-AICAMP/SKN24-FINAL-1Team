@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, SpeakerMapping
+from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance
 
 
 class MeetingSerializer(serializers.ModelSerializer):
@@ -31,7 +31,7 @@ class RecordSerializer(serializers.ModelSerializer):
         model = Record
         fields = "__all__"
 
-class SpeakerMappingSerializer(serializers.ModelSerializer):
+class RecordUtteranceSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SpeakerMapping
+        model = RecordUtterance
         fields = "__all__"

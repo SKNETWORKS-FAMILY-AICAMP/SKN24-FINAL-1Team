@@ -9,8 +9,8 @@ from rest_framework.response import Response
 
 from apps.notifications.models import Notification
 from apps.users.models import Users
-from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, SpeakerMapping
-from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, SpeakerMappingSerializer
+from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance
+from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, RecordUtteranceSerializer
 
 
 def _minutes_payload(meeting, text):
@@ -225,7 +225,7 @@ def _create_tasks_from_todo(meeting, todo_list):
         owner_label = todo.get("owner", "")
         meeting_users = None
         if owner_label:
-            mapping = SpeakerMapping.objects.filter(
+            mapping = RecordUtterance.objects.filter(
                 meeting=meeting,
                 speaker_label=owner_label
             ).first()
@@ -253,20 +253,20 @@ def speaker_mapping_list(request, meeting_id):
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
-        mappings = SpeakerMapping.objects.filter(meeting=meeting)
-        return Response(SpeakerMappingSerializer(mappings, many=True).data)
+        mappings = RecordUtterance.objects.filter(meeting=meeting)
+        return Response(RecordUtteranceSerializer(mappings, many=True).data)
 
     # POST - 매핑 저장 (기존 매핑 삭제 후 새로 저장)
     # 요청 형식: [{"speaker_label": "SPEAKER_01", "meeting_users_id": 3}, ...]
     items = request.data.get("mappings", [])
-    SpeakerMapping.objects.filter(meeting=meeting).delete()
+    RecordUtterance.objects.filter(meeting=meeting).delete()
     created = []
     for item in items:
         try:
             meeting_user = MeetingUsers.objects.get(
                 meeting_users_id=item.get("meeting_users_id")
             )
-            mapping = SpeakerMapping.objects.create(
+            mapping = RecordUtterance.objects.create(
                 meeting=meeting,
                 speaker_label=item.get("speaker_label", ""),
                 meeting_users=meeting_user,
@@ -275,7 +275,7 @@ def speaker_mapping_list(request, meeting_id):
         except MeetingUsers.DoesNotExist:
             pass
 
-    return Response(SpeakerMappingSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+    return Response(RecordUtteranceSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
 
 
 # ── 회의록 승인 플로우 ───────────────────────────────────────────

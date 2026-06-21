@@ -1,5 +1,5 @@
 from django.db import models
-
+from django.conf import settings
 
 class Dept(models.Model):
     dept_id = models.AutoField(primary_key=True, verbose_name="부서 식별 번호")
@@ -31,15 +31,15 @@ class Users(models.Model):
     name = models.CharField(max_length=90, verbose_name="이름")
     work = models.CharField(max_length=150, verbose_name="담당 업무")
 
-    password = models.CharField(max_length=255, default="abc123", verbose_name="비밀번호")
+    password = models.CharField(max_length=255, default=settings.DEFAULT_USER_PASSWORD, verbose_name="비밀번호")
     account_status = models.IntegerField(default=0, verbose_name="계정 상태")
     status = models.IntegerField(default=0, verbose_name="사용자 상태")
-    account_id = models.CharField(max_length=255, null=True, blank=True, db_column="account_Id", verbose_name="아이디")
     role = models.CharField(max_length=20, default="USER", verbose_name="관리자/사용자")
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="계정 생성 일시")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="계정 수정 일시")
 
+    jira_account_id = models.CharField(max_length=255, null=True, blank=True, db_column="jira_account_Id", verbose_name="아이디")
     jira_access_token = models.TextField(null=True, blank=True, verbose_name="Jira 액세스 토큰")
     jira_refresh_token = models.TextField(null=True, blank=True, verbose_name="Jira 리프레시 토큰")
     jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Jira 토큰 만료 일시")

@@ -125,3 +125,5 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME' : timedelta(hours= 1),
     'REFRESH_TOKEN_LIFETIME' : timedelta(days=1),
 }
+
+DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
