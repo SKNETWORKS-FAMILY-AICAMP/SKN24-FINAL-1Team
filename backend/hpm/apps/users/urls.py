@@ -4,6 +4,7 @@ from .views import login, user_list, user_detail, jira_oauth_start, jira_oauth_c
 from rest_framework_simplejwt.views import TokenRefreshView
 urlpatterns = [
     path("login/", views.login),
+    path('me/', views.get_me, name='get_me'),
     path("", views.user_list),
     path("<int:users_id>/", views.user_detail),
     path("token/refresh/", TokenRefreshView.as_view()),

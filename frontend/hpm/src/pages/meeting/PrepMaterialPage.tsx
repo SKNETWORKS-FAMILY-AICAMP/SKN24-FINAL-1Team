@@ -37,7 +37,6 @@ export default function PrepMaterialPage() {
     if (downloading) return;
     setDownloading(true);
     try {
-
       const sections = [
         { label: "회의 목적", value: purpose },
         { label: "프로젝트 현재 상태", value: currentState },
@@ -48,38 +47,57 @@ export default function PrepMaterialPage() {
 
       const wrapper = document.createElement("div");
       wrapper.style.cssText = `
-        position:fixed; top:-9999px; left:0;
+        position:absolute; top:-9999px; left:-9999px;
         width:700px; background:#fff;
-        padding:40px 40px 56px;
+        padding:48px 48px 60px;
         font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
         box-sizing:border-box; color:#111;
       `;
 
-      // 전체 외곽 컨테이너
+      // 제목
+      const title = document.createElement("div");
+      title.style.cssText = `
+        text-align:center; font-size:17px; font-weight:700;
+        margin-bottom:24px;
+      `;
+      title.textContent = "회의 준비 자료";
+      wrapper.appendChild(title);
+
+      // 표 컨테이너 
       const outer = document.createElement("div");
-      outer.style.cssText = `border:1px solid #000; width:100%;`;
+      outer.style.cssText = `width:100%;`;
 
       sections.forEach(({ label, value }, idx) => {
+        const isFirst = idx === 0;
+
         // 섹션 헤더
         const header = document.createElement("div");
         header.style.cssText = `
-          text-align:center; padding:6px 10px;
+          padding:10px 10px 20px;
+          text-align:center;
+          line-height:1.3;
           font-size:13px; font-weight:600;
-          border-top:${idx === 0 ? "none" : "2px solid #000"};
+          border-left:1px solid #000;
+          border-right:1px solid #000;
+          border-top:${isFirst ? "1px solid #000" : "none"};
           border-bottom:1px solid #000;
-          background:#fff;
+          box-sizing:border-box;
         `;
         header.textContent = label;
         outer.appendChild(header);
 
-        // 내용 영역
+        // 내용 행
         const content = document.createElement("div");
         content.style.cssText = `
           padding:14px 18px;
           font-size:12px; line-height:1.9;
           white-space:pre-wrap; word-break:break-word;
           min-height:60px;
-          border-bottom:${idx < sections.length - 1 ? "none" : "none"};
+          border-left:1px solid #000;
+          border-right:1px solid #000;
+          border-top:none;
+          border-bottom:1px solid #000;
+          box-sizing:border-box;
         `;
         content.textContent = value;
         outer.appendChild(content);
@@ -99,8 +117,8 @@ export default function PrepMaterialPage() {
       document.body.removeChild(wrapper);
 
       const imgData = canvas.toDataURL("image/png");
-      const pageW = 210; // A4 너비 (mm)
-      const pageH = Math.ceil(canvas.height * pageW / canvas.width); // 콘텐츠 높이에 맞춤
+      const pageW = 210;
+      const pageH = Math.ceil(canvas.height * pageW / canvas.width);
       const pdf = new jsPDF({ orientation: "p", unit: "mm", format: [pageW, pageH] });
       pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
       pdf.save("회의_준비_자료.pdf");
@@ -174,7 +192,7 @@ export default function PrepMaterialPage() {
           </div>
         ))}
 
-        {/* 참조 문서 목록(수정 불가) */}
+        {/* 참조 문서 목록*/}
         <div>
           <p className="text-[14px] text-[#141414] font-bold mb-2">참조 문서 목록</p>
           <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-1">
@@ -191,7 +209,7 @@ export default function PrepMaterialPage() {
       {/* 다음 버튼 */}
       <div className="flex justify-end mt-8">
         <button
-          onClick={() => navigate(`/meetings/${meetingId}`, { state: { showAgenda, showPrepMaterial: true } })}
+          onClick={() => navigate(`/meetings/${meetingId}/complete`)}
           className="px-8 py-2.5 text-white text-[14px] rounded-lg transition"
           style={{ backgroundColor: "#623FB5" }}
         >

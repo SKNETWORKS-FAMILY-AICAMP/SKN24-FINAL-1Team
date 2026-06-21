@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useRecording } from "../../context/RecordingContext";
 import mikeImg from "../../assets/meeting/mike.png";
 import recordingImg from "../../assets/meeting/recording.png";
 import stopImg from "../../assets/meeting/stop.png";
@@ -20,16 +21,22 @@ export default function MeetingDetailPage() {
   const location = useLocation();
   const meetingId = Number(id);
 
-  // 회의 생성 모달(선택한 섹션 표시 여부)
-  const { showAgenda = true, showPrepMaterial = true } =
-    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean }) ?? {};
+  // 회의 생성 모달(선택한 섹션 표시 여부) + 목록에서 넘어올 때 status
+  const { showAgenda = true, showPrepMaterial = true, status: navStatus } =
+    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; status?: string }) ?? {};
+
+  const { meetingId: ctxMeetingId, startTime: ctxStartTime, startRecording, stopRecording } = useRecording();
+
+  // 이 회의가 사이드바에서 되돌아온 경우 → 컨텍스트의 startTime으로 경과 시간 복원
+  const isReturningToRecording = ctxMeetingId === meetingId && ctxStartTime !== null;
+  const initialStatus = isReturningToRecording || navStatus === "in_progress" ? "in_progress" : "scheduled";
 
   const [meeting, setMeeting] = useState<Meeting | null>({
     meeting_id: meetingId,
     title: "2025 Q3 제품 로드맵 검토",
     location: "3층 대회의실",
     meeting_at: "2025-06-10T14:00:00",
-    status: "scheduled",
+    status: initialStatus,
     minutes_status: "draft",
     meeting_document: null,
     is_meeting: true,
@@ -47,7 +54,11 @@ export default function MeetingDetailPage() {
       { content: "직원 만족도 조사 결과 공유", reason: "만족도 조사 종합 피드백 공유" }
     ]
   });
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(() =>
+    isReturningToRecording && ctxStartTime !== null
+      ? Math.floor((Date.now() - ctxStartTime) / 1000)
+      : 0
+  );
   const [chatFilter, setChatFilter] = useState("전체");
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
@@ -63,6 +74,14 @@ export default function MeetingDetailPage() {
   const chatRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // 진행 중 상태로 진입했을 때 recording context 설정 (사이드바 타이머용)
+  useEffect(() => {
+    if (initialStatus === "in_progress" && ctxMeetingId !== meetingId) {
+      startRecording(meetingId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     // 임시 더미데이터 or API 데이터 세팅
@@ -104,17 +123,18 @@ export default function MeetingDetailPage() {
   const handleStart = async () => {
     try {
       await startMeeting(meetingId);
-      // 녹음 시작
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
       recorder.ondataavailable = e => chunksRef.current.push(e.data);
       recorder.start();
       mediaRef.current = recorder;
+      startRecording(meetingId);
       setMeeting(m => m ? { ...m, status: "in_progress" } : m);
       setElapsed(0);
     } catch (e) {
       alert("회의 시작에 실패했습니다. (데모 환경에서는 가상으로 회의를 시작합니다.)");
+      startRecording(meetingId);
       setMeeting(m => m ? { ...m, status: "in_progress" } : m);
       setElapsed(0);
     }
@@ -139,6 +159,7 @@ export default function MeetingDetailPage() {
   const handleEnd = async () => {
     if (timerRef.current) clearInterval(timerRef.current);
     setEndLoading(true);
+    stopRecording();
     try {
       let audioFile: File | undefined;
       if (mediaRef.current && mediaRef.current.state !== "inactive") {
@@ -188,8 +209,8 @@ export default function MeetingDetailPage() {
           <div className="flex-1">
             <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold mb-2`}>{meeting.title}</h1>
             <div className={`flex flex-wrap items-center gap-4 ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray} mb-3`}>
-              <span>📅 {meeting.meeting_at?.slice(0, 10)} · {meeting.meeting_at?.slice(11, 16) || "14:00"} - 16:00</span>
-              <span>📍 {meeting.location || "3층 대회의실"}</span>
+              <span> {meeting.meeting_at?.slice(0, 10)} · {meeting.meeting_at?.slice(11, 16) || "14:00"} - 16:00</span>
+              <span> {meeting.location || "3층 대회의실"}</span>
             </div>
             
             {/* 참석자 정보 */}
