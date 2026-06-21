@@ -5,9 +5,13 @@ import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
+  KANBAN_CATEGORIES,
   KANBAN_COLUMNS,
+  KANBAN_PRIORITIES,
   toKanbanFormValues,
 } from "../../constants/kanban";
+import { useAuth } from "../../context/AuthContext";
+import { getProjectJiraBoard, type ProjectJiraBoard } from "../../services/meeting";
 import type {
   KanbanColumnId,
   KanbanModalState,
@@ -50,7 +54,37 @@ function jiraBoardToTasks(board: JiraBoard): KanbanTask[] {
   return tasks;
 }
 
+const mapJiraPriority = (priority: string): KanbanPriority => {
+  const normalized = priority.toLowerCase();
+  if (normalized.includes("highest")) return KANBAN_PRIORITIES[4];
+  if (normalized.includes("high")) return KANBAN_PRIORITIES[3];
+  if (normalized.includes("lowest")) return KANBAN_PRIORITIES[0];
+  if (normalized.includes("low")) return KANBAN_PRIORITIES[1];
+  return KANBAN_PRIORITIES[2];
+};
+
+const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
+  let nextId = 1;
+
+  return KANBAN_COLUMNS.flatMap((column) =>
+    (board[column.id] ?? []).map((issue) => ({
+      id: nextId++,
+      columnId: column.id,
+      title: issue.title,
+      description: issue.description,
+      category: KANBAN_CATEGORIES[2],
+      dueDate: issue.due_date || "",
+      startDate: issue.created ? issue.created.slice(0, 10) : "",
+      assignee: issue.assignee,
+      priority: mapJiraPriority(issue.priority),
+      code: issue.issue_key,
+      owner: issue.assignee || "-",
+    })),
+  );
+};
+
 export default function KanbanBoardPage() {
+  const { projectId, projectName } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +102,20 @@ export default function KanbanBoardPage() {
         setLoading(false);
       });
   }, []);
+
+  useEffect(() => {
+    if (!projectId) {
+      setTasks([]);
+      return;
+    }
+
+    getProjectJiraBoard(projectId)
+      .then((board) => setTasks(jiraBoardToTasks(board)))
+      .catch((error) => {
+        console.error("Jira 칸반 조회 실패:", error);
+        setTasks([]);
+      });
+  }, [projectId]);
 
   const tasksByColumn = useMemo(() => {
     return KANBAN_COLUMNS.reduce<Record<KanbanColumnId, KanbanTask[]>>(
@@ -165,7 +213,7 @@ export default function KanbanBoardPage() {
         <section className="absolute left-[68px] top-[32px] flex items-center gap-[10px]">
           <img alt="" aria-hidden="true" className="size-[29px] object-contain" src={projectIcon} />
           <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
-            신규 웹사이트 제작
+            {projectName || "Jira 칸반"}
           </h1>
         </section>
         {KANBAN_COLUMNS.map((column) => (
