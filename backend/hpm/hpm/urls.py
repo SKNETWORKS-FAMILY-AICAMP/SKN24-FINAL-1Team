@@ -2,8 +2,11 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from apps.users.views import jira_oauth_start, jira_oauth_callback, jira_oauth_status, jira_projects
-
+from apps.users.views import (
+    jira_oauth_start, jira_oauth_callback, jira_oauth_status, jira_projects,
+    jira_board, jira_board_issue_status, jira_board_issue_delete,
+    jira_set_project_key, jira_workspaces, jira_select_workspace,
+)
 urlpatterns = [
     path('admin/', admin.site.urls),
     # 사용자
@@ -23,4 +26,12 @@ urlpatterns = [
     path("api/jira/callback/", jira_oauth_callback),
     path("api/jira/status/",   jira_oauth_status),
     path("api/jira/projects/", jira_projects),
+
+    path("api/jira/board/",                              jira_board),
+    path("api/jira/board/issue/<str:issue_key>/status/", jira_board_issue_status),
+    path("api/jira/board/issue/<str:issue_key>/",        jira_board_issue_delete),
+
+    path("api/jira/project-key/", jira_set_project_key),
+    path("api/jira/workspaces/", jira_workspaces),
+    path("api/jira/select-workspace/", jira_select_workspace),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

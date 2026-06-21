@@ -44,6 +44,7 @@ class Users(models.Model):
     jira_refresh_token = models.TextField(null=True, blank=True, verbose_name="Jira 리프레시 토큰")
     jira_token_expires_at = models.DateTimeField(null=True, blank=True, verbose_name="Jira 토큰 만료 일시")
     jira_cloud_id = models.CharField(max_length=255, null=True, blank=True, verbose_name="Jira 클라우드 ID")
+    jira_project_key = models.CharField(max_length=50, null=True, blank=True, verbose_name="Jira 프로젝트 키")
 
     @property
     def is_authenticated(self):
