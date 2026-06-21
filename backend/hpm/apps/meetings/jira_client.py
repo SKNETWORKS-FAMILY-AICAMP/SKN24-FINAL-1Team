@@ -29,11 +29,7 @@ def get_jira_config():
 
 
 def create_jira_issue(title: str, owner: str, access_token: str, cloud_id: str) -> dict:
-    """
-    Jira에 태스크를 생성한다. (OAuth access_token 방식)
-    - summary: [owner] title 형태
-    - issuetype: Task
-    """
+    
     config = get_jira_config()
 
     if not all([access_token, cloud_id, config["project_key"]]):
@@ -76,9 +72,7 @@ def create_jira_issue(title: str, owner: str, access_token: str, cloud_id: str) 
 
 
 def create_jira_issues_from_todo(todo_list: list, access_token: str, cloud_id: str) -> list:
-    """
-    todo_list의 각 항목에서 title, owner를 꺼내 Jira 태스크를 일괄 생성한다.
-    """
+   
     results = []
     for todo in todo_list:
         if not isinstance(todo, dict):
@@ -231,3 +225,109 @@ def delete_jira_issue(issue_key: str, access_token: str, cloud_id: str) -> dict:
             except Exception:
                 error_detail = e.response.text
         return {"success" : False, "error" : str(e), "detail" : error_detail}
+
+
+def create_jira_issue_for_board(title: str, access_token: str, cloud_id: str, project_key: str) -> dict:
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    # 1. 이슈 타입 동적 조회
+    project_url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project/{project_key}"
+    try:
+        project_response = requests.get(project_url, headers=headers, timeout=10)
+        project_response.raise_for_status()
+        issue_types = project_response.json().get("issueTypes", [])
+
+        PREFERRED = ["task", "작업", "story", "스토리"]
+        EXCLUDE = {"epic", "subtask", "에픽"}
+
+        valid_type = None
+        for preferred_name in PREFERRED:
+            valid_type = next(
+                (t for t in issue_types if t["name"].lower() == preferred_name),
+                None
+            )
+            if valid_type:
+                break
+
+        if not valid_type:
+            valid_type = next(
+                (t for t in issue_types if t["name"].lower() not in EXCLUDE),
+                None
+            )
+
+        if not valid_type:
+            return {"success": False, "error": "사용 가능한 이슈 타입이 없습니다."}
+
+        issue_type_id = valid_type["id"]
+
+    except requests.RequestException as e:
+        return {"success": False, "error": f"이슈 타입 조회 실패: {str(e)}"}
+
+    # 2. 이슈 생성
+    url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue"
+    payload = {
+        "fields": {
+            "project": {"key": project_key},
+            "summary": title,
+            "issuetype": {"id": issue_type_id},
+        }
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return {"success": True, "issue_key": data.get("key")}
+
+    except requests.RequestException as e:
+        error_detail = ""
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail = e.response.json()
+            except Exception:
+                error_detail = e.response.text
+        return {"success": False, "error": str(e), "detail": error_detail}
+    
+
+def update_jira_issue(issue_key: str, title: str, description: str, access_token: str, cloud_id: str) -> dict:
+
+    url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue/{issue_key}"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    fields = {}
+    if title:
+        fields["summary"] = title
+    if description:
+        # Jira는 description을 ADF(Atlassian Document Format) 형식으로 받아
+        fields["description"] = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": description}]
+                }
+            ]
+        }
+
+    try:
+        response = requests.put(url, json={"fields": fields}, headers=headers, timeout=10)
+        response.raise_for_status()
+        return {"success": True, "issue_key": issue_key}
+
+    except requests.RequestException as e:
+        error_detail = ""
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail = e.response.json()
+            except Exception:
+                error_detail = e.response.text
+        return {"success": False, "error": str(e), "detail": error_detail}

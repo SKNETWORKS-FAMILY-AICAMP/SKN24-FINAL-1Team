@@ -4,8 +4,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 from apps.users.views import (
     jira_oauth_start, jira_oauth_callback, jira_oauth_status, jira_projects,
-    jira_board, jira_board_issue_status, jira_board_issue_delete,
+    jira_board, jira_board_issue_status, jira_board_issue_detail,
     jira_set_project_key, jira_workspaces, jira_select_workspace,
+    jira_board_issue_create, jira_issue_types,
 )
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,9 +30,13 @@ urlpatterns = [
 
     path("api/jira/board/",                              jira_board),
     path("api/jira/board/issue/<str:issue_key>/status/", jira_board_issue_status),
-    path("api/jira/board/issue/<str:issue_key>/",        jira_board_issue_delete),
+    
 
     path("api/jira/project-key/", jira_set_project_key),
     path("api/jira/workspaces/", jira_workspaces),
     path("api/jira/select-workspace/", jira_select_workspace),
+    path("api/jira/board/issue/", jira_board_issue_create),
+    path("api/jira/issue-types/", jira_issue_types),
+
+    path("api/jira/board/issue/<str:issue_key>/", jira_board_issue_detail),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
