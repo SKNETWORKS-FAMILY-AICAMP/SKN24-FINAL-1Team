@@ -1,5 +1,6 @@
 export interface User {
-  user_id: number;
+  user_id?: number;
+  users_id?: number;
   email: string;
   name?: string;
   is_initial_password?: boolean;

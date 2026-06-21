@@ -33,6 +33,7 @@ interface JiraProject { key: string; name: string; }
 export default function ProjectCreatePage() {
   const navigate = useNavigate();
   const { user, selectProject } = useAuth();
+  const currentUserId = user?.users_id ?? user?.user_id;
   const [step, setStep] = useState(0);
 
   const [jiraConnected, setJiraConnected] = useState(false);
@@ -71,20 +72,20 @@ export default function ProjectCreatePage() {
   }, [user]);
 
   useEffect(() => {
-    if (!jiraConnected || !user) return;
+    if (!jiraConnected || !currentUserId) return;
     setJiraLoading(true);
-    api.get(`/jira/projects/?user_id=${user.users_id}`)
+    api.get(`/jira/projects/?user_id=${currentUserId}`)
       .then(res => setJiraProjects(res.data))
       .catch(() => setJiraErrorModal(true))
       .finally(() => setJiraLoading(false));
-  }, [jiraConnected, user]);
+  }, [currentUserId, jiraConnected]);
 
   const handleJiraConnect = () => {
-    if (!user?.users_id) {
+    if (!currentUserId) {
       navigate("/login");
       return;
     }
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user.users_id}`;
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${currentUserId}`;
   };
 
   const filteredResults = searchName.trim().length > 0
@@ -115,7 +116,7 @@ export default function ProjectCreatePage() {
           ? jiraProjects.find(p => p.key === selectedJiraProject)?.name ?? "새 프로젝트"
           : "새 프로젝트",
         description: "",
-        owner_id: user?.users_id,
+        owner_id: currentUserId,
         member_ids: members.map(m => m.users_id),
       });
       setCreatedProjectId(res.data.project_id);
