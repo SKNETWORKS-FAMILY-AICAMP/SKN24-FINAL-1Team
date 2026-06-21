@@ -4,9 +4,14 @@ import { getMe } from "../services/users";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const normalizeUser = (u: User): User => {
-  const id = u.users_id ?? u.user_id;
-  return { ...u, user_id: id, users_id: id };
+const normalizeUser = (user: Partial<User> & { user_id?: number; users_id?: number }): User => {
+  const id = user.users_id ?? user.user_id ?? 0;
+  return {
+    ...user,
+    user_id: id,
+    users_id: id,
+    email: user.email ?? "",
+  };
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

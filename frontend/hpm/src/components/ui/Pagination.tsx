@@ -1,4 +1,3 @@
-import React from "react";
 import * as DESIGN from "../../constants/design";
 
 interface PaginationProps {

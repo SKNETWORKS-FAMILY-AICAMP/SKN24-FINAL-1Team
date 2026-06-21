@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
@@ -24,10 +24,7 @@ const DUMMY = {
 export default function PrepMaterialPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false } =
-    (location.state as { showAgenda?: boolean }) ?? {};
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);

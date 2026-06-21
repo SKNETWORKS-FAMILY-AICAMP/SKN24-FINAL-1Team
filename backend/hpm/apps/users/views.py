@@ -78,8 +78,6 @@ def login(request):
     if user.account_status == 2:
         return Response({"error": "잠금 처리된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
 
-    data = UserSerializer(user).data
-    data["is_initial_password"] = (user.account_status == 0)
     tokens = get_tokens_for_user(user)
 
     response = Response({
@@ -88,7 +86,7 @@ def login(request):
         "users_id": user.users_id,
         "email": user.email,
         "name": user.name,
-        "is_initial_password": user.is_initial_password
+        "account_status": user.account_status,
     })
 
     response.set_cookie(
@@ -120,7 +118,7 @@ def get_me(request):
         "email": user.email,
         "name": user.name,
         "role": user.role,
-        "is_initial_password": user.is_initial_password,
+        "account_status": user.account_status,
     })
 
 @api_view(["GET"])
@@ -301,6 +299,38 @@ def get_valid_access_token(user: Users) -> str | None:
     return user.jira_access_token
 
 
+def _get_current_user(request):
+    user = getattr(request, "user", None)
+    if user and getattr(user, "is_authenticated", False):
+        return user
+
+    user_id = None
+    if getattr(request, "auth", None):
+        user_id = request.auth.get("user_id")
+    if not user_id:
+        return None
+
+    try:
+        return Users.objects.get(users_id=user_id)
+    except Users.DoesNotExist:
+        return None
+
+
+def _get_jira_context(request):
+    user = _get_current_user(request)
+    if not user:
+        return None, None, Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    access_token = get_valid_access_token(user)
+    if not access_token:
+        return user, None, Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.jira_cloud_id:
+        return user, access_token, Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    return user, access_token, None
+
+
 # ── Jira 연동 상태 확인 ───────────────────────────────────────────────────
 
 @api_view(["GET"])
@@ -345,141 +375,34 @@ def jira_projects(request):
 
 
 @api_view(["GET"])
-def jira_board(request):
-    user_id = request.auth['user_id']
-
-    try:
-        user = Users.objects.get(users_id = user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-    
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error" : "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-    
-    result = get_jira_issues(access_token, user.jira_cloud_id, user.jira_project_key)
-
-
-    if not result["success"]:
-        return Response({"error": result["error"]}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response(result["columns"])
-
-
-@api_view(["PATCH"])
-def jira_board_issue_status(request, issue_key):
-    user_id = request.auth['user_id']
-
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    column_id = request.data.get("column_id")
-
-    if not column_id:
-        return Response({"error": "column_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    result = update_jira_issue_status(issue_key, column_id, access_token, user.jira_cloud_id)
-
-    if not result["success"]:
-        return Response({"error": result["error"]}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response(result)
-
-
-@api_view(["DELETE", "PUT"])
-def jira_board_issue_detail(request, issue_key):
-    user_id = request.auth['user_id']
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if request.method == "DELETE":
-        result = delete_jira_issue(issue_key, access_token, user.jira_cloud_id)
-        if not result["success"]:
-            return Response({"error": result["error"]}, status=status.HTTP_502_BAD_GATEWAY)
-        return Response({"issue_key": issue_key}, status=status.HTTP_200_OK)
-
-    elif request.method == "PUT":
-        title = request.data.get("title", "")
-        description = request.data.get("description", "")
-        if not title and not description:
-            return Response({"error": "title 또는 description이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
-        result = update_jira_issue(
-            issue_key=issue_key,
-            title=title,
-            description=description,
-            access_token=access_token,
-            cloud_id=user.jira_cloud_id,
-        )
-        if not result["success"]:
-            return Response({"error": result["error"], "detail": result.get("detail")}, status=status.HTTP_502_BAD_GATEWAY)
-        return Response({"issue_key": issue_key}, status=status.HTTP_200_OK)
-
-
-@api_view(["PATCH"])
-def jira_set_project_key(request):
-    user_id = request.auth['user_id']
-
-    try:
-        user = Users.objects.get(users_id =user_id)
-    except Users.DoesNotExist:
-        return Response({"error" : "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-    
-    project_key = request.data.get("project_key")
-    if not project_key:
-        return Response({"error" : "project_key가 필요합니다"},status=status.HTTP_400_BAD_REQUEST)
-    
-    user.jira_project_key = project_key
-    user.save(update_fields= ["jira_project_key"])
-    return Response({"success" : True, "project_key" : project_key})
-
-
-@api_view(["GET"])
 def jira_workspaces(request):
-    user_id = request.auth['user_id']
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
 
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-    
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-    
     res = requests.get(
         "https://api.atlassian.com/oauth/token/accessible-resources",
         headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
         timeout=10,
     )
     if not res.ok:
-        return Response({"error": "Jira 워크스페이스를 조회할 수 없습니다."}, status=status.HTTP_502_BAD_GATEWAY)
-    
+        return Response({"error": "Jira 워크스페이스 조회 실패", "detail": res.text}, status=status.HTTP_502_BAD_GATEWAY)
+
     workspaces = [
-        {"cloud_id": w["id"], "name": w["name"], "url": w["url"]}
-        for w in res.json()
+        {
+            "cloud_id": item.get("id", ""),
+            "name": item.get("name", ""),
+            "url": item.get("url", ""),
+        }
+        for item in res.json()
     ]
     return Response(workspaces)
 
 
 @api_view(["PATCH"])
 def jira_select_workspace(request):
-    user_id = request.auth['user_id']
-
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
+    user = _get_current_user(request)
+    if not user:
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     cloud_id = request.data.get("cloud_id")
@@ -488,94 +411,133 @@ def jira_select_workspace(request):
 
     user.jira_cloud_id = cloud_id
     user.save(update_fields=["jira_cloud_id"])
-    return Response({"success": True, "cloud_id": cloud_id})
+    return Response({"cloud_id": cloud_id})
 
+
+@api_view(["PATCH"])
+def jira_set_project_key(request):
+    user = _get_current_user(request)
+    if not user:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    project_key = request.data.get("project_key")
+    if not project_key:
+        return Response({"error": "project_key가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.jira_project_key = project_key
+    user.save(update_fields=["jira_project_key"])
+    return Response({"project_key": project_key})
+
+
+@api_view(["GET"])
+def jira_board(request):
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
+
+    project_key = user.jira_project_key or settings.JIRA_PROJECT_KEY
+    if not project_key:
+        return Response({"error": "Jira 프로젝트 키가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    result = get_jira_issues(access_token, user.jira_cloud_id, project_key)
+    if not result.get("success"):
+        return Response({"error": "Jira 보드 조회 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response(result.get("columns", {"todo": [], "progress": [], "review": [], "done": []}))
+
+
+@api_view(["PATCH"])
+def jira_board_issue_status(request, issue_key):
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
+
+    column_id = request.data.get("column_id")
+    if not column_id:
+        return Response({"error": "column_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    result = update_jira_issue_status(issue_key, column_id, access_token, user.jira_cloud_id)
+    if not result.get("success"):
+        return Response({"error": "Jira 이슈 상태 변경 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response(result)
 
 
 @api_view(["POST"])
 def jira_board_issue_create(request):
-    user_id = request.auth['user_id']
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
 
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    title = request.data.get("title")
+    title = (request.data.get("title") or "").strip()
     if not title:
         return Response({"error": "title이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not user.jira_project_key:
-        return Response({"error": "프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
+    project_key = request.data.get("project_key") or user.jira_project_key or settings.JIRA_PROJECT_KEY
+    if not project_key:
+        return Response({"error": "Jira 프로젝트 키가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    result = create_jira_issue_for_board(
-        title=title,
-        access_token=access_token,
-        cloud_id=user.jira_cloud_id,
-        project_key=user.jira_project_key,
+    result = create_jira_issue_for_board(title, access_token, user.jira_cloud_id, project_key)
+    if not result.get("success"):
+        return Response({"error": "Jira 이슈 생성 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response(result, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PATCH", "DELETE"])
+def jira_board_issue_detail(request, issue_key):
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
+
+    if request.method == "DELETE":
+        result = delete_jira_issue(issue_key, access_token, user.jira_cloud_id)
+        if not result.get("success"):
+            return Response({"error": "Jira 이슈 삭제 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    if request.method == "PATCH":
+        result = update_jira_issue(
+            issue_key,
+            request.data.get("title", ""),
+            request.data.get("description", ""),
+            access_token,
+            user.jira_cloud_id,
+        )
+        if not result.get("success"):
+            return Response({"error": "Jira 이슈 수정 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result)
+
+    res = requests.get(
+        f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/issue/{issue_key}",
+        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        timeout=10,
     )
-
-    if not result["success"]:
-        # detail 부분 추후에 제거 필요
-        return Response({"error": result["error"],"detail" : result.get("detail")}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response({"issue_key": result["issue_key"]}, status=status.HTTP_201_CREATED)
+    if not res.ok:
+        return Response({"error": "Jira 이슈 조회 실패", "detail": res.text}, status=status.HTTP_502_BAD_GATEWAY)
+    return Response(res.json())
 
 
 @api_view(["GET"])
 def jira_issue_types(request):
-    user_id = request.auth['user_id']
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-    
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-    
-    url = f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/project/{user.jira_project_key}"
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Accept": "application/json",
-    }
-    response = requests.get(url, headers=headers, timeout=10)
-    data = response.json()
-    issue_types = [{"id": t["id"], "name": t["name"]} for t in data.get("issueTypes", [])]
-    return Response({"issue_types": issue_types})
+    user, access_token, error_response = _get_jira_context(request)
+    if error_response:
+        return error_response
 
+    project_key = request.GET.get("project_key") or user.jira_project_key or settings.JIRA_PROJECT_KEY
+    if not project_key:
+        return Response({"error": "Jira 프로젝트 키가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(["PUT"])
-def jira_board_issue_update(request, issue_key):
-    user_id = request.auth['user_id']
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    title = request.data.get("title", "")
-    description = request.data.get("description", "")
-
-    if not title and not description:
-        return Response({"error": "title 또는 description이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    result = update_jira_issue(
-        issue_key=issue_key,
-        title=title,
-        description=description,
-        access_token=access_token,
-        cloud_id=user.jira_cloud_id,
+    res = requests.get(
+        f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/project/{project_key}",
+        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        timeout=10,
     )
+    if not res.ok:
+        return Response({"error": "Jira 이슈 타입 조회 실패", "detail": res.text}, status=status.HTTP_502_BAD_GATEWAY)
 
-    if not result["success"]:
-        return Response({"error": result["error"], "detail": result.get("detail")}, status=status.HTTP_502_BAD_GATEWAY)
-
-    return Response({"issue_key": issue_key}, status=status.HTTP_200_OK)
+    issue_types = [
+        {"id": item.get("id"), "name": item.get("name")}
+        for item in res.json().get("issueTypes", [])
+    ]
+    return Response(issue_types)

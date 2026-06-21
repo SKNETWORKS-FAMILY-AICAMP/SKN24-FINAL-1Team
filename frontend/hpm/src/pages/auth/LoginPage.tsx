@@ -5,8 +5,8 @@ import * as DESIGN from "../../constants/design";
 import { AUTH_ERRORS } from "../../constants/auth";
 import api from "../../services/meeting";
 import Input from "../../components/ui/Input";
-import Button from "../../components/ui/button";
-import ServiceLogo from "../../components/ui/ServiceLogo"
+import Button from "../../components/ui/Button";
+import ServiceLogo from "../../components/ui/ServiceLogo";
 
 
 export default function LoginPage() {
@@ -42,7 +42,7 @@ const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
     const res = await api.post("/users/login/", { email, password });
     login(res.data);
 
-    if (res.data.is_initial_password) {
+    if (res.data.account_status === 0) {
       navigate("/change-password");
     } else {
       navigate("/projects");
@@ -88,7 +88,7 @@ const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
               error={passwordError}
             />
 
-          <Button type="submit" disabled={loading} buttonClassName = "w-full">
+          <Button type="submit" disabled={loading} className="w-full">
             로그인
           </Button>
           </form>

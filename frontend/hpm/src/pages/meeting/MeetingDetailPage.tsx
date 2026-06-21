@@ -59,7 +59,6 @@ export default function MeetingDetailPage() {
       ? Math.floor((Date.now() - ctxStartTime) / 1000)
       : 0
   );
-  const [chatFilter, setChatFilter] = useState("전체");
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -252,6 +251,16 @@ export default function MeetingDetailPage() {
                 <img src={stopImg} alt="녹음 재개" className="w-[38px] h-[38px] object-contain" />
               )}
             </button>
+            {isInProgress ? (
+              <button
+                type="button"
+                onClick={handleEnd}
+                disabled={endLoading}
+                className="rounded-[8px] bg-[#623FB5] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
+              >
+                {endLoading ? "종료 중..." : "회의 종료"}
+              </button>
+            ) : null}
           </div>
         </div>
 

@@ -52,12 +52,13 @@ export interface AgendaItem {
 
 export interface Task {
   meeting_task_id: number;
+  meeting_id?: number;
   title: string;
-  content: string;
+  content?: string;
   owner: string;
   due_date: string | null;
   priority: string;
-  status: number;
+  status?: number;
   is_jira_synced?: boolean;
   jira_key?: string;
 }
