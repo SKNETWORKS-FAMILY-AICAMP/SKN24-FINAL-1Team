@@ -274,6 +274,11 @@ export interface JiraBoardIssue {
   due_date: string;
   created: string;
   status: string;
+  parent_key?: string;
+  parent_title?: string;
+  issue_type?: string;
+  issue_type_icon_url?: string;
+  issue_type_hierarchy_level?: number | null;
 }
 
 export interface ProjectJiraBoard {
@@ -285,6 +290,22 @@ export interface ProjectJiraBoard {
 
 export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
   const res = await api.get(`/projects/${projectId}/jira-board/`);
+  return res.data;
+};
+
+export const createProjectJiraIssue = async (
+  projectId: number,
+  data: {
+    title: string;
+    description?: string;
+    due_date?: string;
+    priority?: string;
+    column_id?: string;
+    assignee_user_id?: number;
+    parent_key?: string;
+  },
+): Promise<{ success: boolean; issue_key: string; column_id: string }> => {
+  const res = await api.post(`/projects/${projectId}/jira-board/`, data);
   return res.data;
 };
 

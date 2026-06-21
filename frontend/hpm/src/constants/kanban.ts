@@ -44,6 +44,12 @@ export const KANBAN_CATEGORIES: KanbanCategory[] = [
   "고객 요청",
 ];
 
+const getTodayDate = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 export const INITIAL_KANBAN_TASKS: KanbanTask[] = [
   {
     id: 1,
@@ -151,15 +157,21 @@ export const INITIAL_KANBAN_TASKS: KanbanTask[] = [
   },
 ];
 
-export const emptyKanbanForm = (): KanbanTaskFormValues => ({
-  title: "",
-  description: "",
-  category: "UI/UX 디자인",
-  dueDate: "2026-06-15",
-  startDate: "2026-06-15",
-  assignee: "박수영(팀장)",
-  priority: "",
-});
+export const emptyKanbanForm = (): KanbanTaskFormValues => {
+  const today = getTodayDate();
+
+  return {
+    title: "",
+    description: "",
+    category: "",
+    dueDate: today,
+    startDate: today,
+    assignee: "",
+    assigneeId: "",
+    priority: KANBAN_PRIORITIES[2],
+    parentKey: "",
+  };
+};
 
 export const toKanbanFormValues = (task: KanbanTask): KanbanTaskFormValues => ({
   title: task.title,
@@ -168,7 +180,9 @@ export const toKanbanFormValues = (task: KanbanTask): KanbanTaskFormValues => ({
   dueDate: task.dueDate,
   startDate: task.startDate,
   assignee: task.assignee,
+  assigneeId: "",
   priority: task.priority,
+  parentKey: task.parentKey || "",
 });
 
 export const getKanbanColumnHeight = (taskCount: number) => {
