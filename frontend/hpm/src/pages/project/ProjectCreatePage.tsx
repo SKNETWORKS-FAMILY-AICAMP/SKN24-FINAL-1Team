@@ -117,6 +117,7 @@ export default function ProjectCreatePage() {
         description: "",
         owner_id: user?.users_id,
         member_ids: members.map(m => m.users_id),
+        jira_project_key: selectedJiraProject,
       });
       setCreatedProjectId(res.data.project_id);
       setCreatedProjectName(res.data.project_name);
