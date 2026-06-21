@@ -31,13 +31,17 @@ def project_list(request):
         project_name=data.get("project_name", ""),
     )
     # 생성자를 구성원으로 자동 추가
-    ProjectUsers.objects.create(project=project, user=owner)
+    ProjectUsers.objects.get_or_create(project=project, user=owner)
 
     # 초대 구성원 추가
     for uid in data.get("member_ids", []):
         try:
+            if uid == owner.users_id:
+                continue
             user = Users.objects.get(pk=uid)
-            ProjectUsers.objects.create(project=project, user=user)
+            _, created = ProjectUsers.objects.get_or_create(project=project, user=user)
+            if not created:
+                continue
             Notification.objects.create(
                 user=user,
                 notification_type=Notification.PROJECT_MEMBER_ADDED,
@@ -60,14 +64,27 @@ def project_detail(request, project_id):
 
     if request.method == "GET":
         data = ProjectSerializer(project).data
-        members = ProjectUsers.objects.filter(project=project).select_related("user")
-        data["members"] = [
-            {"user_id": m.user.users_id, "name": m.user.name, "work": m.user.work}
-            for m in members
-        ]
+        members = ProjectUsers.objects.filter(project=project).select_related("user", "user__dept", "user__rank")
+        seen_user_ids = set()
+        data["members"] = []
+        for m in members:
+            if m.user.users_id in seen_user_ids:
+                continue
+            seen_user_ids.add(m.user.users_id)
+            data["members"].append({
+                "user_id": m.user.users_id,
+                "name": m.user.name,
+                "email": m.user.email,
+                "work": m.user.work,
+                "dept_name": m.user.dept.dept_name,
+                "rank_name": m.user.rank.rank_name,
+            })
         return Response(data)
 
     if request.method == "PATCH":
+        if project.project_owner_id != request.auth["user_id"]:
+            return Response({"error": "프로젝트 생성자만 구성원을 추가할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
         # 구성원 추가 / 삭제
         add_ids = request.data.get("add_member_ids", [])
         remove_ids = request.data.get("remove_member_ids", [])
