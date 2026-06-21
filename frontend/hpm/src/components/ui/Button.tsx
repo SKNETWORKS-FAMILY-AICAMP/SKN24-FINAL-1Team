@@ -45,14 +45,14 @@ export default function Button({
       sizeClass = `px-4 py-2 ${DESIGN.FONT_SIZES.sm}`;
       break;
     case "lg":
-      sizeClass = "px-6 py-2.5 text-base";
+      sizeClass = `${DESIGN.PADDING_SIZES.sm} ${DESIGN.FONT_SIZES.md}`;
       break;
   }
 
   return (
     <button
       disabled={disabled}
-      className={`inline-flex items-center justify-center font-semibold transition ${DESIGN.RADIUS_SIZES.sm} whitespace-nowrap gap-1.5 ${sizeClass} ${variantClass} ${className}`}
+      className={`inline-flex items-center justify-center text-center ${DESIGN.RADIUS_SIZES.sm} ${sizeClass} ${variantClass} ${className}`}
       {...props}
     >
       {children}

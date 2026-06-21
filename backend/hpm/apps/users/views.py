@@ -14,9 +14,13 @@ from django.utils import timezone
 from datetime import timedelta
 from django.http import HttpResponse
 
+from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import permission_classes
+from django.conf import settings
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
@@ -31,14 +35,12 @@ def _hash_pw(raw: str) -> str:
 def get_tokens_for_user(user):
     refresh = RefreshToken()
     refresh['user_id'] = user.users_id
-    refresh['email'] = user.email
-    refresh['name'] = user.name
     return {
         'refresh' : str(refresh),
         'access' : str(refresh.access_token),
     }
 
-
+# 로그인
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def login(request):
@@ -49,26 +51,65 @@ def login(request):
     try:
         user = Users.objects.get(email=email)
     except Users.DoesNotExist:
-        return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, 
+        status=status.HTTP_401_UNAUTHORIZED)
 
     # 초기 비밀번호 abc123 또는 해시 비교
-    raw_match = (password == "abc123" and user.password == "abc123")
+    raw_match = (password == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD)
     hash_match = (user.password == _hash_pw(password))
 
     if not (raw_match or hash_match):
         return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
     if user.status != 0:
-        return Response({"error": "비활성화된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
+        return Response(
+            {"error": "비활성화된 계정입니다."},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
-    data = UserSerializer(user).data
-    data["is_initial_password"] = (user.password == "abc123")
     tokens = get_tokens_for_user(user)
-    data.update(tokens)
-    return  Response(data)
 
+    response = Response({
+        "message": "로그인 성공",
+        "user_id": user.users_id,
+        "email": user.email,
+        "is_initial_password": user.is_initial_password
+    })
+
+    response.set_cookie(
+        key="access",
+        value=tokens["access"],
+        httponly=True,
+        secure=False, 
+        samesite="Lax",
+    )
+
+    response.set_cookie(
+        key="refresh",
+        value=tokens["refresh"],
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+    )
+
+    return response
+
+# 로그인 유지
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_me(request):
+    user = request.user
+
+    return Response({
+        "users_id": user.users_id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "is_initial_password": user.is_initial_password,
+    })
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def user_list(request):
     """전체 사용자 목록 (관리자용)"""
     users = Users.objects.all().order_by("-created_at")
@@ -76,6 +117,7 @@ def user_list(request):
 
 
 @api_view(["GET", "PATCH"])
+@permission_classes([IsAuthenticated])
 def user_detail(request, users_id):
     try:
         user = Users.objects.select_related("dept", "rank").get(users_id=users_id)
@@ -102,6 +144,7 @@ def user_detail(request, users_id):
     new_pw = request.data.get("password")
     if new_pw:
         user.password = _hash_pw(new_pw)
+        user.is_initial_password = False
 
     user.save()
     return Response(UserSerializer(user).data)
