@@ -1,13 +1,31 @@
+import keyIcon from "../../assets/key.svg";
+import logoutIcon from "../../assets/logout.svg";
+
 interface HeaderProfilePopoverProps {
   email?: string;
   name?: string;
+  empNo?: string;
+  deptName?: string;
+  rankName?: string;
+  work?: string;
+  loading?: boolean;
   onChangePassword?: () => void;
   onLogout?: () => void;
 }
 
+const displayValue = (value?: string, loading?: boolean) => {
+  if (loading) return "...";
+  return value || "-";
+};
+
 export default function HeaderProfilePopover({
   email,
   name,
+  empNo,
+  deptName,
+  rankName,
+  work,
+  loading,
   onChangePassword,
   onLogout,
 }: HeaderProfilePopoverProps) {
@@ -20,25 +38,25 @@ export default function HeaderProfilePopover({
       <div className="px-[26px] pb-[24px] pt-[26px]">
         <div className="h-[96px] rounded-[10px] bg-[#F6F5FA] px-[18px] py-[20px]">
           <p className="m-0 text-[17px] font-medium leading-[1.2] text-[#141414]">
-            {name || "사용자"}
+            {loading ? "..." : name ? `${name}님` : "-"}
           </p>
           <a
             className="mt-[14px] block text-[15px] font-normal leading-[1.2] text-[#623FB5] underline"
             href={email ? `mailto:${email}` : undefined}
           >
-            {email || "sample@gmail.com"}
+            {displayValue(email, loading)}
           </a>
         </div>
 
         <dl className="mt-[26px] grid grid-cols-[1fr_auto] gap-y-[20px] text-[15px] font-normal leading-[1.2]">
-          <dt className="text-[#969696]">사원번호</dt>
-          <dd className="m-0 text-[#141414]">29189540</dd>
+          <dt className="text-[#969696]">사번</dt>
+          <dd className="m-0 text-right text-[#141414]">{displayValue(empNo, loading)}</dd>
           <dt className="text-[#969696]">부서</dt>
-          <dd className="m-0 text-[#141414]">개발1팀</dd>
+          <dd className="m-0 text-right text-[#141414]">{displayValue(deptName, loading)}</dd>
           <dt className="text-[#969696]">직급</dt>
-          <dd className="m-0 text-[#141414]">대리</dd>
+          <dd className="m-0 text-right text-[#141414]">{displayValue(rankName, loading)}</dd>
           <dt className="text-[#969696]">직무</dt>
-          <dd className="m-0 text-[#141414]">개발</dd>
+          <dd className="m-0 text-right text-[#141414]">{displayValue(work, loading)}</dd>
         </dl>
       </div>
 
@@ -47,21 +65,17 @@ export default function HeaderProfilePopover({
         <button
           type="button"
           onClick={onChangePassword}
-          className="flex items-center gap-[7px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
+          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
         >
-          <span aria-hidden="true" className="inline-flex size-[14px] items-center justify-center text-[14px]">
-            *
-          </span>
+          <img src={keyIcon} alt="" className="size-[20px] shrink-0" />
           <span>비밀번호 변경</span>
         </button>
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-[7px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
+          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
         >
-          <span aria-hidden="true" className="inline-flex size-[14px] items-center justify-center text-[14px]">
-            -
-          </span>
+          <img src={logoutIcon} alt="" className="size-[20px] shrink-0" />
           <span>로그아웃</span>
         </button>
       </div>

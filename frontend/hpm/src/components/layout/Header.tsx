@@ -5,7 +5,12 @@ import bell from "../../assets/header/bell.png";
 import toggle from "../../assets/header/toggle.png";
 import { useAuth } from "../../context/AuthContext";
 import type { HeaderPopover } from "../../constants/header";
-import { getNotifications, type Notification } from "../../services/meeting";
+import {
+  getNotifications,
+  getUserProfile,
+  type Notification,
+  type UserProfile,
+} from "../../services/meeting";
 import HeaderNotificationPopover from "./HeaderNotificationPopover";
 import HeaderProfilePopover from "./HeaderProfilePopover";
 
@@ -15,6 +20,8 @@ export default function Header() {
   const [openPopover, setOpenPopover] = useState<HeaderPopover>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   const loadNotifications = useCallback(async () => {
     if (!user) {
@@ -38,6 +45,24 @@ export default function Header() {
     void loadNotifications();
   }, [loadNotifications]);
 
+  const loadProfile = useCallback(async () => {
+    if (!user?.users_id) {
+      setProfile(null);
+      setProfileLoading(false);
+      return;
+    }
+
+    setProfileLoading(true);
+    try {
+      const data = await getUserProfile(user.users_id);
+      setProfile(data);
+    } catch {
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [user]);
+
   const unreadNotificationCount = useMemo(
     () => notifications.filter((notification) => !notification.is_read).length,
     [notifications],
@@ -50,6 +75,9 @@ export default function Header() {
       const next = current === popover ? null : popover;
       if (popover === "notifications" && next === "notifications") {
         void loadNotifications();
+      }
+      if (popover === "profile" && next === "profile") {
+        void loadProfile();
       }
       return next;
     });
@@ -95,7 +123,7 @@ export default function Header() {
             ) : null}
           </div>
           <div className={`relative flex items-center justify-center ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.GAP_SIZES["xl"]} rounded-full ${DESIGN.PADDING_X_SIZES.sm}`}>
-            <p>{user?.name}</p>
+            <p>{user?.name ? `${user.name}님` : ""}</p>
             <button
               type="button"
               aria-label="프로필 메뉴"
@@ -105,8 +133,13 @@ export default function Header() {
             </button>
             {openPopover === "profile" ? (
               <HeaderProfilePopover
-                email={user?.email}
-                name={user?.name}
+                email={profile?.email || user?.email}
+                name={profile?.name || user?.name}
+                empNo={profile?.emp_no}
+                deptName={profile?.dept_name}
+                rankName={profile?.rank_name}
+                work={profile?.work}
+                loading={profileLoading}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
               />

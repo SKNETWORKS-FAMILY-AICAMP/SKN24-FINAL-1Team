@@ -72,6 +72,16 @@ export interface Notification {
   created_at: string;
 }
 
+export interface UserProfile {
+  users_id: number;
+  email: string;
+  name: string;
+  emp_no: string;
+  work: string;
+  dept_name: string;
+  rank_name: string;
+}
+
 // ── 회의 ──────────────────────────────────────────────────────────
 export const getMeetingList = async (project_id?: number): Promise<Meeting[]> => {
   const params = project_id ? { project_id } : {};
@@ -157,6 +167,11 @@ export const sendChatMessage = async (meetingId: number, query: string): Promise
 // ── 유저 ─────────────────────────────────────────────────────────
 export const getUserList = async (): Promise<{ users_id: number; name: string; email: string }[]> => {
   const res = await api.get("/users/");
+  return res.data;
+};
+
+export const getUserProfile = async (userId: number): Promise<UserProfile> => {
+  const res = await api.get(`/users/${userId}/`);
   return res.data;
 };
 
