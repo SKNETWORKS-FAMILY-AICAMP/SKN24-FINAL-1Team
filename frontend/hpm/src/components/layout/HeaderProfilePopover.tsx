@@ -1,6 +1,3 @@
-import keyIcon from "../../assets/header/icon-key.svg";
-import logoutIcon from "../../assets/header/icon-logout.svg";
-
 interface HeaderProfilePopoverProps {
   email?: string;
   name?: string;
@@ -52,7 +49,9 @@ export default function HeaderProfilePopover({
           onClick={onChangePassword}
           className="flex items-center gap-[7px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
         >
-          <img alt="" aria-hidden="true" className="size-[14px] object-contain" src={keyIcon} />
+          <span aria-hidden="true" className="inline-flex size-[14px] items-center justify-center text-[14px]">
+            *
+          </span>
           <span>비밀번호 변경</span>
         </button>
         <button
@@ -60,7 +59,9 @@ export default function HeaderProfilePopover({
           onClick={onLogout}
           className="flex items-center gap-[7px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
         >
-          <img alt="" aria-hidden="true" className="size-[14px] object-contain" src={logoutIcon} />
+          <span aria-hidden="true" className="inline-flex size-[14px] items-center justify-center text-[14px]">
+            -
+          </span>
           <span>로그아웃</span>
         </button>
       </div>
