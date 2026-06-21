@@ -1,11 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import projectIcon from "../../assets/kanban/icon-project.svg";
 import KanbanColumn from "../../components/project/KanbanColumn";
 import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
-  INITIAL_KANBAN_TASKS,
   KANBAN_COLUMNS,
   toKanbanFormValues,
 } from "../../constants/kanban";
@@ -15,10 +14,60 @@ import type {
   KanbanPriority,
   KanbanTask,
 } from "../../types/kanban";
+import { getJiraBoard } from "../../services/jira";
+import type { JiraBoard } from "../../services/jira";
+
+const PRIORITY_MAP: Record<string, KanbanPriority> = {
+  Highest: "매우 높음",
+  High: "높음",
+  Medium: "중간",
+  Low: "낮음",
+  Lowest: "매우 낮음",
+};
+
+function jiraBoardToTasks(board: JiraBoard): KanbanTask[] {
+  const tasks: KanbanTask[] = [];
+  let id = 1;
+
+  (Object.keys(board) as KanbanColumnId[]).forEach((columnId) => {
+    board[columnId].forEach((issue) => {
+      tasks.push({
+        id: id++,
+        columnId,
+        title: issue.title,
+        description: "",
+        category: "서비스 기획",
+        dueDate: issue.due_date ?? "",
+        startDate: "",
+        assignee: issue.assignee,
+        priority: PRIORITY_MAP[issue.priority] ?? "중간",
+        code: issue.issue_key,
+        owner: issue.assignee,
+      });
+    });
+  });
+
+  return tasks;
+}
 
 export default function KanbanBoardPage() {
-  const [tasks, setTasks] = useState<KanbanTask[]>(INITIAL_KANBAN_TASKS);
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getJiraBoard()
+      .then((board) => {
+        setTasks(jiraBoardToTasks(board));
+      })
+      .catch(() => {
+        setError("Jira 보드를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
 
   const tasksByColumn = useMemo(() => {
     return KANBAN_COLUMNS.reduce<Record<KanbanColumnId, KanbanTask[]>>(
@@ -45,14 +94,10 @@ export default function KanbanBoardPage() {
     });
   };
 
-  const closeModal = () => {
-    setModal(null);
-  };
+  const closeModal = () => setModal(null);
 
   const submitTask = () => {
-    if (!modal || !modal.values.title.trim() || !modal.values.priority) {
-      return;
-    }
+    if (!modal || !modal.values.title.trim() || !modal.values.priority) return;
 
     if (modal.mode === "edit" && modal.taskId) {
       setTasks((current) =>
@@ -73,7 +118,6 @@ export default function KanbanBoardPage() {
 
     setTasks((current) => {
       const nextId = Math.max(0, ...current.map((task) => task.id)) + 1;
-
       return [
         ...current,
         {
@@ -86,13 +130,29 @@ export default function KanbanBoardPage() {
           startDate: modal.values.startDate,
           assignee: modal.values.assignee,
           priority: modal.values.priority as KanbanPriority,
-          code: `APP-${String(nextId).padStart(2, "0")}`,
-          owner: "류지지",
+          code: "KAN-NEW",
+          owner: modal.values.assignee,
         },
       ];
     });
     closeModal();
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-[#623FB5]">Jira 보드 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-red-500">{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[80px] pt-[64px] font-pretendard">
