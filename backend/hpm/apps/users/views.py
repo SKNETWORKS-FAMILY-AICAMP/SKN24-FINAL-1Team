@@ -82,7 +82,6 @@ def login(request):
         httponly=True,
         secure=False, 
         samesite="Lax",
-        path="/",
     )
 
     response.set_cookie(
@@ -91,7 +90,6 @@ def login(request):
         httponly=True,
         secure=False,
         samesite="Lax",
-        path="/",
     )
 
     return response

@@ -13,6 +13,7 @@ export const loginUser = async (credentials: { email: string; password: string }
 
 export const getMe = async (): Promise<User> => {
   const response = await api.get<User>("/users/me/");
+  console.log(response.data)
   return response.data;
 };
 
