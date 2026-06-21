@@ -69,7 +69,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.getenv("DB_NAME", "hpm_db"),
         'USER': os.getenv("DB_USER", "root"),
-        'PASSWORD': os.getenv("DB_PASSWORD", ""),
+        'PASSWORD': os.getenv("DB_PASSWORD", "1234"),
         'HOST': os.getenv("DB_HOST", "localhost"),
         'PORT': os.getenv("DB_PORT", "3306"),
         'OPTIONS': {'charset': 'utf8mb4'},
@@ -91,8 +91,13 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 # ── CORS ─────────────────────────────────────────────────────────
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
 
 # ── 미디어 파일 ───────────────────────────────────────────────────
 MEDIA_URL = '/media/'
@@ -113,12 +118,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'hpm.authentication.CustomJWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "apps.users.authentication.CustomJWTAuthentication",
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
-    )
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
 }
 
 SIMPLE_JWT = {

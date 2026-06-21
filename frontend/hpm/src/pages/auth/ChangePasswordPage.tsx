@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import ServiceLogo from "../../components/ui/ServiceLogo"
-import api from "../../services/meeting";
+import ServiceLogo from "../../components/ui/ServiceLogo";
+import { changePassword } from "../../services/users";
 import * as DESIGN from "../../constants/design";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/button";
@@ -45,11 +45,8 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      const res = await api.patch(`/users/${user?.users_id}/`, {
-        password: next,
-      });
-      // 유저 정보 업데이트 (is_initial_password false로)
-      login({ ...user!, ...res.data, is_initial_password: false });
+      const updatedUser = await changePassword(user!.user_id, next);
+      login({ ...user!, ...updatedUser, is_initial_password: false });
       navigate("/projects");
     } catch {
       setError("비밀번호 변경에 실패했습니다.");
@@ -109,7 +106,8 @@ export default function ChangePasswordPage() {
             <Button
               type="submit"
               disabled={loading || !current || !next || !confirm}
-              buttonClassName="w-full"
+              className={`w-full ${DESIGN.FONT_SIZES.md}`}
+              size="lg"
             >
               {loading ? "변경 중..." : "비밀번호 변경"}
             </Button>

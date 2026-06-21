@@ -1,44 +1,43 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
-
-interface User {
-  users_id: number;
-  name: string;
-  email: string;
-  is_initial_password?: boolean;
-  jira_connected?: boolean;  // 추가
-}
-
-interface AuthContextType {
-  user: User | null;
-  projectId: number | null;
-  projectName: string;
-  login: (user: User) => void;
-  logout: () => void;
-  selectProject: (id: number, name: string) => void;
-}
+import type { User, AuthContextType } from "../types/user";
+import { getMe } from "../services/users";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    try { return JSON.parse(localStorage.getItem("hpm_user") || "null"); } catch { return null; }
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   const [projectId, setProjectId] = useState<number | null>(() => {
     const v = localStorage.getItem("hpm_project_id");
     return v ? Number(v) : null;
   });
   const [projectName, setProjectName] = useState(() => localStorage.getItem("hpm_project_name") || "");
 
+  useEffect(() => {
+    const fetchMe = async () => {
+      try {
+        const data = await getMe();
+        setUser(data);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMe();
+  }, []);
+
+
   const login = (u: User) => {
     setUser(u);
-    localStorage.setItem("hpm_user", JSON.stringify(u));
   };
 
   const logout = () => {
     setUser(null);
     setProjectId(null);
     setProjectName("");
-    localStorage.removeItem("hpm_user");
     localStorage.removeItem("hpm_project_id");
     localStorage.removeItem("hpm_project_name");
   };
@@ -51,8 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, projectId, projectName, login, logout, selectProject }}>
-      {children}
+    <AuthContext.Provider value={{ user, isLoading, projectId, projectName, login, logout, selectProject }}>
+      {isLoading ? <div>Loading...</div> : children}
     </AuthContext.Provider>
   );
 }

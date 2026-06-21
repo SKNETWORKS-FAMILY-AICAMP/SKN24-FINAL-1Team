@@ -1,16 +1,17 @@
 export interface User {
-  users_id: number;
-  emp_no: string;
+  user_id: number;
   email: string;
-  name: string;
-  work: string;
-  password?: string;
-  account_status: number;
-  status: number;
-  account_id: string | null;
-  role: 'ADMIN' | 'USER';
-  created_at: string;
-  updated_at: string;
-  dept: number;
-  rank: number;
+  name?: string;
+  is_initial_password?: boolean;
+  jira_connected?: boolean; 
+}
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean; // 화면 깜빡임 방지용 로딩 상태
+  projectId: number | null;
+  projectName: string;
+  login: (user: User) => void;
+  logout: () => void;
+  selectProject: (id: number, name: string) => void;
 }
