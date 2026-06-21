@@ -78,7 +78,7 @@ def meeting_list(request):
         title=data.get("title", ""),
         location=data.get("location", ""),
         meeting_at=data.get("meeting_at"),
-        status=Meeting.STATUS_SCHEDULED,
+        meeting_status=Meeting.MeetingStatus.SCHEDULED,
         creator = creator,
     )
 
@@ -164,12 +164,11 @@ def start_meeting(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    if meeting.status == Meeting.STATUS_IN_PROGRESS:
+    if meeting.meeting_status == Meeting.MeetingStatus.IN_PROGRESS:
         return Response({"error": "이미 진행 중인 회의입니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    meeting.status = Meeting.STATUS_IN_PROGRESS
-    meeting.is_meeting = True
-    meeting.save()
+    meeting.meeting_status = Meeting.MeetingStatus.IN_PROGRESS
+    meeting.save(update_fields=["meeting_status"])
 
     # OneToOneField라서 get_or_create 사용
     Record.objects.get_or_create(meeting=meeting)
@@ -183,10 +182,9 @@ def end_meeting(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    meeting.status = Meeting.STATUS_FINISHED
-    meeting.is_meeting = False
-    meeting.minutes_status = Meeting.MINUTES_DRAFT
-    meeting.save()
+    meeting.meeting_status = Meeting.MeetingStatus.FINISHED
+    meeting.is_meeting_approve = False
+    meeting.save(update_fields=["meeting_status", "is_meeting_approve"])
 
     minutes_data = {"content": "", "todo_list": []}
     audio_file = request.FILES.get("audio")
@@ -318,16 +316,18 @@ def complete_minutes_review(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    if meeting.minutes_status != Meeting.MINUTES_DRAFT:
-        return Response({"error": "검토 전 상태가 아닙니다."}, status=status.HTTP_400_BAD_REQUEST)
+    if not meeting.meeting_document:
+        return Response({"error": "확정할 회의록이 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    meeting.minutes_status = Meeting.MINUTES_APPROVED
-    meeting.save()
-    _notify_meeting_users(
-        meeting,
-        Notification.MINUTES_APPROVED,
-        f"[{meeting.title}] 회의록이 확정되었습니다.",
-    )
+    was_approved = meeting.is_meeting_approve
+    meeting.is_meeting_approve = True
+    meeting.save(update_fields=["is_meeting_approve"])
+    if not was_approved:
+        _notify_meeting_users(
+            meeting,
+            Notification.MINUTES_APPROVED,
+            f"[{meeting.title}] 회의록이 확정되었습니다.",
+        )
     return Response({"message": "검토 완료되었습니다.", "minutes_status": "approved"})
 
 def _notify_meeting_users(meeting, notification_type, content):
