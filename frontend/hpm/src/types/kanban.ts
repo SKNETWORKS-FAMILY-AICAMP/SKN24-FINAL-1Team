@@ -2,7 +2,7 @@ export type KanbanColumnId = "todo" | "progress" | "review" | "done";
 
 export type KanbanPriority = "매우 낮음" | "낮음" | "중간" | "높음" | "매우 높음";
 
-export type KanbanCategory = "UI/UX 디자인" | "서비스 기획" | "백엔드 로직" | "고객 요청";
+export type KanbanCategory = string;
 
 export interface KanbanTask {
   id: number;
@@ -16,6 +16,10 @@ export interface KanbanTask {
   priority: KanbanPriority;
   code: string;
   owner: string;
+  parentKey?: string;
+  issueType?: string;
+  issueTypeIconUrl?: string;
+  issueTypeHierarchyLevel?: number | null;
 }
 
 export interface KanbanTaskFormValues {
@@ -25,7 +29,9 @@ export interface KanbanTaskFormValues {
   dueDate: string;
   startDate: string;
   assignee: string;
+  assigneeId: string;
   priority: KanbanPriority | "";
+  parentKey: string;
 }
 
 export interface KanbanColumnConfig {

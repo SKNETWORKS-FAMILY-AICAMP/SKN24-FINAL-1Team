@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from apps.users.models import Users
 from apps.users.views import get_valid_access_token
+from apps.meetings.jira_client import create_jira_issue_for_board, update_jira_issue_status
 from apps.notifications.models import Notification
 from .models import Project, ProjectUsers
 from .serializers import ProjectSerializer, ProjectUsersSerializer
@@ -69,7 +70,7 @@ def project_list(request):
     return Response(ProjectSerializer(project).data, status=status.HTTP_201_CREATED)
 
 
-@api_view(["GET"])
+@api_view(["GET", "POST"])
 def project_jira_board(request, project_id):
     user_id = request.auth["user_id"]
 
@@ -97,6 +98,46 @@ def project_jira_board(request, project_id):
     if not user.jira_cloud_id:
         return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
+    if request.method == "POST":
+        title = (request.data.get("title") or "").strip()
+        if not title:
+            return Response({"error": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        assignee_account_id = None
+        assignee_user_id = request.data.get("assignee_user_id")
+        if assignee_user_id and ProjectUsers.objects.filter(project=project, user_id=assignee_user_id).exists():
+            try:
+                assignee = Users.objects.get(users_id=assignee_user_id)
+                assignee_account_id = assignee.jira_account_id
+            except Users.DoesNotExist:
+                assignee_account_id = None
+
+        result = create_jira_issue_for_board(
+            title,
+            access_token,
+            user.jira_cloud_id,
+            project.jira_project_key,
+            description=request.data.get("description", ""),
+            due_date=request.data.get("due_date"),
+            priority=request.data.get("priority"),
+            assignee_account_id=assignee_account_id,
+            parent_key=request.data.get("parent_key"),
+        )
+        if not result.get("success"):
+            return Response({"error": "Jira issue create failed.", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+
+        column_id = request.data.get("column_id")
+        if result.get("issue_key") and column_id and column_id != "todo":
+            result["transition"] = update_jira_issue_status(
+                result["issue_key"],
+                column_id,
+                access_token,
+                user.jira_cloud_id,
+            )
+        result["column_id"] = column_id or "todo"
+
+        return Response(result, status=status.HTTP_201_CREATED)
+
     try:
         res = requests.post(
             f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/search/jql",
@@ -108,7 +149,7 @@ def project_jira_board(request, project_id):
             json={
                 "jql": f"project = {project.jira_project_key} ORDER BY created DESC",
                 "maxResults": 100,
-                "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created"],
+                "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"],
             },
             timeout=10,
         )
@@ -131,6 +172,9 @@ def project_jira_board(request, project_id):
         column_id = JIRA_STATUS_TO_COLUMN.get(jira_status, "todo")
         assignee = fields.get("assignee") or {}
         priority = fields.get("priority") or {}
+        parent = fields.get("parent") or {}
+        parent_fields = parent.get("fields") or {}
+        issue_type = fields.get("issuetype") or {}
 
         columns[column_id].append({
             "issue_key": issue.get("key"),
@@ -141,6 +185,11 @@ def project_jira_board(request, project_id):
             "due_date": fields.get("duedate") or "",
             "created": fields.get("created") or "",
             "status": jira_status,
+            "parent_key": parent.get("key", ""),
+            "parent_title": parent_fields.get("summary", ""),
+            "issue_type": issue_type.get("name", ""),
+            "issue_type_icon_url": issue_type.get("iconUrl", ""),
+            "issue_type_hierarchy_level": issue_type.get("hierarchyLevel"),
         })
 
     return Response(columns)

@@ -5,13 +5,18 @@ import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
-  KANBAN_CATEGORIES,
   KANBAN_COLUMNS,
   KANBAN_PRIORITIES,
   toKanbanFormValues,
 } from "../../constants/kanban";
 import { useAuth } from "../../context/AuthContext";
-import { getProjectJiraBoard, type ProjectJiraBoard } from "../../services/meeting";
+import {
+  createProjectJiraIssue,
+  getProjectDetail,
+  getProjectJiraBoard,
+  type ProjectMember,
+  type ProjectJiraBoard,
+} from "../../services/meeting";
 import type {
   KanbanColumnId,
   KanbanModalState,
@@ -28,6 +33,20 @@ const mapJiraPriority = (priority: string): KanbanPriority => {
   return KANBAN_PRIORITIES[2];
 };
 
+const mapKanbanPriorityToJira = (priority: KanbanPriority | "") => {
+  const index = KANBAN_PRIORITIES.indexOf(priority as KanbanPriority);
+  return ["Lowest", "Low", "Medium", "High", "Highest"][index] || "Medium";
+};
+
+const isEpicTask = (task: KanbanTask) => {
+  const issueType = (task.issueType || "").toLowerCase();
+  return (
+    issueType === "epic" ||
+    issueType.includes("에픽") ||
+    task.issueTypeHierarchyLevel === 1
+  );
+};
+
 const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
   let nextId = 1;
 
@@ -37,13 +56,17 @@ const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
       columnId: column.id,
       title: issue.title,
       description: issue.description,
-      category: KANBAN_CATEGORIES[2],
+      category: issue.parent_title || "Epic 없음",
       dueDate: issue.due_date || "",
       startDate: issue.created ? issue.created.slice(0, 10) : "",
       assignee: issue.assignee,
       priority: mapJiraPriority(issue.priority),
       code: issue.issue_key,
       owner: issue.assignee || "-",
+      parentKey: issue.parent_key || "",
+      issueType: issue.issue_type || "",
+      issueTypeIconUrl: issue.issue_type_icon_url || "",
+      issueTypeHierarchyLevel: issue.issue_type_hierarchy_level ?? null,
     })),
   );
 };
@@ -51,7 +74,9 @@ const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
 export default function KanbanBoardPage() {
   const { projectId, projectName } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [members, setMembers] = useState<ProjectMember[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!projectId) {
@@ -67,6 +92,20 @@ export default function KanbanBoardPage() {
       });
   }, [projectId]);
 
+  useEffect(() => {
+    if (!projectId) {
+      setMembers([]);
+      return;
+    }
+
+    getProjectDetail(projectId)
+      .then((project) => setMembers(project.members || []))
+      .catch((error) => {
+        console.error("프로젝트 구성원 조회 실패:", error);
+        setMembers([]);
+      });
+  }, [projectId]);
+
   const tasksByColumn = useMemo(() => {
     return KANBAN_COLUMNS.reduce<Record<KanbanColumnId, KanbanTask[]>>(
       (acc, column) => {
@@ -79,8 +118,37 @@ export default function KanbanBoardPage() {
 
   const boardHeight = useMemo(() => getKanbanBoardHeight(tasksByColumn), [tasksByColumn]);
 
+  const assigneeOptions = useMemo(
+    () =>
+      members.map((member) => ({
+        value: String(member.user_id),
+        label: member.name,
+      })),
+    [members],
+  );
+
+  const parentOptions = useMemo(
+    () =>
+      tasks
+        .filter(isEpicTask)
+        .map((task) => ({
+          value: task.code,
+          label: task.title,
+        })),
+    [tasks],
+  );
+
   const openAddModal = (columnId: KanbanColumnId) => {
-    setModal({ mode: "add", columnId, values: emptyKanbanForm() });
+    const defaultAssignee = assigneeOptions[0];
+    setModal({
+      mode: "add",
+      columnId,
+      values: {
+        ...emptyKanbanForm(),
+        assigneeId: defaultAssignee?.value || "",
+        assignee: defaultAssignee?.label || "",
+      },
+    });
   };
 
   const openEditModal = (task: KanbanTask) => {
@@ -94,8 +162,8 @@ export default function KanbanBoardPage() {
 
   const closeModal = () => setModal(null);
 
-  const submitTask = () => {
-    if (!modal || !modal.values.title.trim() || !modal.values.priority) return;
+  const submitTask = async () => {
+    if (!modal || !modal.values.title.trim() || !modal.values.priority || saving) return;
 
     if (modal.mode === "edit" && modal.taskId) {
       setTasks((current) =>
@@ -114,26 +182,52 @@ export default function KanbanBoardPage() {
       return;
     }
 
-    setTasks((current) => {
-      const nextId = Math.max(0, ...current.map((task) => task.id)) + 1;
-      return [
-        ...current,
-        {
-          id: nextId,
-          columnId: modal.columnId,
-          title: modal.values.title.trim(),
-          description: modal.values.description,
-          category: modal.values.category,
-          dueDate: modal.values.dueDate,
-          startDate: modal.values.startDate,
-          assignee: modal.values.assignee,
-          priority: modal.values.priority as KanbanPriority,
-          code: "KAN-NEW",
-          owner: modal.values.assignee,
-        },
-      ];
-    });
-    closeModal();
+    if (!projectId) {
+      alert("프로젝트를 먼저 선택해 주세요.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const result = await createProjectJiraIssue(projectId, {
+        title: modal.values.title.trim(),
+        description: modal.values.description,
+        due_date: modal.values.dueDate || undefined,
+        priority: mapKanbanPriorityToJira(modal.values.priority),
+        column_id: modal.columnId,
+        assignee_user_id: modal.values.assigneeId ? Number(modal.values.assigneeId) : undefined,
+        parent_key: modal.values.parentKey || undefined,
+      });
+      const optimisticTask: KanbanTask = {
+        id: Math.max(0, ...tasks.map((task) => task.id)) + 1,
+        columnId: modal.columnId,
+        title: modal.values.title.trim(),
+        description: modal.values.description,
+        category: modal.values.category || "상위 업무 없음",
+        dueDate: modal.values.dueDate,
+        startDate: modal.values.startDate,
+        assignee: modal.values.assignee,
+        priority: modal.values.priority as KanbanPriority,
+        code: result.issue_key,
+        owner: modal.values.assignee || "-",
+        parentKey: modal.values.parentKey,
+        issueType: "",
+        issueTypeIconUrl: "",
+        issueTypeHierarchyLevel: null,
+      };
+      const board = await getProjectJiraBoard(projectId);
+      const nextTasks = jiraBoardToTasks(board);
+      if (!nextTasks.some((task) => task.code === result.issue_key)) {
+        nextTasks.unshift(optimisticTask);
+      }
+      setTasks(nextTasks);
+      closeModal();
+    } catch (error) {
+      console.error("Jira 업무 생성 실패:", error);
+      alert("Jira 업무 생성에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -167,6 +261,8 @@ export default function KanbanBoardPage() {
           onCancel={closeModal}
           onChange={(values) => setModal({ ...modal, values })}
           onSubmit={submitTask}
+          assigneeOptions={assigneeOptions}
+          parentOptions={parentOptions}
         />
       ) : null}
     </div>
