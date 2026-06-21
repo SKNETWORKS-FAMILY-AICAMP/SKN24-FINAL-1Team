@@ -85,7 +85,9 @@ def login(request):
     response = Response({
         "message": "로그인 성공",
         "user_id": user.users_id,
+        "users_id": user.users_id,
         "email": user.email,
+        "name": user.name,
         "is_initial_password": user.is_initial_password
     })
 
@@ -204,7 +206,7 @@ def jira_oauth_callback(request):
     code = request.GET.get("code")
     user_id = request.GET.get("state")  # start에서 넣었던 user_id
 
-    if not code or not user_id:
+    if not code or not user_id or not str(user_id).isdigit():
         return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
     
     # code → access_token 교환
@@ -222,7 +224,7 @@ def jira_oauth_callback(request):
     )
 
     if not token_response.ok:
-        return redirect("/?jira=error")
+        return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
 
     token_data = token_response.json()
     access_token = token_data.get("access_token")
@@ -247,6 +249,7 @@ def jira_oauth_callback(request):
         user.jira_access_token = access_token
         user.jira_refresh_token = refresh_token
         user.jira_token_expires_at = timezone.now() + timedelta(seconds=expires_in)
+        user.jira_cloud_id = cloud_id
         
         user.save(update_fields=[
             "jira_access_token",
@@ -254,8 +257,8 @@ def jira_oauth_callback(request):
             "jira_token_expires_at",
             "jira_cloud_id",
         ])
-    except Users.DoesNotExist:
-        return redirect(f"{FRONTEND_URL}/?jira=error")
+    except (Users.DoesNotExist, ValueError):
+        return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
 
     return redirect(f"{FRONTEND_URL}/projects/create?jira=success")
 

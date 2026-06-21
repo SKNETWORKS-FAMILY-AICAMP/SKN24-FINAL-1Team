@@ -5,16 +5,18 @@ import {
   DOCUMENT_ALLOWED_EXTENSIONS,
   DOCUMENT_MAX_UPLOAD_SIZE,
 } from "../../constants/documentManagement";
-import { useDocumentManagement } from "../../context/DocumentManagementContext";
+import { useAuth } from "../../context/AuthContext";
+import { uploadDocuments } from "../../services/documents";
 import type { UploadedDocument } from "../../types/documentManagement";
 
 const getExtension = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
 
 export default function DocumentUploadPage() {
   const navigate = useNavigate();
-  const { addUploadedDocuments } = useDocumentManagement();
+  const { projectId } = useAuth();
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [uploadMessage, setUploadMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const addUploadFiles = (files: File[]) => {
     const validFiles = files.filter(
@@ -24,7 +26,7 @@ export default function DocumentUploadPage() {
     );
 
     if (validFiles.length !== files.length) {
-      setUploadMessage("PDF, DOCX, TXT 파일만 업로드할 수 있고 파일당 최대 1GB입니다.");
+      setUploadMessage("PDF, DOCX, TXT 파일만 업로드할 수 있고 파일은 최대 20MB입니다.");
     } else {
       setUploadMessage("");
     }
@@ -47,9 +49,31 @@ export default function DocumentUploadPage() {
     setUploadMessage("");
   };
 
-  const completeUpload = () => {
-    addUploadedDocuments(uploadedDocuments);
-    navigate("/documents");
+  const completeUpload = async () => {
+    if (!projectId) {
+      setUploadMessage("프로젝트를 먼저 선택해야 합니다.");
+      return;
+    }
+    if (uploadedDocuments.length === 0 || submitting) return;
+
+    setSubmitting(true);
+    try {
+      const result = await uploadDocuments(
+        projectId,
+        uploadedDocuments.map((item) => item.file),
+      );
+
+      if (result.errors.length > 0 && result.created.length === 0) {
+        setUploadMessage(result.errors.map((item) => `${item.file}: ${item.error}`).join(", "));
+        return;
+      }
+
+      navigate("/documents");
+    } catch {
+      setUploadMessage("문서 업로드에 실패했습니다.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -58,9 +82,10 @@ export default function DocumentUploadPage() {
         <DocumentUploadPanel
           uploadMessage={uploadMessage}
           uploadedDocuments={uploadedDocuments}
+          submitting={submitting}
           onAddFiles={addUploadFiles}
           onBack={() => navigate("/documents")}
-          onComplete={completeUpload}
+          onComplete={() => void completeUpload()}
           onRemoveUploadedDocument={removeUploadedDocument}
         />
       </section>

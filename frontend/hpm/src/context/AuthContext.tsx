@@ -4,6 +4,11 @@ import { getMe } from "../services/users";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const normalizeUser = (u: User): User => {
+  const id = u.users_id ?? u.user_id;
+  return { ...u, user_id: id, users_id: id };
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchMe = async () => {
       try {
         const data = await getMe();
-        setUser(data);
+        setUser(normalizeUser(data));
       } catch (error) {
         setUser(null);
       } finally {
@@ -31,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const login = (u: User) => {
-    setUser(u);
+    setUser(normalizeUser(u));
   };
 
   const logout = () => {
