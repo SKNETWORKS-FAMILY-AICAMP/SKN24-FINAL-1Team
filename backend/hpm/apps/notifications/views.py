@@ -9,7 +9,7 @@ from .serializers import NotificationSerializer
 def notification_list(request):
     """로그인 사용자 알림 목록 (user_id 쿼리파라미터로 필터)"""
     user_id = request.auth['user_id']
-    qs = Notification.objects.filter(user_id = user_id).order_by("-notification_id")
+    qs = Notification.objects.filter(user_id=user_id).order_by("-created_at", "-notification_id")
 
     return Response(NotificationSerializer(qs, many=True).data)
 
@@ -18,11 +18,11 @@ def notification_list(request):
 def notification_read(request, notification_id):
     """단건 읽음 처리"""
     try:
-        notif = Notification.objects.get(notification_id=notification_id)
+        notif = Notification.objects.get(notification_id=notification_id, user_id=request.auth['user_id'])
     except Notification.DoesNotExist:
         return Response({"error": "알림을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
     notif.is_read = True
-    notif.save()
+    notif.save(update_fields=["is_read"])
     return Response(NotificationSerializer(notif).data)
 
 
@@ -30,7 +30,7 @@ def notification_read(request, notification_id):
 def notification_delete(request, notification_id):
     """단건 삭제"""
     try:
-        notif = Notification.objects.get(notification_id=notification_id)
+        notif = Notification.objects.get(notification_id=notification_id, user_id=request.auth['user_id'])
     except Notification.DoesNotExist:
         return Response({"error": "알림을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
     notif.delete()
@@ -41,6 +41,6 @@ def notification_delete(request, notification_id):
 def notification_delete_all(request):
     """전체 삭제 (user_id 쿼리파라미터)"""
     user_id = request.auth['user_id']
-    qs = Notification.objects.filter(user_id = user_id)
+    qs = Notification.objects.filter(user_id=user_id)
     qs.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

@@ -1,28 +1,85 @@
-import { useMemo, useState } from "react";
-import checkIcon from "../../assets/header/icon-check.svg";
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   HEADER_NOTIFICATION_TABS,
-  INITIAL_HEADER_NOTIFICATIONS,
-  type HeaderNotification,
   type NotificationTab,
 } from "../../constants/header";
+import {
+  deleteNotification,
+  markNotificationRead,
+  type Notification,
+} from "../../services/meeting";
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
 
-export default function HeaderNotificationPopover() {
+interface HeaderNotificationPopoverProps {
+  loading: boolean;
+  notifications: Notification[];
+  setNotifications: Dispatch<SetStateAction<Notification[]>>;
+}
+
+const TYPE_META: Record<Notification["notification_type"], { category: Exclude<NotificationTab, "전체">; kind: string }> = {
+  project_member_added: { category: "프로젝트", kind: "프로젝트 추가" },
+  meeting_invited: { category: "회의", kind: "회의 초대" },
+  meeting_started: { category: "회의", kind: "회의 시작" },
+  minutes_approved: { category: "회의", kind: "회의록 확정" },
+  task_assigned: { category: "업무", kind: "업무 배정" },
+};
+
+const getRelativeTime = (createdAt: string) => {
+  const created = new Date(createdAt).getTime();
+  if (Number.isNaN(created)) return "";
+
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - created) / 60000));
+  if (diffMinutes < 1) return "방금 전";
+  if (diffMinutes < 60) return `${diffMinutes}분 전`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}시간 전`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}일 전`;
+};
+
+const getNotificationPath = (notification: Notification) => {
+  switch (notification.notification_type) {
+    case "meeting_invited":
+    case "meeting_started":
+      return notification.target_id ? `/meetings/${notification.target_id}` : null;
+    case "minutes_approved":
+      return notification.target_id ? `/meetings/${notification.target_id}/minutes` : null;
+    case "task_assigned":
+      return "/dashboard";
+    case "project_member_added":
+    default:
+      return null;
+  }
+};
+
+export default function HeaderNotificationPopover({
+  loading,
+  notifications,
+  setNotifications,
+}: HeaderNotificationPopoverProps) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<NotificationTab>("전체");
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
-  const [notifications, setNotifications] = useState<HeaderNotification[]>(
-    INITIAL_HEADER_NOTIFICATIONS,
-  );
 
   const visibleNotifications = useMemo(() => {
     return activeTab === "전체"
       ? notifications
-      : notifications.filter((notification) => notification.category === activeTab);
+      : notifications.filter((notification) => TYPE_META[notification.notification_type]?.category === activeTab);
   }, [activeTab, notifications]);
+
+  const hasUnreadInTab = (tab: NotificationTab) => {
+    return notifications.some((notification) => {
+      if (notification.is_read) return false;
+      if (tab === "전체") return true;
+      return TYPE_META[notification.notification_type]?.category === tab;
+    });
+  };
 
   const handleTabChange = (tab: NotificationTab) => {
     setActiveTab(tab);
@@ -45,7 +102,32 @@ export default function HeaderNotificationPopover() {
     });
   };
 
-  const handleDeleteClick = () => {
+  const handleNotificationClick = async (notification: Notification) => {
+    if (deleteMode) {
+      toggleSelected(notification.notification_id);
+      return;
+    }
+
+    if (!notification.is_read) {
+      try {
+        const updated = await markNotificationRead(notification.notification_id);
+        setNotifications((current) =>
+          current.map((item) =>
+            item.notification_id === notification.notification_id ? updated : item,
+          ),
+        );
+      } catch {
+        return;
+      }
+    }
+
+    const path = getNotificationPath(notification);
+    if (path) {
+      navigate(path);
+    }
+  };
+
+  const handleDeleteClick = async () => {
     if (!deleteMode) {
       setDeleteMode(true);
       setSelectedIds(new Set());
@@ -57,8 +139,9 @@ export default function HeaderNotificationPopover() {
       return;
     }
 
+    await Promise.all(Array.from(selectedIds).map((id) => deleteNotification(id)));
     setNotifications((current) =>
-      current.filter((notification) => !selectedIds.has(notification.id)),
+      current.filter((notification) => !selectedIds.has(notification.notification_id)),
     );
     setSelectedIds(new Set());
     setDeleteMode(false);
@@ -89,39 +172,51 @@ export default function HeaderNotificationPopover() {
             type="button"
             onClick={() => handleTabChange(tab)}
             className={cn(
-              "flex h-[22px] w-[61px] items-center justify-center rounded-[5px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
+              "relative flex h-[22px] w-[61px] items-center justify-center rounded-[5px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
               activeTab === tab
                 ? "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5] hover:bg-[#C4B6E5]"
                 : "border border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
             )}
           >
             {tab}
+            {hasUnreadInTab(tab) ? (
+              <span className="absolute -right-[4px] -top-[4px] size-[8px] rounded-full border border-[#FFFDFD] bg-[#F04438]" />
+            ) : null}
           </button>
         ))}
       </div>
 
-      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] flex-col gap-[10px] overflow-hidden">
-        {visibleNotifications.length > 0 ? (
+      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] w-[324px] flex-col gap-[10px] overflow-y-auto pr-1">
+        {loading ? (
+          <div className="flex h-[70px] w-full items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
+            알림을 불러오는 중입니다.
+          </div>
+        ) : visibleNotifications.length > 0 ? (
           visibleNotifications.map((notification) => {
-            const selected = selectedIds.has(notification.id);
+            const selected = selectedIds.has(notification.notification_id);
+            const meta = TYPE_META[notification.notification_type];
 
             return (
               <button
-                key={notification.id}
+                key={notification.notification_id}
                 type="button"
-                disabled={!deleteMode}
-                onClick={() => toggleSelected(notification.id)}
-                className="relative h-[70px] w-[324px] shrink-0 rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-left transition-all duration-150 ease-out enabled:hover:border-[#623FB5] enabled:hover:bg-[#ECECF2] enabled:active:scale-[0.99]"
+                onClick={() => handleNotificationClick(notification)}
+                className={cn(
+                  "relative h-[70px] w-full shrink-0 rounded-[7px] border border-[#969696] px-[15px] py-[13px] text-left transition-all duration-150 ease-out hover:border-[#623FB5] hover:bg-[#ECECF2] active:scale-[0.99]",
+                  notification.is_read ? "bg-[#F4F5F8]" : "bg-[#F0ECFA]",
+                )}
               >
-                <span className="absolute left-[15px] top-[15px] text-[12px] font-normal leading-[1.2] text-[#623FB5]">
-                  {notification.kind}
-                </span>
-                <span className="absolute left-[65px] top-[22px] size-[2px] rounded-full bg-[#969696]" />
-                <span className="absolute left-[75px] top-[15px] text-[12px] font-normal leading-[1.2] text-[#969696]">
-                  {notification.time}
-                </span>
-                <span className="absolute left-[15px] top-[43px] w-[230px] truncate text-[10px] font-normal leading-[1.2] text-[#141414]">
-                  {notification.message}
+                <div className="flex min-w-0 items-center gap-[8px] text-[12px] font-normal leading-[1.2]">
+                  <span className="shrink-0 text-[#623FB5]">
+                    {meta?.kind || "알림"}
+                  </span>
+                  <span className="size-[2px] shrink-0 rounded-full bg-[#969696]" />
+                  <span className="min-w-0 truncate text-[#969696]">
+                    {getRelativeTime(notification.created_at)}
+                  </span>
+                </div>
+                <span className="mt-[14px] block w-[230px] truncate text-[10px] font-normal leading-[1.2] text-[#141414]">
+                  {notification.content}
                 </span>
                 {deleteMode ? (
                   <span
@@ -133,9 +228,7 @@ export default function HeaderNotificationPopover() {
                         : "border-[#969696] bg-[#FFFDFD]",
                     )}
                   >
-                    {selected ? (
-                      <img alt="" aria-hidden="true" className="size-[13px] brightness-0 invert" src={checkIcon} />
-                    ) : null}
+                    {selected ? <span className="size-[8px] rounded-full bg-[#FFFDFD]" /> : null}
                   </span>
                 ) : null}
               </button>

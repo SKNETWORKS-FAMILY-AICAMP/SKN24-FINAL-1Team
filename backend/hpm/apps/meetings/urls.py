@@ -17,6 +17,7 @@ urlpatterns = [
     path("<int:meeting_id>/agenda/", views.agenda_list),
     path("<int:meeting_id>/agenda/confirm/", views.confirm_agenda),
     # 회의록 승인 플로우
+    path("<int:meeting_id>/minutes/approve/", views.complete_minutes_review),
     path("<int:meeting_id>/minutes/complete/", views.complete_minutes_review),
     # 태스크
     path("<int:meeting_id>/tasks/", views.task_list),

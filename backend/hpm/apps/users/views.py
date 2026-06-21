@@ -26,7 +26,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
 JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET", "")
 JIRA_REDIRECT_URI = os.getenv("JIRA_REDIRECT_URI", "http://localhost:8000/api/jira/callback/")
-JIRA_SCOPES = "read:jira-work write:jira-work"
+JIRA_SCOPES = "read:jira-work write:jira-work offline_access"
 
 
 def _hash_pw(raw: str) -> str:
@@ -120,12 +120,20 @@ def user_list(request):
 @permission_classes([IsAuthenticated])
 def user_detail(request, users_id):
     try:
-        user = Users.objects.get(users_id=users_id)
+        user = Users.objects.select_related("dept", "rank").get(users_id=users_id)
     except Users.DoesNotExist:
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
-        return Response(UserSerializer(user).data)
+        return Response({
+            "users_id": user.users_id,
+            "email": user.email,
+            "name": user.name,
+            "emp_no": user.emp_no,
+            "work": user.work,
+            "dept_name": user.dept.dept_name,
+            "rank_name": user.rank.rank_name,
+        })
 
     # PATCH - 수정 가능 필드
     for field in ["name", "email", "work"]:
