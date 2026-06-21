@@ -36,6 +36,8 @@ export default function ProjectCreatePage() {
   const [step, setStep] = useState(0);
 
   const [jiraConnected, setJiraConnected] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([]);
   const [jiraLoading, setJiraLoading] = useState(false);
   const [selectedJiraProject, setSelectedJiraProject] = useState<string | null>(null);
@@ -122,7 +124,9 @@ export default function ProjectCreatePage() {
       setStep(3);
     } catch (e) {
       console.error("프로젝트 생성 실패:", e);
-      alert("프로젝트 생성에 실패했습니다.");
+      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "프로젝트 생성에 실패했습니다.";
+      setErrorMessage(msg);
+      setShowErrorModal(true);
     } finally {
       setCreating(false);
     }
@@ -130,6 +134,24 @@ export default function ProjectCreatePage() {
 
   return (
     <div className="min-h-screen bg-[#F6F5FA] flex flex-col p-4">
+
+      {showErrorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="text-[#623FB5] text-[14px] leading-relaxed">{errorMessage}</p>
+            </div>
+            <div className="border-t border-gray-200">
+              <button
+                onClick={() => setShowErrorModal(false)}
+                className="w-full py-4 text-sm text-gray-700 hover:bg-gray-50 transition"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {jiraErrorModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">

@@ -8,6 +8,9 @@ import DashboardPage from "../pages/project/DashboardPage";
 import KanbanBoardPage from "../pages/project/KanbanBoardPage";
 import MeetingListPage from "../pages/meeting/MeetingListPage";
 import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
+import MeetingUploadPage from "../pages/meeting/MeetingUploadPage";
+import AgendaCreatePage from "../pages/meeting/AgendaCreatePage";
+import PrepMaterialPage from "../pages/meeting/PrepMaterialPage";
 import MeetingDetailPage from "../pages/meeting/MeetingDetailPage";
 import MeetingMinutesPage from "../pages/meeting/MeetingMinutesPage";
 import SpeakerMappingPage from "../pages/meeting/SpeakerMappingPage";
@@ -39,6 +42,9 @@ const router = createBrowserRouter([
       { path: "/dashboard", element: <KanbanBoardPage /> },
       { path: "/meetings", element: <MeetingListPage /> },
       { path: "/meetings/create", element: <MeetingCreatePage /> },
+      { path: "/meetings/:id/upload", element: <MeetingUploadPage /> },
+      { path: "/meetings/:id/agenda", element: <AgendaCreatePage /> },
+      { path: "/meetings/:id/prep-material", element: <PrepMaterialPage /> },
       { path: "/meetings/:id", element: <MeetingDetailPage /> },
       { path: "/meetings/:id/speaker-mapping", element: <SpeakerMappingPage /> },
       { path: "/meetings/:id/minutes", element: <MeetingMinutesPage /> },
