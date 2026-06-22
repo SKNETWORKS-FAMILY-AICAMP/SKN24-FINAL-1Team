@@ -1,11 +1,13 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import {
   HEADER_NOTIFICATION_TABS,
   type NotificationTab,
 } from "../../constants/header";
 import {
   deleteNotification,
+  getProjectDetail,
   markNotificationRead,
   type Notification,
 } from "../../services/meeting";
@@ -17,6 +19,7 @@ interface HeaderNotificationPopoverProps {
   loading: boolean;
   notifications: Notification[];
   setNotifications: Dispatch<SetStateAction<Notification[]>>;
+  onClose?: () => void;
 }
 
 const TYPE_META: Record<Notification["notification_type"], { category: Exclude<NotificationTab, "전체">; kind: string }> = {
@@ -61,8 +64,10 @@ export default function HeaderNotificationPopover({
   loading,
   notifications,
   setNotifications,
+  onClose,
 }: HeaderNotificationPopoverProps) {
   const navigate = useNavigate();
+  const { projectId, selectProject } = useAuth();
   const [activeTab, setActiveTab] = useState<NotificationTab>("전체");
   const [deleteMode, setDeleteMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
@@ -117,13 +122,30 @@ export default function HeaderNotificationPopover({
           ),
         );
       } catch {
-        return;
+
       }
+    }
+
+    if (notification.notification_type === "project_member_added") {
+      if (!notification.target_id) return;
+
+      try {
+        const project = await getProjectDetail(notification.target_id);
+        if (projectId !== project.project_id) {
+          selectProject(project.project_id, project.project_name);
+        }
+        navigate("/dashboard");
+        onClose?.();
+      } catch (error) {
+        console.error("프로젝트 알림 이동 실패:", error);
+      }
+      return;
     }
 
     const path = getNotificationPath(notification);
     if (path) {
       navigate(path);
+      onClose?.();
     }
   };
 

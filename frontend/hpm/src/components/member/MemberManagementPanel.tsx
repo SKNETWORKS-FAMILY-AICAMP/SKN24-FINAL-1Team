@@ -1,7 +1,6 @@
 import type { MemberAuthority, MemberRecord } from "../../types/memberManagement";
 import Table from "../ui/Table";
 import type { TableColumn } from "../ui/Table";
-import * as DESIGN from "../../constants/design";
 import Button from "../ui/Button";
 
 function PlusIcon() {
@@ -31,29 +30,16 @@ function AuthorityBadge({ authority }: { authority: MemberAuthority }) {
   );
 }
 
-function RemoveIcon() {
-  return (
-    <svg aria-hidden="true" className="size-[13px]" fill="none" viewBox="0 0 14 14">
-      <path
-        d="m3 3 8 8m0-8-8 8"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
 interface MemberManagementPanelProps {
   members: MemberRecord[];
+  canInvite?: boolean;
   onInviteClick: () => void;
-  onRemoveMember: (memberId: number) => void;
 }
 
 export default function MemberManagementPanel({
   members,
+  canInvite = false,
   onInviteClick,
-  onRemoveMember,
 }: MemberManagementPanelProps) {
   const columns: TableColumn<MemberRecord>[] = [
     {
@@ -106,10 +92,12 @@ export default function MemberManagementPanel({
           </p>
         </header>
 
-        <Button onClick={onInviteClick}>
+        {canInvite ? (
+          <Button onClick={onInviteClick}>
           구성원 초대
           <PlusIcon />
-        </Button>
+          </Button>
+        ) : null}
       </div>
 
       <section className="mt-[31px] w-full">

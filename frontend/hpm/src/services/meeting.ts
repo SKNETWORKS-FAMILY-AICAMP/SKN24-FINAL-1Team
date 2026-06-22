@@ -52,12 +52,13 @@ export interface AgendaItem {
 
 export interface Task {
   meeting_task_id: number;
+  meeting_id?: number;
   title: string;
-  content: string;
+  content?: string;
   owner: string;
   due_date: string | null;
   priority: string;
-  status: number;
+  status?: number;
   is_jira_synced?: boolean;
   jira_key?: string;
 }
@@ -108,6 +109,33 @@ export interface UserProfile {
   work: string;
   dept_name: string;
   rank_name: string;
+}
+
+export interface UserListItem {
+  users_id: number;
+  name: string;
+  email: string;
+  work?: string;
+  dept?: number;
+  rank?: number;
+  dept_name?: string;
+  rank_name?: string;
+}
+
+export interface ProjectMember {
+  user_id: number;
+  name: string;
+  email: string;
+  work: string;
+  dept_name: string;
+  rank_name: string;
+}
+
+export interface ProjectDetail {
+  project_id: number;
+  project_owner: number;
+  project_name: string;
+  members: ProjectMember[];
 }
 
 // ── 회의 ──────────────────────────────────────────────────────────
@@ -193,7 +221,7 @@ export const sendChatMessage = async (meetingId: number, query: string): Promise
 };
 
 // ── 유저 ─────────────────────────────────────────────────────────
-export const getUserList = async (): Promise<{ users_id: number; name: string; email: string }[]> => {
+export const getUserList = async (): Promise<UserListItem[]> => {
   const res = await api.get("/users/");
   return res.data;
 };
@@ -232,6 +260,82 @@ export const getProjects = async () => {
   return res.data;
 };
 
+export const getProjectDetail = async (projectId: number): Promise<ProjectDetail> => {
+  const res = await api.get(`/projects/${projectId}/`);
+  return res.data;
+};
+
+export interface JiraBoardIssue {
+  issue_key: string;
+  title: string;
+  description: string;
+  assignee: string;
+  priority: string;
+  due_date: string;
+  created: string;
+  status: string;
+  parent_key?: string;
+  parent_title?: string;
+  issue_type?: string;
+  issue_type_icon_url?: string;
+  issue_type_hierarchy_level?: number | null;
+}
+
+export interface JiraBoardColumn {
+  id: string;
+  label: string;
+  status_ids: string[];
+  status_names: string[];
+}
+
+export interface ProjectJiraBoard {
+  columns: JiraBoardColumn[];
+  issues: Record<string, JiraBoardIssue[]>;
+}
+
+export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
+  const res = await api.get(`/projects/${projectId}/jira-board/`);
+  return res.data;
+};
+
+export const createProjectJiraIssue = async (
+  projectId: number,
+  data: {
+    title: string;
+    description?: string;
+    due_date?: string;
+    priority?: string;
+    column_id?: string;
+    target_status_names?: string[];
+    assignee_user_id?: number;
+    parent_key?: string;
+  },
+): Promise<{ success: boolean; issue_key: string; column_id: string }> => {
+  const res = await api.post(`/projects/${projectId}/jira-board/`, data);
+  return res.data;
+};
+
+export const updateProjectJiraIssueStatus = async (
+  projectId: number,
+  issueKey: string,
+  columnId: string,
+  targetStatusNames?: string[],
+): Promise<{ success: boolean; column_id: string }> => {
+  const res = await api.patch(
+    `/projects/${projectId}/jira-board/issue/${issueKey}/status/`,
+    { column_id: columnId, target_status_names: targetStatusNames ?? [] },
+  );
+  return res.data;
+};
+
+export const addProjectMembers = async (projectId: number, memberIds: number[]): Promise<void> => {
+  await api.patch(`/projects/${projectId}/`, { add_member_ids: memberIds });
+};
+
+export const deleteProject = async (projectId: number): Promise<void> => {
+  await api.delete(`/projects/${projectId}/`);
+};
+
 export const createProject = async (data: { name: string; description: string }) => {
   const res = await api.post("/projects/", data);
   return res.data;
@@ -249,5 +353,33 @@ export const generateAgendaWithOcr = async (
     headers: { "Content-Type": "multipart/form-data" },
     timeout: 300000,
   });
+  return res.data;
+};
+
+// ── 회의 준비 자료 ─────────────────────────────────────────────────────
+export interface MeetingPreparation {
+  preration_id?: number;
+  meeting: number;
+  purpose: string | null;
+  project_status: string | null;
+  rule: string | null;
+  effect: string | null;
+}
+
+export const getPrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {
+  const res = await api.get(`/meetings/${meetingId}/prep/`);
+  return res.data;
+};
+
+export const savePrepMaterial = async (
+  meetingId: number,
+  data: Partial<MeetingPreparation>
+): Promise<MeetingPreparation> => {
+  const res = await api.post(`/meetings/${meetingId}/prep/`, data);
+  return res.data;
+};
+
+export const generatePrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {
+  const res = await api.post(`/meetings/${meetingId}/prep/generate/`);
   return res.data;
 };

@@ -1,5 +1,6 @@
 import keyIcon from "../../assets/key.svg";
 import logoutIcon from "../../assets/logout.svg";
+import jiraIcon from "../../assets/jira.png";
 
 interface HeaderProfilePopoverProps {
   email?: string;
@@ -9,6 +10,9 @@ interface HeaderProfilePopoverProps {
   rankName?: string;
   work?: string;
   loading?: boolean;
+  jiraConnected?: boolean;
+  jiraStatusLoading?: boolean;
+  onJiraConnect?: () => void;
   onChangePassword?: () => void;
   onLogout?: () => void;
 }
@@ -26,9 +30,14 @@ export default function HeaderProfilePopover({
   rankName,
   work,
   loading,
+  jiraConnected,
+  jiraStatusLoading,
+  onJiraConnect,
   onChangePassword,
   onLogout,
 }: HeaderProfilePopoverProps) {
+  const jiraDisabled = jiraConnected || jiraStatusLoading;
+
   return (
     <section
       aria-label="사용자 프로필"
@@ -62,6 +71,25 @@ export default function HeaderProfilePopover({
 
       <div className="h-px w-full bg-[#E6E1E6]" />
       <div className="flex flex-col gap-[15px] px-[26px] py-[22px]">
+        <button
+          type="button"
+          onClick={jiraDisabled ? undefined : onJiraConnect}
+          disabled={jiraDisabled}
+          className={`flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] transition-all duration-150 ease-out ${
+            jiraDisabled
+              ? "cursor-default text-[#969696]"
+              : "text-[#141414] hover:text-[#623FB5] active:scale-[0.98]"
+          }`}
+        >
+          <img src={jiraIcon} alt="" className="size-[20px] shrink-0 object-contain" />
+          <span>
+            {jiraStatusLoading
+              ? "Jira 연동 확인 중"
+              : jiraConnected
+                ? "Jira 연동됨"
+                : "Jira 연동하기"}
+          </span>
+        </button>
         <button
           type="button"
           onClick={onChangePassword}

@@ -5,6 +5,7 @@ import type { UploadedDocument } from "../../types/documentManagement";
 interface DocumentUploadPanelProps {
   uploadMessage: string;
   uploadedDocuments: UploadedDocument[];
+  submitting?: boolean;
   onAddFiles: (files: File[]) => void;
   onBack: () => void;
   onComplete: () => void;
@@ -58,6 +59,7 @@ function CloseIcon() {
 export default function DocumentUploadPanel({
   uploadMessage,
   uploadedDocuments,
+  submitting = false,
   onAddFiles,
   onBack,
   onComplete,
@@ -117,7 +119,7 @@ export default function DocumentUploadPanel({
               파일을 드래그하거나 클릭하여 업로드
             </span>
             <span className="mt-[10px] text-[15px] font-medium text-[#808080]">
-              PDF · DOCX · TXT 파일당 최대 1GB
+              PDF · DOCX · TXT 파일당 최대 20MB
             </span>
             <span className="mt-[33px] flex h-[48px] w-[150px] items-center justify-center rounded-[7px] bg-[#141414] text-[17px] font-medium text-[#fdfdfd]">
               파일 선택
@@ -170,7 +172,7 @@ export default function DocumentUploadPanel({
             </div>
             <div className="mt-[8px] flex justify-between text-[15px] font-medium text-black">
               <span>0Mb</span>
-              <span>1GB</span>
+              <span>20MB</span>
             </div>
             {uploadMessage ? (
               <p className="mt-[8px] text-[12px] text-[#e52e2e]">{uploadMessage}</p>
@@ -187,11 +189,11 @@ export default function DocumentUploadPanel({
             </button>
             <button
               type="button"
-              disabled={!hasUploadedDocuments}
+              disabled={!hasUploadedDocuments || submitting}
               onClick={onComplete}
               className="h-[48px] w-[150px] rounded-[7px] border-0 bg-[#623fb5] text-[17px] font-medium text-[#fdfdfd] transition-all duration-150 hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
             >
-              완료
+              {submitting ? "업로드 중..." : "완료"}
             </button>
           </div>
         </div>

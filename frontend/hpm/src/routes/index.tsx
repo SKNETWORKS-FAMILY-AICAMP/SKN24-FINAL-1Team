@@ -4,7 +4,6 @@ import LoginPage from "../pages/auth/LoginPage";
 import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import ProjectSelectPage from "../pages/project/ProjectSelectPage";
 import ProjectCreatePage from "../pages/project/ProjectCreatePage";
-import DashboardPage from "../pages/project/DashboardPage";
 import KanbanBoardPage from "../pages/project/KanbanBoardPage";
 import MeetingListPage from "../pages/meeting/MeetingListPage";
 import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
@@ -22,15 +21,10 @@ import MeetingEmailPage from "../pages/meeting/MeetingEmailPage";
 import MeetingJiraRegisterPage from "../pages/meeting/MeetingJiraRegisterPage";
 import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
-import { DocumentManagementProvider } from "../context/DocumentManagementContext";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 
 function DocumentRoutes() {
-  return (
-    <DocumentManagementProvider>
-      <Outlet />
-    </DocumentManagementProvider>
-  );
+  return <Outlet />;
 }
 
 const router = createBrowserRouter([

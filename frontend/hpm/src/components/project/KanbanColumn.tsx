@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import plusIcon from "../../assets/kanban/icon-plus.svg";
 import {
   getKanbanColumnHeight,
@@ -62,6 +62,12 @@ interface KanbanColumnProps {
   tasks: KanbanTask[];
   onAddTask: (columnId: KanbanColumnId) => void;
   onEditTask: (task: KanbanTask) => void;
+  onCardDragStart?: (task: KanbanTask) => void;
+  onCardDragEnd?: () => void;
+  onDropTask?: (columnId: KanbanColumnId) => void;
+  draggingTaskId?: number | null;
+  isDragActive?: boolean;
+  canManage?: boolean;
 }
 
 export default function KanbanColumn({
@@ -69,15 +75,40 @@ export default function KanbanColumn({
   tasks,
   onAddTask,
   onEditTask,
+  onCardDragStart,
+  onCardDragEnd,
+  onDropTask,
+  draggingTaskId = null,
+  isDragActive = false,
+  canManage = true,
 }: KanbanColumnProps) {
+  const [isOver, setIsOver] = useState(false);
   const hasTasks = tasks.length > 0;
   const columnHeight = getKanbanColumnHeight(tasks.length);
-  const columnBackground = hasTasks ? "#ECECF2" : "#EFECEF";
+  const columnBackground = isOver ? "#E3DAFB" : hasTasks ? "#ECECF2" : "#EFECEF";
   const addButtonTop = KANBAN_FIRST_CARD_TOP + tasks.length * KANBAN_CARD_GAP;
 
   return (
     <section
-      className="absolute overflow-hidden rounded-[12px] transition-all duration-200 ease-out"
+      onDragOver={(event) => {
+        if (!canManage || !isDragActive) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        if (!isOver) setIsOver(true);
+      }}
+      onDragLeave={(event) => {
+        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
+        setIsOver(false);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        setIsOver(false);
+        if (!canManage) return;
+        onDropTask?.(column.id);
+      }}
+      className={`absolute overflow-hidden rounded-[12px] transition-all duration-200 ease-out ${
+        isOver ? "outline outline-2 outline-dashed outline-[#623FB5]" : ""
+      }`}
       style={{
         left: column.left,
         top: KANBAN_COLUMN_TOP,
@@ -103,16 +134,22 @@ export default function KanbanColumn({
                   task={task}
                   top={KANBAN_FIRST_CARD_TOP + index * KANBAN_CARD_GAP}
                   onClick={() => onEditTask(task)}
+                  onDragStart={onCardDragStart}
+                  onDragEnd={onCardDragEnd}
+                  isDragging={draggingTaskId === task.id}
+                  canManage={canManage}
                 />
               ))}
-              <AddTaskButton
-                className="left-[23px]"
-                style={{ top: addButtonTop }}
-                onClick={() => onAddTask(column.id)}
-              />
+              {canManage ? (
+                <AddTaskButton
+                  className="left-[23px]"
+                  style={{ top: addButtonTop }}
+                  onClick={() => onAddTask(column.id)}
+                />
+              ) : null}
             </>
           ) : (
-            <EmptyAddCard onClick={() => onAddTask(column.id)} />
+            canManage ? <EmptyAddCard onClick={() => onAddTask(column.id)} /> : null
           )}
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getTaskList, registerJiraTasks, type Task } from "../../services/meeting";
 import StepBar from "../../components/meeting/StepBar";
 
@@ -50,7 +50,6 @@ const MOCK_TASKS: Task[] = [
 
 export default function JiraTaskPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const meetingId = Number(id);
 
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
@@ -92,84 +91,81 @@ export default function JiraTaskPage() {
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <StepBar steps={STEP_LABELS} activeStep={2} />
-
-      <h2 className="text-xl font-bold text-gray-900 mb-6">Jira 태스크 등록</h2>
-
-      <div className="flex flex-col gap-3">
-        {tasks.map(task => {
-          const isSelected = selected.has(task.meeting_task_id);
-          return (
-            <button
-              key={task.meeting_task_id}
-              onClick={() => toggle(task.meeting_task_id)}
-              className={`w-full text-left px-5 py-4 rounded-xl border transition-colors
-                ${isSelected
-                  ? "bg-indigo-50 border-indigo-200"
-                  : "bg-white border-gray-200 hover:bg-gray-50"}`}
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium mb-2 ${isSelected ? "text-indigo-900" : "text-gray-900"}`}>
-                    {task.title}
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className={`text-xs border rounded-full px-2.5 py-0.5
-                      ${isSelected ? "border-indigo-300 text-indigo-600" : "border-gray-300 text-gray-600"}`}>
-                      담당: {task.owner || "미배정"}
-                    </span>
-                    {task.due_date && (
-                      <span className={`text-xs border rounded-full px-2.5 py-0.5
-                        ${isSelected ? "border-indigo-300 text-indigo-600" : "border-gray-300 text-gray-600"}`}>
-                        기한: {task.due_date}
-                      </span>
-                    )}
-                    {task.priority && (
-                      <span className={`text-xs border rounded-full px-2.5 py-0.5
-                        ${isSelected ? "border-indigo-300 text-indigo-600" : "border-gray-300 text-gray-600"}`}>
-                        {PRIORITY_LABEL[task.priority] || task.priority}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div
-                  className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center border-2 transition-colors
-                    ${isSelected
-                      ? "bg-indigo-600 border-indigo-600 text-white"
-                      : "border-gray-300 bg-white"}`}
-                >
-                  {isSelected && (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
+    <div className="mx-auto max-w-[960px] p-8">
+      <div className="mb-8 flex items-center gap-3">
+        {stepLabels.map((label, index) => (
+          <div
+            key={label}
+            className={`rounded-full px-4 py-2 text-sm ${
+              index === 1 ? "bg-[#623FB5] text-white" : "bg-[#F4F5F8] text-[#969696]"
+            }`}
+          >
+            {label}
+          </div>
+        ))}
       </div>
 
-      <div className="mt-6 flex items-center justify-between bg-white border border-gray-200 rounded-xl px-6 py-4">
-        <p className="text-sm text-gray-400">등록할 태스크를 선택하고 Jira에 등록해주세요.</p>
-        <div className="flex gap-3">
-          <button
-            onClick={() => navigate(`/meetings/${meetingId}/minutes`)}
-            className="px-5 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-          >
-            이전
-          </button>
-          <button
-            onClick={handleRegister}
-            disabled={registering || selected.size === 0}
-            className="px-5 py-2 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
-            style={{ backgroundColor: "#623FB5" }}
-          >
-            {registering ? "등록 중..." : "Jira 등록"}
-          </button>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-[24px] font-semibold text-[#141414]">Jira 태스크 등록</h1>
+        <button
+          type="button"
+          disabled={selected.length === 0 || registering}
+          onClick={handleRegister}
+          className="rounded-[8px] bg-[#623FB5] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
+        >
+          {registering ? "등록 중..." : `선택 등록 (${selected.length})`}
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="rounded-[12px] bg-[#F4F5F8] p-8 text-center text-sm text-[#969696]">
+          태스크를 불러오는 중입니다.
         </div>
-      </div>
+      ) : tasks.length === 0 ? (
+        <div className="rounded-[12px] bg-[#F4F5F8] p-8 text-center text-sm text-[#969696]">
+          등록할 태스크가 없습니다.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {tasks.map((task) => {
+            const isRegistered = registered.includes(task.meeting_task_id) || task.is_jira_synced;
+            const isSelected = selected.includes(task.meeting_task_id);
+
+            return (
+              <button
+                key={task.meeting_task_id}
+                type="button"
+                disabled={isRegistered}
+                onClick={() => toggle(task.meeting_task_id)}
+                className={`rounded-[12px] border p-4 text-left transition ${
+                  isSelected
+                    ? "border-[#623FB5] bg-[#F4F1FF]"
+                    : "border-[#E6E1E6] bg-white hover:border-[#623FB5]"
+                } ${isRegistered ? "cursor-not-allowed opacity-60" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-[#141414]">{task.title}</p>
+                    <p className="mt-1 text-xs text-[#969696]">
+                      담당자 {task.owner || "미정"} · 마감 {task.due_date || "미정"}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+                      PRIORITY_COLOR[task.priority] || "bg-gray-100 text-gray-500"
+                    }`}
+                  >
+                    {PRIORITY_LABEL[task.priority] || task.priority || "중간"}
+                  </span>
+                </div>
+                {isRegistered ? (
+                  <p className="mt-2 text-xs text-[#623FB5]">이미 Jira에 등록되었습니다.</p>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import toggle from "../../assets/header/toggle.png";
 import { useAuth } from "../../context/AuthContext";
 import type { HeaderPopover } from "../../constants/header";
 import {
+  getJiraStatus,
   getNotifications,
   getUserProfile,
   type Notification,
@@ -22,6 +23,18 @@ export default function Header() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [jiraConnected, setJiraConnected] = useState<boolean | null>(null);
+  const [jiraStatusLoading, setJiraStatusLoading] = useState(false);
+
+  const addNotification = useCallback((notification: Notification) => {
+    setNotifications((current) => {
+      if (current.some((item) => item.notification_id === notification.notification_id)) {
+        return current;
+      }
+
+      return [notification, ...current];
+    });
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     if (!user) {
@@ -45,6 +58,45 @@ export default function Header() {
     void loadNotifications();
   }, [loadNotifications]);
 
+  useEffect(() => {
+    setJiraConnected(null);
+    setJiraStatusLoading(false);
+  }, [user?.users_id]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let accessToken = "";
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("hpm_user") || "null");
+      accessToken = savedUser?.access || "";
+    } catch {
+      accessToken = "";
+    }
+
+    if (!accessToken) return;
+
+    const url = new URL(`${import.meta.env.VITE_API_BASE_URL}/notifications/stream/`);
+    url.searchParams.set("token", accessToken);
+
+    const source = new EventSource(url.toString());
+    const handleNotification = (event: Event) => {
+      try {
+        const message = event as MessageEvent<string>;
+        addNotification(JSON.parse(message.data) as Notification);
+      } catch {
+        // Ignore malformed SSE messages and keep the stream alive.
+      }
+    };
+
+    source.addEventListener("notification", handleNotification);
+
+    return () => {
+      source.removeEventListener("notification", handleNotification);
+      source.close();
+    };
+  }, [addNotification, user]);
+
   const loadProfile = useCallback(async () => {
     if (!user?.users_id) {
       setProfile(null);
@@ -63,6 +115,26 @@ export default function Header() {
     }
   }, [user]);
 
+  const loadJiraStatus = useCallback(async () => {
+    if (!user) {
+      setJiraConnected(null);
+      setJiraStatusLoading(false);
+      return null;
+    }
+
+    setJiraStatusLoading(true);
+    try {
+      const status = await getJiraStatus();
+      setJiraConnected(status.connected);
+      return status.connected;
+    } catch {
+      setJiraConnected(false);
+      return false;
+    } finally {
+      setJiraStatusLoading(false);
+    }
+  }, [user]);
+
   const unreadNotificationCount = useMemo(
     () => notifications.filter((notification) => !notification.is_read).length,
     [notifications],
@@ -78,9 +150,20 @@ export default function Header() {
       }
       if (popover === "profile" && next === "profile") {
         void loadProfile();
+        void loadJiraStatus();
       }
       return next;
     });
+  };
+
+  const handleJiraConnect = async () => {
+    if (!user?.users_id || jiraStatusLoading) return;
+
+    const connected = jiraConnected ?? (await loadJiraStatus());
+    if (connected) return;
+
+    const next = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user.users_id}&next=${next}`;
   };
 
   const handleChangePassword = () => {
@@ -119,6 +202,7 @@ export default function Header() {
                 loading={notificationsLoading}
                 notifications={notifications}
                 setNotifications={setNotifications}
+                onClose={() => setOpenPopover(null)}
               />
             ) : null}
           </div>
@@ -140,6 +224,9 @@ export default function Header() {
                 rankName={profile?.rank_name}
                 work={profile?.work}
                 loading={profileLoading}
+                jiraConnected={jiraConnected === true}
+                jiraStatusLoading={jiraStatusLoading}
+                onJiraConnect={handleJiraConnect}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
               />

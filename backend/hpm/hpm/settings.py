@@ -2,12 +2,16 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
+import boto3
+
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent.parent
 
 # 절대경로 → 상대경로로 변경 (parents[3]는 .env 위치에 맞게 조정)
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-^ai6lg-1&n^afjylo6rs$2s(!5)j(449z=!vfje)7h7xb71!*v")
 
@@ -100,8 +104,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
-    #"http://192.168.56.1:5173",
-    "http://192.168.56.1:5174",
 ]
 
 # ── 미디어 파일 ───────────────────────────────────────────────────
@@ -137,3 +139,7 @@ SIMPLE_JWT = {
 }
 
 DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
+
+# AWS SES
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
+DEFAULT_FROM_EMAIL = os.environ.get("SES_FROM_EMAIL")

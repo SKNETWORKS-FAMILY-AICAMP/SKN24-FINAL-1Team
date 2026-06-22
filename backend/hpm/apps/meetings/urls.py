@@ -28,4 +28,7 @@ urlpatterns = [
     path("<int:meeting_id>/agenda/generate/", generate_agenda),
     # speaker_mapping_list
     path("<int:meeting_id>/speaker-mapping/", views.speaker_mapping_list),
+    # 회의 준비 자료
+    path("<int:meeting_id>/prep/", views.prep_material_detail),
+    path("<int:meeting_id>/prep/generate/", views.generate_prep_material),
 ]
