@@ -40,6 +40,12 @@ JIRA_SCOPES = "read:jira-work write:jira-work offline_access"
 def _hash_pw(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
+
+def _password_matches(user: Users, raw: str) -> bool:
+    return (
+        raw == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD
+    ) or user.password == _hash_pw(raw)
+
 def get_tokens_for_user(user):
     refresh = RefreshToken()
     refresh['user_id'] = user.users_id
@@ -167,6 +173,16 @@ def user_detail(request, users_id):
     # 비밀번호 변경
     new_pw = request.data.get("password")
     if new_pw:
+        if len(new_pw) < 6:
+            return Response({"error": "password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.account_status != 0:
+            current_pw = request.data.get("current_password", "")
+            if not current_pw:
+                return Response({"error": "current_password is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not _password_matches(user, current_pw):
+                return Response({"error": "current_password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
         user.password = _hash_pw(new_pw)
         user.account_status = 1
 
