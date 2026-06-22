@@ -59,8 +59,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("hpm_project_name", name);
   };
 
+  const clearProject = () => {
+    setProjectId(null);
+    setProjectName("");
+    localStorage.removeItem("hpm_project_id");
+    localStorage.removeItem("hpm_project_name");
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, projectId, projectName, login, logout, selectProject }}>
+    <AuthContext.Provider value={{ user, isLoading, projectId, projectName, login, logout, selectProject, clearProject }}>
       {isLoading ? <div>Loading...</div> : children}
     </AuthContext.Provider>
   );

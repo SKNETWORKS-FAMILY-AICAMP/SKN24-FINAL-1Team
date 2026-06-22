@@ -117,7 +117,7 @@ export default function HeaderNotificationPopover({
           ),
         );
       } catch {
-        return;
+
       }
     }
 

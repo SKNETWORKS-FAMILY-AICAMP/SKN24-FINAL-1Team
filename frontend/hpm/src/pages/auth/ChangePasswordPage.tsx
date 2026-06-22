@@ -18,6 +18,7 @@ export default function ChangePasswordPage() {
   const [confirmError, setConfirmError] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const isFirstLogin = user?.account_status === 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +29,7 @@ export default function ChangePasswordPage() {
 
     let hasError = false;
 
-    if (!current) {
+    if (!isFirstLogin && !current) {
       setCurrentError("기존 비밀번호를 입력하세요.");
       hasError = true;
     }
@@ -45,7 +46,7 @@ export default function ChangePasswordPage() {
 
     setLoading(true);
     try {
-      const updatedUser = await changePassword(user!.user_id, next);
+      const updatedUser = await changePassword(user!.user_id, next, isFirstLogin ? undefined : current);
       login({ ...user!, ...updatedUser, account_status: 1 });
       navigate("/projects");
     } catch {
@@ -62,8 +63,9 @@ export default function ChangePasswordPage() {
         <div className={`${DESIGN.PADDING_SIZES["2xl"]} ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.MARGIN_TOP_SIZES["5xl"]} ${DESIGN.RADIUS_SIZES["2xl"]} flex justify-center items-center flex-col`}>
           <p className={`${DESIGN.FONT_SIZES.h3} justify-center ${DESIGN.MARGIN_BOTTOM_SIZES["3xl"]}`}>비밀번호 변경</p>
           <form onSubmit={handleSubmit} className={`flex flex-col ${DESIGN.GAP_SIZES["4xl"]} w-full`}>
-            <Input
-              id="currentPassword"
+            {!isFirstLogin ? (
+              <Input
+                id="currentPassword"
               label="기존 비밀번호"
               type="password"
               value={current}
@@ -73,7 +75,8 @@ export default function ChangePasswordPage() {
               }}
               placeholder="기존 비밀번호를 입력하세요"
               error={currentError}
-            />
+              />
+            ) : null}
             <Input
               id="newPassword"
               label="새 비밀번호"
@@ -105,7 +108,7 @@ export default function ChangePasswordPage() {
 
             <Button
               type="submit"
-              disabled={loading || !current || !next || !confirm}
+              disabled={loading || (!isFirstLogin && !current) || !next || !confirm}
               className={`w-full ${DESIGN.FONT_SIZES.md}`}
               size="lg"
             >
