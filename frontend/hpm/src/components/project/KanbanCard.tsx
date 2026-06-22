@@ -4,16 +4,30 @@ interface KanbanCardProps {
   task: KanbanTask;
   top: number;
   onClick: () => void;
-  disabled?: boolean;
+  onDragStart?: (task: KanbanTask) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }
 
-export default function KanbanCard({ task, top, onClick, disabled = false }: KanbanCardProps) {
+export default function KanbanCard({
+  task,
+  top,
+  onClick,
+  onDragStart,
+  onDragEnd,
+  isDragging = false,
+}: KanbanCardProps) {
   return (
     <article
-      className={`absolute left-[23px] h-[142px] w-[306px] rounded-[10px] border-0 bg-[#FFFDFD] p-0 text-left transition-all duration-150 ease-out ${
-        disabled
-          ? ""
-          : "hover:bg-[#F4F5F8] hover:brightness-[0.96] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985] active:bg-[#EFECEF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", task.code);
+        onDragStart?.(task);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      className={`absolute left-[23px] h-[142px] w-[306px] cursor-grab rounded-[10px] border-0 bg-[#FFFDFD] p-0 text-left transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:brightness-[0.96] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985] active:bg-[#EFECEF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5] ${
+        isDragging ? "opacity-40" : "opacity-100"
       }`}
       style={{ top }}
       data-name="dashboard=card"
@@ -21,12 +35,7 @@ export default function KanbanCard({ task, top, onClick, disabled = false }: Kan
       <button
         type="button"
         onClick={onClick}
-        disabled={disabled}
-        className={`absolute inset-0 rounded-[10px] border-0 bg-transparent p-0 text-left transition-all duration-150 ease-out ${
-          disabled
-            ? "cursor-default"
-            : "active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]"
-        }`}
+        className="absolute inset-0 rounded-[10px] border-0 bg-transparent p-0 text-left transition-all duration-150 ease-out active:scale-[0.985] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]"
       >
         <div className="absolute left-[18px] top-[18px] flex w-[170px] flex-col items-start gap-[18px]">
           <div className="flex w-full flex-col items-start gap-[10px]">
