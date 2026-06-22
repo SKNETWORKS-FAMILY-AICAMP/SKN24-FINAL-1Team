@@ -281,11 +281,16 @@ export interface JiraBoardIssue {
   issue_type_hierarchy_level?: number | null;
 }
 
+export interface JiraBoardColumn {
+  id: string;
+  label: string;
+  status_ids: string[];
+  status_names: string[];
+}
+
 export interface ProjectJiraBoard {
-  todo: JiraBoardIssue[];
-  progress: JiraBoardIssue[];
-  review: JiraBoardIssue[];
-  done: JiraBoardIssue[];
+  columns: JiraBoardColumn[];
+  issues: Record<string, JiraBoardIssue[]>;
 }
 
 export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
@@ -301,6 +306,7 @@ export const createProjectJiraIssue = async (
     due_date?: string;
     priority?: string;
     column_id?: string;
+    target_status_names?: string[];
     assignee_user_id?: number;
     parent_key?: string;
   },

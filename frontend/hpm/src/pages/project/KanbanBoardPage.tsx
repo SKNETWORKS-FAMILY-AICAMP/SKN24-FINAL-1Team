@@ -16,13 +16,19 @@ import {
   getProjectJiraBoard,
   type ProjectMember,
   type ProjectJiraBoard,
+  type JiraBoardColumn,
 } from "../../services/meeting";
 import type {
   KanbanColumnId,
+  KanbanColumnConfig,
   KanbanModalState,
   KanbanPriority,
   KanbanTask,
 } from "../../types/kanban";
+
+const COLUMN_LEFT_START = 68;
+const COLUMN_STEP = 384;
+const BOARD_MIN_WIDTH = 1252;
 
 const mapJiraPriority = (priority: string): KanbanPriority => {
   const normalized = priority.toLowerCase();
@@ -47,11 +53,23 @@ const isEpicTask = (task: KanbanTask) => {
   );
 };
 
-const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
+const toKanbanColumns = (columns: JiraBoardColumn[]): KanbanColumnConfig[] => {
+  if (columns.length === 0) return KANBAN_COLUMNS;
+
+  return columns.map((column, index) => ({
+    id: column.id,
+    label: column.label,
+    left: COLUMN_LEFT_START + index * COLUMN_STEP,
+    height: 742,
+    statusNames: column.status_names,
+  }));
+};
+
+const jiraBoardToTasks = (board: ProjectJiraBoard, columns: KanbanColumnConfig[]): KanbanTask[] => {
   let nextId = 1;
 
-  return KANBAN_COLUMNS.flatMap((column) =>
-    (board[column.id] ?? []).map((issue) => ({
+  return columns.flatMap((column) =>
+    (board.issues[column.id] ?? []).map((issue) => ({
       id: nextId++,
       columnId: column.id,
       title: issue.title,
@@ -74,6 +92,7 @@ const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
 export default function KanbanBoardPage() {
   const { projectId, projectName } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [boardColumns, setBoardColumns] = useState<KanbanColumnConfig[]>(KANBAN_COLUMNS);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,13 +100,19 @@ export default function KanbanBoardPage() {
   useEffect(() => {
     if (!projectId) {
       setTasks([]);
+      setBoardColumns(KANBAN_COLUMNS);
       return;
     }
 
     getProjectJiraBoard(projectId)
-      .then((board) => setTasks(jiraBoardToTasks(board)))
+      .then((board) => {
+        const nextColumns = toKanbanColumns(board.columns || []);
+        setBoardColumns(nextColumns);
+        setTasks(jiraBoardToTasks(board, nextColumns));
+      })
       .catch((error) => {
         console.error("Jira 칸반 조회 실패:", error);
+        setBoardColumns(KANBAN_COLUMNS);
         setTasks([]);
       });
   }, [projectId]);
@@ -107,16 +132,23 @@ export default function KanbanBoardPage() {
   }, [projectId]);
 
   const tasksByColumn = useMemo(() => {
-    return KANBAN_COLUMNS.reduce<Record<KanbanColumnId, KanbanTask[]>>(
+    return boardColumns.reduce<Record<KanbanColumnId, KanbanTask[]>>(
       (acc, column) => {
         acc[column.id] = tasks.filter((task) => task.columnId === column.id);
         return acc;
       },
-      { todo: [], progress: [], review: [], done: [] },
+      {},
     );
-  }, [tasks]);
+  }, [boardColumns, tasks]);
 
-  const boardHeight = useMemo(() => getKanbanBoardHeight(tasksByColumn), [tasksByColumn]);
+  const boardHeight = useMemo(
+    () => getKanbanBoardHeight(tasksByColumn, boardColumns),
+    [boardColumns, tasksByColumn],
+  );
+  const boardWidth = useMemo(
+    () => Math.max(BOARD_MIN_WIDTH, COLUMN_LEFT_START * 2 + boardColumns.length * COLUMN_STEP),
+    [boardColumns.length],
+  );
 
   const assigneeOptions = useMemo(
     () =>
@@ -197,6 +229,7 @@ export default function KanbanBoardPage() {
         column_id: modal.columnId,
         assignee_user_id: modal.values.assigneeId ? Number(modal.values.assigneeId) : undefined,
         parent_key: modal.values.parentKey || undefined,
+        target_status_names: boardColumns.find((column) => column.id === modal.columnId)?.statusNames || [],
       });
       const optimisticTask: KanbanTask = {
         id: Math.max(0, ...tasks.map((task) => task.id)) + 1,
@@ -216,10 +249,12 @@ export default function KanbanBoardPage() {
         issueTypeHierarchyLevel: null,
       };
       const board = await getProjectJiraBoard(projectId);
-      const nextTasks = jiraBoardToTasks(board);
+      const nextColumns = toKanbanColumns(board.columns || []);
+      const nextTasks = jiraBoardToTasks(board, nextColumns);
       if (!nextTasks.some((task) => task.code === result.issue_key)) {
         nextTasks.unshift(optimisticTask);
       }
+      setBoardColumns(nextColumns);
       setTasks(nextTasks);
       closeModal();
     } catch (error) {
@@ -233,8 +268,8 @@ export default function KanbanBoardPage() {
   return (
     <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[80px] pt-[64px] font-pretendard">
       <section
-        className="relative w-[1636px] transition-all duration-200 ease-out"
-        style={{ height: boardHeight }}
+        className="relative transition-all duration-200 ease-out"
+        style={{ height: boardHeight, width: boardWidth }}
         data-node-id={modal ? "43:4229" : "1:7286"}
         data-name="dashboard"
       >
@@ -244,7 +279,7 @@ export default function KanbanBoardPage() {
             {projectName || "Jira 칸반"}
           </h1>
         </section>
-        {KANBAN_COLUMNS.map((column) => (
+        {boardColumns.map((column) => (
           <KanbanColumn
             key={column.id}
             column={column}

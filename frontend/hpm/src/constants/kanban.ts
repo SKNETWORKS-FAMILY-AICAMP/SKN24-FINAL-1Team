@@ -24,9 +24,8 @@ export const KANBAN_EMPTY_COLUMN_HEIGHT = 226;
 
 export const KANBAN_COLUMNS: KanbanColumnConfig[] = [
   { id: "todo", label: "할 일", left: 68, height: 742 },
-  { id: "progress", label: "진행 중", left: 452, height: 742 },
-  { id: "review", label: "검토 중", left: 836, height: 226 },
-  { id: "done", label: "완료", left: 1220, height: 742 },
+  { id: "progress", label: "진행중", left: 452, height: 742 },
+  { id: "done", label: "완료", left: 836, height: 742 },
 ];
 
 export const KANBAN_PRIORITIES: KanbanPriority[] = [
@@ -201,9 +200,10 @@ export const getKanbanColumnHeight = (taskCount: number) => {
 
 export const getKanbanBoardHeight = (
   tasksByColumn: Record<KanbanColumnId, KanbanTask[]>,
+  columns: KanbanColumnConfig[] = KANBAN_COLUMNS,
 ) => {
   const maxColumnHeight = Math.max(
-    ...KANBAN_COLUMNS.map((column) =>
+    ...columns.map((column) =>
       getKanbanColumnHeight(tasksByColumn[column.id].length),
     ),
   );

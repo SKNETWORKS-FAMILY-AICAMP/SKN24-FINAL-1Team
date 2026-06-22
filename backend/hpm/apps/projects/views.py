@@ -16,11 +16,119 @@ JIRA_STATUS_TO_COLUMN = {
     "할 일": "todo",
     "In Progress": "progress",
     "진행 중": "progress",
-    "In Review": "review",
-    "검토 중": "review",
+    "In Review": "progress",
+    "검토 중": "progress",
     "Done": "done",
     "완료": "done",
 }
+
+DEFAULT_JIRA_COLUMNS = [
+    {
+        "id": "todo",
+        "label": "할 일",
+        "status_ids": [],
+        "status_names": ["To Do", "할 일", "해야 할 일"],
+    },
+    {
+        "id": "progress",
+        "label": "진행중",
+        "status_ids": [],
+        "status_names": ["In Progress", "진행 중", "진행중"],
+    },
+    {
+        "id": "done",
+        "label": "완료",
+        "status_ids": [],
+        "status_names": ["Done", "완료"],
+    },
+]
+
+
+def _status_name_map(access_token, cloud_id):
+    try:
+        res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/status",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        return {}
+
+    if not res.ok:
+        return {}
+
+    return {str(item.get("id")): item.get("name", "") for item in res.json()}
+
+
+def _get_jira_board_columns(access_token, cloud_id, project_key):
+    headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
+
+    try:
+        boards_res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board",
+            headers=headers,
+            params={"projectKeyOrId": project_key, "type": "kanban", "maxResults": 50},
+            timeout=10,
+        )
+    except requests.RequestException:
+        return DEFAULT_JIRA_COLUMNS
+
+    if not boards_res.ok:
+        return DEFAULT_JIRA_COLUMNS
+
+    boards = boards_res.json().get("values", [])
+    if not boards:
+        return DEFAULT_JIRA_COLUMNS
+
+    board_id = boards[0].get("id")
+    if not board_id:
+        return DEFAULT_JIRA_COLUMNS
+
+    try:
+        config_res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board/{board_id}/configuration",
+            headers=headers,
+            timeout=10,
+        )
+    except requests.RequestException:
+        return DEFAULT_JIRA_COLUMNS
+
+    if not config_res.ok:
+        return DEFAULT_JIRA_COLUMNS
+
+    status_names_by_id = _status_name_map(access_token, cloud_id)
+    columns = []
+    for index, column in enumerate(config_res.json().get("columnConfig", {}).get("columns", [])):
+        label = column.get("name") or f"Column {index + 1}"
+        statuses = column.get("statuses", [])
+        status_ids = [str(item.get("id")) for item in statuses if item.get("id")]
+        status_names = [
+            status_names_by_id.get(status_id)
+            for status_id in status_ids
+            if status_names_by_id.get(status_id)
+        ]
+        columns.append({
+            "id": f"jira-{index}",
+            "label": label,
+            "status_ids": status_ids,
+            "status_names": status_names or [label],
+        })
+
+    return columns or DEFAULT_JIRA_COLUMNS
+
+
+def _match_jira_column(columns, jira_status):
+    status_id = str(jira_status.get("id") or "")
+    status_name = jira_status.get("name", "")
+    status_name_lower = status_name.lower()
+
+    for column in columns:
+        if status_id and status_id in column.get("status_ids", []):
+            return column["id"]
+        if status_name_lower in {name.lower() for name in column.get("status_names", [])}:
+            return column["id"]
+
+    return JIRA_STATUS_TO_COLUMN.get(status_name, columns[0]["id"] if columns else "todo")
 
 
 @api_view(["GET", "POST"])
@@ -98,6 +206,8 @@ def project_jira_board(request, project_id):
     if not user.jira_cloud_id:
         return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
+    jira_columns = _get_jira_board_columns(access_token, user.jira_cloud_id, project.jira_project_key)
+
     if request.method == "POST":
         title = (request.data.get("title") or "").strip()
         if not title:
@@ -127,14 +237,16 @@ def project_jira_board(request, project_id):
             return Response({"error": "Jira issue create failed.", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
 
         column_id = request.data.get("column_id")
-        if result.get("issue_key") and column_id and column_id != "todo":
+        target_status_names = request.data.get("target_status_names") or []
+        if result.get("issue_key") and column_id:
             result["transition"] = update_jira_issue_status(
                 result["issue_key"],
                 column_id,
                 access_token,
                 user.jira_cloud_id,
+                target_status_names=target_status_names,
             )
-        result["column_id"] = column_id or "todo"
+        result["column_id"] = column_id or jira_columns[0]["id"]
 
         return Response(result, status=status.HTTP_201_CREATED)
 
@@ -165,18 +277,18 @@ def project_jira_board(request, project_id):
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    columns = {"todo": [], "progress": [], "review": [], "done": []}
+    issues_by_column = {column["id"]: [] for column in jira_columns}
     for issue in res.json().get("issues", []):
         fields = issue.get("fields", {})
-        jira_status = fields.get("status", {}).get("name", "")
-        column_id = JIRA_STATUS_TO_COLUMN.get(jira_status, "todo")
+        jira_status = fields.get("status", {})
+        column_id = _match_jira_column(jira_columns, jira_status)
         assignee = fields.get("assignee") or {}
         priority = fields.get("priority") or {}
         parent = fields.get("parent") or {}
         parent_fields = parent.get("fields") or {}
         issue_type = fields.get("issuetype") or {}
 
-        columns[column_id].append({
+        issues_by_column.setdefault(column_id, []).append({
             "issue_key": issue.get("key"),
             "title": fields.get("summary", ""),
             "description": "",
@@ -184,7 +296,7 @@ def project_jira_board(request, project_id):
             "priority": priority.get("name", ""),
             "due_date": fields.get("duedate") or "",
             "created": fields.get("created") or "",
-            "status": jira_status,
+            "status": jira_status.get("name", ""),
             "parent_key": parent.get("key", ""),
             "parent_title": parent_fields.get("summary", ""),
             "issue_type": issue_type.get("name", ""),
@@ -192,7 +304,10 @@ def project_jira_board(request, project_id):
             "issue_type_hierarchy_level": issue_type.get("hierarchyLevel"),
         })
 
-    return Response(columns)
+    return Response({
+        "columns": jira_columns,
+        "issues": issues_by_column,
+    })
 
 
 @api_view(["GET", "PATCH", "DELETE"])
