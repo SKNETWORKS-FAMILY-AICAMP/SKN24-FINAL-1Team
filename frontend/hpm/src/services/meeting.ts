@@ -310,3 +310,32 @@ export const generateAgendaWithOcr = async (
   });
   return res.data;
 };
+
+// ── 회의 준비 자료 ─────────────────────────────────────────────────────
+export interface MeetingPreparation {
+  preration_id?: number;
+  meeting: number;
+  purpose: string | null;
+  project_status: string | null;
+  rule: string | null;
+  effect: string | null;
+}
+
+export const getPrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {
+  const res = await api.get(`/meetings/${meetingId}/prep/`);
+  return res.data;
+};
+
+export const savePrepMaterial = async (
+  meetingId: number,
+  data: Partial<MeetingPreparation>
+): Promise<MeetingPreparation> => {
+  const res = await api.post(`/meetings/${meetingId}/prep/`, data);
+  return res.data;
+};
+
+export const generatePrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {
+  const res = await api.post(`/meetings/${meetingId}/prep/generate/`);
+  return res.data;
+};
+
