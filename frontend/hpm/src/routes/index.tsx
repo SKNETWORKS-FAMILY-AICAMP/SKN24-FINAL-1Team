@@ -21,6 +21,7 @@ import MeetingJiraRegisterPage from "../pages/meeting/MeetingJiraRegisterPage";
 import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
+import UserManagementPage from "../pages/admins/UserManagementPage";
 
 function DocumentRoutes() {
   return <Outlet />;
@@ -58,6 +59,7 @@ const router = createBrowserRouter([
         ],
       },
       { path: "/members", element: <MemberManagementPage /> },
+      { path: "/admin/users", element: <UserManagementPage /> },
     ],
   },
 ]);

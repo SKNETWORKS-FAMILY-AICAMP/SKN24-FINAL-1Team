@@ -35,3 +35,46 @@ export const changePassword = async (
 };
 
 export default api;
+
+
+// ── 관리자 전용 API ────────────────────────────────────────────────
+
+export const fetchAdminUsers = async () => {
+  const response = await api.get("/admin/users/");
+  return response.data;
+};
+
+export const createAdminUser = async (data: {
+  emp_no: string; name: string; email: string;
+  dept_name: string; rank_name: string; work: string;
+}) => {
+  const response = await api.post("/admin/users/", data);
+  return response.data;
+};
+
+export const deleteAdminUser = async (userId: number) => {
+  await api.delete(`/admin/users/${userId}/`);
+};
+
+export const updateAdminUser = async (userId: number, data: {
+  name?: string; email?: string; emp_no?: string;
+  work?: string; dept_name?: string; rank_name?: string; status?: number;
+}) => {
+  const response = await api.patch(`/admin/users/${userId}/`, data);
+  return response.data;
+};
+
+export const resetAdminUserPassword = async (userId: number) => {
+  const response = await api.patch(`/admin/users/${userId}/`, { reset_password: true });
+  return response.data;
+};
+
+export const fetchDepts = async () => {
+  const response = await api.get("/admin/depts/");
+  return response.data;
+};
+
+export const fetchRanks = async () => {
+  const response = await api.get("/admin/ranks/");
+  return response.data;
+};
