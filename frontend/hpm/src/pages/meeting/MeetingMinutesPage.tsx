@@ -4,24 +4,24 @@ import {
   getMeetingDetail,
   getTaskList,
   updateTask,
-  requestMinutesApproval,
   approveMinutes,
   rejectMinutes,
   type Meeting,
   type Task,
 } from "../../services/meeting";
-
-type Tab = "minutes" | "tasks" | "chat";
-
-const PRIORITY_COLOR: Record<string, string> = {
-  High: "bg-red-100 text-red-600",
-  Medium: "bg-yellow-100 text-yellow-600",
-  Low: "bg-blue-100 text-blue-600",
-  Lowest: "bg-gray-100 text-gray-500",
-};
+import warningIcon from "../../assets/table/warning2.png";
+import StepBar from "../../components/meeting/StepBar";
 
 const PRIORITY_LABEL: Record<string, string> = {
-  High: "높음", Medium: "중간", Low: "낮음", Lowest: "최하",
+  Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
+};
+
+const PRIORITY_BG: Record<string, string> = {
+  Highest: "bg-red-600 text-white",
+  High: "bg-indigo-600 text-white",
+  Medium: "bg-indigo-400 text-white",
+  Low: "bg-blue-100 text-blue-600",
+  Lowest: "bg-gray-100 text-gray-500",
 };
 
 export default function MeetingMinutesPage() {
@@ -31,75 +31,79 @@ export default function MeetingMinutesPage() {
 
   const [meeting, setMeeting] = useState<Meeting | null>({
     meeting_id: meetingId,
-    title: "2025 Q3 제품 로드맵 검토",
-    location: "3층 대회의실",
-    meeting_at: "2025-06-10T14:00:00",
+    title: "AI 매칭 엔진 고도화 및 프로젝트 진행 상황 점검 회의",
+    location: "대룡 17차 18층",
+    meeting_at: "2025년 5월 29일 9:00",
     status: "finished",
     minutes_status: "draft",
-    meeting_document: `1. 상반기 채용 진행 상황 공유
-- 지원자 총 130명 중 백엔드 지원자가 가장 높은 비율 차지.
-- 협업 경험 부족자가 다수 관찰되므로 최종 면접에서 추가 검증 필요.
-
-2. 신규 입사자 온보딩 현황 공유
-- 기존 가이드 문서가 불명확하여 혼란스럽다는 의견 수렴.
-- 협업 툴(슬랙, 지라, 노션) 상세 사용 가이드라인과 사내 FAQ 보강 예정.
-
-3. 조직 개편 현황 공유
-- 개발팀 조직을 기능(Data/Service) 중심으로 변경 논의 중.
-- 불필요한 회의 단축을 위한 회의 규칙 제정 예정.
-
-4. 직원 만족도 조사 결과 공유
-- 유연근무 시간 확대 및 복지비 사용처 다양화 요구가 높음.
-- 개선안 실현 가능 여부 파악 예정.`,
+    meeting_document: `AI 매칭 엔진 고도화 및 포털 개편 관련 회의
+1. AI 매칭 엔진 고도화 현황
+  - 기존 키워드 매칭에서 임베딩 기반 시맨틱 매칭으로 전환 중.
+  - 프로토타입 결과: Top 5 적합 공급기업 표시를 기존 대비 약 23% 개선.
+  - 결정 사항: 우선 1차(LLM 리라이언) 방식으로 진행, 파인튜닝은 2차로 추진.
+2. 보안 및 인프라 검토
+  - 운영 서버에서 외부 API(LLM) 호출 시 보안 정책 준수 여부 확인 필요.
+3. 포털 프론트엔드 개편 및 기타 안건
+  - 수요기업 온보딩 플로우 내 업종 코드 자동 분류 기능 추가 요청.`,
     is_meeting: true,
     project: 1,
     participants: [
-      { user_id: 1, name: "김민준(팀장)" },
+      { user_id: 1, name: "김규호" },
       { user_id: 2, name: "김지원" },
-      { user_id: 3, name: "김규호" },
-      { user_id: 4, name: "류지우" }
-    ]
+      { user_id: 3, name: "류지우" },
+      { user_id: 4, name: "박수영" },
+      { user_id: 5, name: "황인규" },
+    ],
   });
+
   const [tasks, setTasks] = useState<Task[]>([
     {
       meeting_task_id: 1,
       meeting_id: meetingId,
-      title: "백엔드 최종 오프라인 면접 문항 개발 및 프로세스 정리",
-      owner: "김민준(팀장)",
-      due_date: "2025-06-17",
+      title: "사내 클라우드 보호처 신청 절차 및 예산 코드 확인",
+      owner: "김규호",
+      due_date: "2026-06-18",
       priority: "High",
-      jira_key: ""
+      jira_key: "",
     },
     {
       meeting_task_id: 2,
       meeting_id: meetingId,
-      title: "협업 툴 사용 매뉴얼 보강 및 사내 FAQ 문서 제작",
-      owner: "류지우",
-      due_date: "2025-06-20",
-      priority: "Medium",
-      jira_key: ""
+      title: "운영 서버 외부 API 호출 보안 정책 확인",
+      owner: "김규호",
+      due_date: "2026-06-05",
+      priority: "High",
+      jira_key: "",
     },
     {
       meeting_task_id: 3,
       meeting_id: meetingId,
-      title: "데이터팀/서비스팀 구조 개편안 확정 및 공표",
-      owner: "김지원",
-      due_date: "2025-06-25",
+      title: "",
+      owner: "류지우",
+      due_date: "2026-06-05",
       priority: "Medium",
-      jira_key: ""
+      jira_key: "",
     },
-    {
-      meeting_task_id: 4,
-      meeting_id: meetingId,
-      title: "유연근무제 확대 운영지침 초안 마련",
-      owner: "김규호",
-      due_date: "2025-06-22",
-      priority: "Low",
-      jira_key: ""
-    }
   ]);
-  const [tab, setTab] = useState<Tab>("minutes");
-  const [viewAs, setViewAs] = useState<"member" | "creator">("member");
+
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<number>>(new Set());
+  const [openPriorityDropdown, setOpenPriorityDropdown] = useState<number | null>(null);
+  const [openAssigneeDropdown, setOpenAssigneeDropdown] = useState<number | null>(null);
+  const [requested, setRequested] = useState(false);
+
+  const toggleCollapse = (taskId: number) => {
+    setCollapsedTasks(prev => {
+      const next = new Set(prev);
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+      return next;
+    });
+  };
+
+  const [taskMemos] = useState<Record<number, string>>({
+    1: "파인튜닝 GPU 서버 확보를 위해 사내 클라우드 보호처 신청 절차와 관련된 예산 코드 적정성을 확인하여 보고",
+    2: "LLM 라이브러리 방식 도입 시 운영 서버에서 외부 API를 호출하는 것이 보안 규정상 허용되는지 확인 요청",
+    3: "업종 코드 자동 분류 기능이 RFP 범위에 포함되는지 여부 확인 후 가입 변경 상의위원회 설정 여부 결정",
+  });
 
   useEffect(() => {
     Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
@@ -114,11 +118,11 @@ export default function MeetingMinutesPage() {
 
   const minutesStatus = meeting.minutes_status || "draft";
 
-  const handleRequestApproval = async () => {
-    try {
-      await requestMinutesApproval(meetingId);
-      setMeeting(m => m ? { ...m, minutes_status: "reviewing" } : m);
-    } catch { alert("승인 요청에 실패했습니다."); }
+  const handleRequestApproval = () => {
+    setRequested(true);
+    setTimeout(() => {
+      navigate(`/meetings/${meetingId}/jira`);
+    }, 400);
   };
 
   const handleApprove = async () => {
@@ -136,56 +140,20 @@ export default function MeetingMinutesPage() {
     } catch { alert("거절에 실패했습니다."); }
   };
 
-  const handleReEdit = () => {
-    setMeeting(m => m ? { ...m, minutes_status: "draft" } : m);
-  };
-
   const handleTaskUpdate = async (task: Task, field: keyof Task, value: string) => {
+    // 즉시 UI 반영 (optimistic update)
+    setTasks(prev => prev.map(t =>
+      t.meeting_task_id === task.meeting_task_id ? { ...t, [field]: value } : t
+    ));
     try {
-      const updated = await updateTask(meetingId, task.meeting_task_id, { [field]: value });
-      setTasks(prev => prev.map(t => t.meeting_task_id === task.meeting_task_id ? updated : t));
+      await updateTask(meetingId, task.meeting_task_id, { [field]: value });
     } catch (e) { console.error(e); }
   };
 
-  const TABS: { key: Tab; label: string }[] = [
-    { key: "minutes", label: "📝 회의록" },
-    { key: "tasks", label: "✅ 태스크" },
-    { key: "chat", label: "💬 챗봇 내역" },
-  ];
-
-  const stepLabels = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
-
   return (
-    <div className="p-8">
-      {/* Step bar */}
-      <div className="flex items-start justify-center gap-0 mb-6">
-        {stepLabels.map((label, i) => (
-          <div key={i} className="flex flex-col items-center" style={{ minWidth: 140 }}>
-            <div className="flex items-center w-full">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 z-10
-                ${i === 0 ? "bg-[#F5A623] text-white" : "bg-gray-200 text-gray-400"}`}>
-                {i === 0 ? "✓" : i + 1}
-              </div>
-              {i < stepLabels.length - 1 && <div className="h-0.5 flex-1 bg-gray-200" />}
-            </div>
-            <span className={`text-xs mt-1.5 text-center ${i === 0 ? "text-[#F5A623] font-semibold" : "text-gray-400"}`}>{label}</span>
-          </div>
-        ))}
-      </div>
+    <div className="p-8 max-w-5xl mx-auto">
 
-      {/* 역할 전환 */}
-      <div className="flex items-center gap-2 mb-4 bg-white border border-dashed border-gray-200 rounded-lg px-4 py-2 w-fit">
-        <span className="text-xs text-gray-400">데모 역할:</span>
-        {(["member", "creator"] as const).map(r => (
-          <button
-            key={r}
-            onClick={() => setViewAs(r)}
-            className={`text-xs px-3 py-1 rounded-full border transition ${viewAs === r ? "bg-[#1A1A2E] text-white border-[#1A1A2E]" : "border-gray-200 text-gray-500"}`}
-          >
-            {r === "member" ? "구성원" : "프로젝트 생성자"}
-          </button>
-        ))}
-      </div>
+      <StepBar steps={["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"]} activeStep={1} />
 
       {/* 상태 배너 */}
       {minutesStatus === "reviewing" && (
@@ -204,136 +172,248 @@ export default function MeetingMinutesPage() {
         </div>
       )}
 
-      {/* 탭 */}
-      <div className="flex gap-1 mb-4 bg-white rounded-xl p-1 w-fit shadow-sm">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${tab === t.key ? "bg-[#1A1A2E] text-white" : "text-gray-500 hover:text-gray-700"}`}
-          >
-            {t.label}
-          </button>
-        ))}
+      {/* 회의록 카드 */}
+      <div className="bg-white rounded-xl border border-gray-200 mb-4">
+        {/* 카드 헤더 */}
+        <div className="flex items-center justify-between px-6 py-4">
+          <h2 className="text-lg font-bold text-gray-900">회의록</h2>
+          <div className="flex gap-2">
+            {minutesStatus === "draft" && (
+              <button
+                onClick={handleRequestApproval}
+                disabled={requested}
+                className="px-5 py-2 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-80"
+                style={{ backgroundColor: requested ? "#623FB5" : "#4f46e5" }}
+              >
+                {requested ? "수정 요청 중..." : "수정 요청"}
+              </button>
+            )}
+            {minutesStatus === "reviewing" && (
+              <>
+                <button
+                  onClick={handleReject}
+                  className="px-5 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600"
+                >
+                  거절
+                </button>
+                <button
+                  onClick={handleApprove}
+                  className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700"
+                >
+                  승인
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 회의 정보 테이블 */}
+        <table className="w-full text-sm border-collapse border-t border-gray-100">
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <td className="px-6 py-3 w-28 text-gray-500 whitespace-nowrap">회의 주제</td>
+              <td className="px-4 py-3 text-gray-800" colSpan={3}>{meeting.title}</td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <td className="px-6 py-3 text-gray-500 whitespace-nowrap">회의 일시</td>
+              <td className="px-4 py-3 text-gray-800">{meeting.meeting_at}</td>
+              <td className="px-6 py-3 text-gray-500 whitespace-nowrap w-20 border-l border-gray-100">작성자</td>
+              <td className="px-4 py-3 text-gray-800">
+                {meeting.participants?.[0]?.name ?? "-"}
+              </td>
+            </tr>
+            <tr className="border-b border-gray-100">
+              <td className="px-6 py-3 text-gray-500 whitespace-nowrap">회의 장소</td>
+              <td className="px-4 py-3 text-gray-800" colSpan={3}>{meeting.location || "미정"}</td>
+            </tr>
+            <tr>
+              <td className="px-6 py-3 text-gray-500 whitespace-nowrap">참석자</td>
+              <td className="px-4 py-3 text-gray-800" colSpan={3}>
+                {meeting.participants?.map(p => p.name).join(", ")}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* 회의 내용 헤더 */}
+        <div className="bg-gray-100 text-center py-2 text-sm font-semibold text-gray-700 border-t border-gray-200">
+          회의 내용
+        </div>
+
+        {/* 회의 내용 본문 */}
+        <div className="p-6">
+          <div className="border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line min-h-[120px]">
+            {meeting.meeting_document || "회의 내용이 없습니다."}
+          </div>
+        </div>
       </div>
 
-      {/* 회의록 탭 */}
-      {tab === "minutes" && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-900 mb-4">회의록</h2>
-          <table className="text-sm mb-5 w-full">
-            <tbody>
-              {[
-                ["날짜 및 시간", meeting.meeting_at],
-                ["참석자", meeting.participants?.map(p => p.name).join(", ")],
-                ["장소", meeting.location || "미정"],
-                ["회의 주제", meeting.title],
-              ].map(([k, v]) => (
-                <tr key={k}>
-                  <td className="text-gray-400 pr-6 pb-2 w-24 whitespace-nowrap">{k}</td>
-                  <td className="pb-2 text-gray-700">{v}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {meeting.meeting_document && (
-            <div className="mb-5">
-              <p className="text-xs font-semibold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-1">회의 내용 요약</p>
-              <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                {meeting.meeting_document}
-              </div>
-            </div>
-          )}
+      {/* 업무 카드 */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        {/* 업무 헤더 */}
+        <div className="flex items-center justify-between px-6 py-3 bg-gray-50 border-b border-gray-200 rounded-t-xl">
+          <span className="text-sm font-bold text-gray-800">업무</span>
+          <span className="text-xs text-amber-600 flex items-center gap-1">
+          <img src={warningIcon} alt="warning" className="w-4 h-4" />  업무는 Jira에 등록할 태스크입니다!</span>
         </div>
-      )}
 
-      {/* 태스크 탭 */}
-      {tab === "tasks" && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-900 mb-2">추출된 태스크</h2>
-          <p className="text-sm text-gray-400 mb-5">내용, 담당자, 기한을 수정할 수 있습니다.</p>
-          {tasks.length === 0 ? (
-            <div className="text-center text-gray-300 py-12">태스크가 없습니다.</div>
-          ) : (
-            tasks.map(task => (
-              <div key={task.meeting_task_id} className="flex gap-4 py-4 border-b border-gray-50 last:border-0">
-                <div className="flex-1">
+        {/* 컬럼 헤더 */}
+        <div className="grid gap-2 px-4 py-2 border-b border-gray-100 text-xs text-gray-500 font-medium"
+          style={{ gridTemplateColumns: "1fr auto auto auto" }}>
+          <span className="pl-2">업무 명</span>
+          <span className="w-36 text-center">담당자</span>
+          <span className="w-32 text-center">기한</span>
+          <span className="w-28 text-center">우선순위</span>
+        </div>
+
+        {/* 태스크 목록 */}
+        <div className="divide-y divide-gray-100">
+          {tasks.map(task => {
+            const isCollapsed = collapsedTasks.has(task.meeting_task_id);
+            const isPriorityOpen = openPriorityDropdown === task.meeting_task_id;
+            return (
+              <div key={task.meeting_task_id} className="px-4 py-3">
+                <div className="flex items-center gap-2">
+                  {/* 업무명 */}
                   <input
                     defaultValue={task.title}
                     onBlur={e => handleTaskUpdate(task, "title", e.target.value)}
-                    disabled={minutesStatus === "reviewing" || minutesStatus === "approved"}
-                    className="font-medium text-sm text-gray-900 mb-2 w-full bg-transparent outline-none border-b border-transparent focus:border-[#F5A623] disabled:cursor-default"
+                    className="flex-1 border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-indigo-400"
+                    placeholder="업무명을 입력하세요"
                   />
-                  <div className="flex gap-3 items-center flex-wrap mt-2">
-                    <input
-                      defaultValue={task.owner}
-                      onBlur={e => handleTaskUpdate(task, "owner", e.target.value)}
-                      disabled={minutesStatus === "reviewing" || minutesStatus === "approved"}
-                      className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full w-24 outline-none disabled:cursor-default"
-                      placeholder="담당자"
-                    />
-                    <input
-                      type="date"
-                      defaultValue={task.due_date || ""}
-                      onBlur={e => handleTaskUpdate(task, "due_date", e.target.value)}
-                      disabled={minutesStatus === "reviewing" || minutesStatus === "approved"}
-                      className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full outline-none disabled:cursor-default"
-                    />
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PRIORITY_COLOR[task.priority] || "bg-gray-100 text-gray-500"}`}>
-                      {PRIORITY_LABEL[task.priority] || task.priority}
-                    </span>
+                  {/* 잡기 버튼 */}
+                  <button className="text-xs text-gray-500 border border-gray-200 rounded px-2 py-1.5 whitespace-nowrap hover:bg-gray-50">
+                    잡기 ▲
+                  </button>
+                  {/* 담당자 커스텀 드롭다운 */}
+                  <div className="relative w-36">
+                    <button
+                      onClick={() => setOpenAssigneeDropdown(
+                        openAssigneeDropdown === task.meeting_task_id ? null : task.meeting_task_id
+                      )}
+                      className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 text-left flex justify-between items-center hover:bg-gray-50"
+                    >
+                      <span className="truncate">{task.owner || "미배정"}</span>
+                      <span className="text-xs text-gray-300 ml-1">▾</span>
+                    </button>
+                    {openAssigneeDropdown === task.meeting_task_id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenAssigneeDropdown(null)} />
+                        <div className="absolute z-20 top-full mt-1 right-0 w-44 bg-white rounded-xl border border-gray-200 shadow-md py-2 overflow-hidden">
+                          {meeting.participants?.map(p => (
+                            <button
+                              key={p.user_id}
+                              onClick={() => {
+                                handleTaskUpdate(task, "owner", p.name);
+                                setOpenAssigneeDropdown(null);
+                              }}
+                              className={`w-full text-left px-4 py-2 text-sm transition
+                                ${task.owner === p.name
+                                  ? "bg-gray-50 text-gray-900 font-medium"
+                                  : "text-gray-700 hover:bg-gray-50"}`}
+                            >
+                              {p.name}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => {
+                              handleTaskUpdate(task, "owner", "");
+                              setOpenAssigneeDropdown(null);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:bg-gray-50"
+                          >
+                            미배정
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
+                  {/* 기한 */}
+                  <input
+                    type="date"
+                    defaultValue={task.due_date || ""}
+                    onBlur={e => handleTaskUpdate(task, "due_date", e.target.value)}
+                    className="border border-gray-200 rounded px-2 py-1.5 text-sm text-gray-700 outline-none w-32"
+                  />
+                  {/* 우선순위 커스텀 드롭다운 */}
+                  <div className="relative w-28">
+                    <button
+                      onClick={() => setOpenPriorityDropdown(isPriorityOpen ? null : task.meeting_task_id)}
+                      className="w-full border border-indigo-200 rounded-lg px-3 py-1.5 text-sm text-indigo-600 text-left flex justify-between items-center hover:bg-indigo-50"
+                    >
+                      <span>{PRIORITY_LABEL[task.priority] || task.priority}</span>
+                      <span className="text-xs text-indigo-300">▾</span>
+                    </button>
+                    {isPriorityOpen && (
+                      <>
+                        {/* 닫기 오버레이 */}
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenPriorityDropdown(null)} />
+                        {/* 드롭다운 목록 */}
+                        <div className="absolute z-20 top-full mt-1 right-0 w-32 bg-white rounded-xl border-2 border-indigo-200 shadow-lg shadow-indigo-100 py-2 overflow-hidden">
+                          {[
+                            { value: "Highest", label: "매우 높음" },
+                            { value: "High", label: "높음" },
+                            { value: "Medium", label: "중간" },
+                            { value: "Low", label: "낮음" },
+                            { value: "Lowest", label: "매우 낮음" },
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => {
+                                handleTaskUpdate(task, "priority", opt.value);
+                                setOpenPriorityDropdown(null);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm transition
+                                ${task.priority === opt.value
+                                  ? "mx-1 w-[calc(100%-8px)] bg-indigo-100 text-indigo-600 font-medium rounded-lg"
+                                  : "text-gray-700 hover:bg-gray-50"}`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {/* 접기/펼치기 버튼 */}
+                  {taskMemos[task.meeting_task_id] && (
+                    <button
+                      onClick={() => toggleCollapse(task.meeting_task_id)}
+                      className="text-xs text-gray-400 hover:text-gray-600 whitespace-nowrap"
+                    >
+                      {isCollapsed ? "펼치기" : "접기"}
+                    </button>
+                  )}
                 </div>
+                {/* 메모 - 접기 상태일 때 숨김 */}
+                {!isCollapsed && taskMemos[task.meeting_task_id] && (
+                  <div className="mt-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded px-3 py-2">
+                    {taskMemos[task.meeting_task_id]}
+                  </div>
+                )}
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
-      )}
+      </div>
 
-      {/* 챗봇 내역 탭 */}
-      {tab === "chat" && (
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-900 mb-2">챗봇 질의·답변 내역</h2>
-          <div className="text-center text-gray-300 py-12">
-            <p className="text-2xl mb-2">💬</p>
-            <p className="text-sm">회의 중 챗봇 질의 내역이 없습니다.</p>
-          </div>
-        </div>
-      )}
-
-      {/* 액션 버튼 */}
+      {/* 하단 버튼 */}
       <div className="flex justify-between items-center mt-5">
-        <button onClick={() => navigate(`/meetings/${meetingId}`)} className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-          ← 회의 상세
+        <button
+          onClick={() => navigate(`/meetings`)}
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+        >
+          ← 회의 목록
         </button>
-        <div className="flex gap-2">
-          {viewAs === "member" && minutesStatus === "draft" && (
-            <button onClick={handleRequestApproval} className="px-5 py-2 bg-[#F5A623] text-white rounded-lg text-sm font-semibold hover:bg-[#e8951a]">
-              승인 요청
-            </button>
-          )}
-          {viewAs === "member" && minutesStatus === "reviewing" && (
-            <button disabled className="px-5 py-2 bg-gray-200 text-gray-400 rounded-lg text-sm font-semibold cursor-not-allowed">
-              검토 중...
-            </button>
-          )}
-          {viewAs === "member" && minutesStatus === "rejected" && (
-            <button onClick={handleReEdit} className="px-5 py-2 bg-[#1A1A2E] text-white rounded-lg text-sm font-semibold hover:bg-[#2a2a4e]">
-              회의록 재수정
-            </button>
-          )}
-          {viewAs === "creator" && minutesStatus === "reviewing" && (
-            <>
-              <button onClick={handleReject} className="px-5 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600">
-                거절
-              </button>
-              <button onClick={handleApprove} className="px-5 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700">
-                승인
-              </button>
-            </>
-          )}
-        </div>
+        {minutesStatus === "approved" && (
+          <button
+            onClick={() => navigate(`/meetings/${meetingId}/jira`)}
+            className="px-5 py-2 text-white rounded-lg text-sm font-semibold"
+            style={{ backgroundColor: "#623FB5" }}
+          >
+            Jira 등록 →
+          </button>
+        )}
       </div>
     </div>
   );
