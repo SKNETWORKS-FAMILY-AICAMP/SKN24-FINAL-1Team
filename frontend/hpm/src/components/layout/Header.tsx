@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import * as DESIGN from "../../constants/design";
 import bell from "../../assets/header/bell.png";
 import toggle from "../../assets/header/toggle.png";
@@ -7,7 +7,6 @@ import { useAuth } from "../../context/AuthContext";
 import type { HeaderPopover } from "../../constants/header";
 import {
   getNotifications,
-  getJiraStatus,
   getUserProfile,
   type Notification,
   type UserProfile,
@@ -18,13 +17,11 @@ import HeaderProfilePopover from "./HeaderProfilePopover";
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [openPopover, setOpenPopover] = useState<HeaderPopover>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
-  const [jiraConnected, setJiraConnected] = useState(false);
 
   const addNotification = useCallback((notification: Notification) => {
     setNotifications((current) => {
@@ -110,20 +107,6 @@ export default function Header() {
     }
   }, [user]);
 
-  const loadJiraStatus = useCallback(async () => {
-    if (!user) {
-      setJiraConnected(false);
-      return;
-    }
-
-    try {
-      const data = await getJiraStatus();
-      setJiraConnected(data.connected);
-    } catch {
-      setJiraConnected(false);
-    }
-  }, [user]);
-
   const unreadNotificationCount = useMemo(
     () => notifications.filter((notification) => !notification.is_read).length,
     [notifications],
@@ -139,7 +122,6 @@ export default function Header() {
       }
       if (popover === "profile" && next === "profile") {
         void loadProfile();
-        void loadJiraStatus();
       }
       return next;
     });
@@ -148,25 +130,6 @@ export default function Header() {
   const handleChangePassword = () => {
     setOpenPopover(null);
     navigate("/change-password");
-  };
-
-  const handleJiraConnect = () => {
-    const userId = user?.users_id ?? user?.user_id;
-    if (jiraConnected) return;
-
-    if (!userId) {
-      setOpenPopover(null);
-      navigate("/login");
-      return;
-    }
-
-    setOpenPopover(null);
-    const next = `${location.pathname}${location.search}${location.hash}`;
-    const params = new URLSearchParams({
-      user_id: String(userId),
-      next,
-    });
-    window.location.href = `${import.meta.env.VITE_API_BASE_URL}/jira/start/?${params.toString()}`;
   };
 
   const handleLogout = () => {
@@ -221,8 +184,6 @@ export default function Header() {
                 rankName={profile?.rank_name}
                 work={profile?.work}
                 loading={profileLoading}
-                jiraConnected={jiraConnected}
-                onJiraConnect={handleJiraConnect}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
               />
