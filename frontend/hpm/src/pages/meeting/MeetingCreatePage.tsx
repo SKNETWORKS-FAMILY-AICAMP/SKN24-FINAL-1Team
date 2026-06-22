@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMeeting, getUserList, getJiraStatus } from "../../services/meeting";
+import { createMeeting, getUserList } from "../../services/meeting";
 import { useAuth } from "../../context/AuthContext";
 import * as DESIGN from "../../constants/design";
 import Button from "../../components/ui/Button";
@@ -24,13 +24,9 @@ export default function MeetingCreatePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [createdMeetingId, setCreatedMeetingId] = useState<number | null>(null);
   const [showJiraModal, setShowJiraModal] = useState(false);
-  const [showSelectModal, setShowSelectModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [selectAgenda, setSelectAgenda] = useState(true);
-  const [selectPrepMaterial, setSelectPrepMaterial] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -98,7 +94,7 @@ export default function MeetingCreatePage() {
 
   const filteredUsers = users.filter(
     u =>
-      u.users_id !== user.users_id &&
+      u.users_id !== user?.users_id &&
       (
         u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -127,7 +123,6 @@ export default function MeetingCreatePage() {
       window.open(`${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${currentUserId}`, "_blank");
     }
     setShowJiraModal(false);
-    setShowSelectModal(true);
   };
 
 
@@ -174,7 +169,7 @@ export default function MeetingCreatePage() {
             </div>
             <div className="border-t border-gray-200">
               <button
-                onClick={() => { setShowJiraModal(false); setShowSelectModal(true); }}
+                onClick={() => { setShowJiraModal(false); }}
                 className={`w-full py-4 text-center ${DESIGN.FONT_SIZES.md} font-bold ${DESIGN.COLORS.black} hover:bg-gray-50 transition`}
               >
                 확인
@@ -274,7 +269,7 @@ export default function MeetingCreatePage() {
               className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} p-2.5 min-h-[48px] flex flex-wrap gap-2 items-center cursor-pointer`}
             >
               {participants  
-              .filter(id => id !== user.users_id)
+              .filter(id => id !== user?.users_id)
               .map(id => {
                 const u = users.find(user => user.users_id === id);
                 if (!u) return null;
