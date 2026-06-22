@@ -67,6 +67,7 @@ interface KanbanColumnProps {
   onDropTask?: (columnId: KanbanColumnId) => void;
   draggingTaskId?: number | null;
   isDragActive?: boolean;
+  canManage?: boolean;
 }
 
 export default function KanbanColumn({
@@ -79,6 +80,7 @@ export default function KanbanColumn({
   onDropTask,
   draggingTaskId = null,
   isDragActive = false,
+  canManage = true,
 }: KanbanColumnProps) {
   const [isOver, setIsOver] = useState(false);
   const hasTasks = tasks.length > 0;
@@ -89,7 +91,7 @@ export default function KanbanColumn({
   return (
     <section
       onDragOver={(event) => {
-        if (!isDragActive) return;
+        if (!canManage || !isDragActive) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         if (!isOver) setIsOver(true);
@@ -101,6 +103,7 @@ export default function KanbanColumn({
       onDrop={(event) => {
         event.preventDefault();
         setIsOver(false);
+        if (!canManage) return;
         onDropTask?.(column.id);
       }}
       className={`absolute overflow-hidden rounded-[12px] transition-all duration-200 ease-out ${
@@ -134,16 +137,19 @@ export default function KanbanColumn({
                   onDragStart={onCardDragStart}
                   onDragEnd={onCardDragEnd}
                   isDragging={draggingTaskId === task.id}
+                  canManage={canManage}
                 />
               ))}
-              <AddTaskButton
-                className="left-[23px]"
-                style={{ top: addButtonTop }}
-                onClick={() => onAddTask(column.id)}
-              />
+              {canManage ? (
+                <AddTaskButton
+                  className="left-[23px]"
+                  style={{ top: addButtonTop }}
+                  onClick={() => onAddTask(column.id)}
+                />
+              ) : null}
             </>
           ) : (
-            <EmptyAddCard onClick={() => onAddTask(column.id)} />
+            canManage ? <EmptyAddCard onClick={() => onAddTask(column.id)} /> : null
           )}
         </div>
       </div>
