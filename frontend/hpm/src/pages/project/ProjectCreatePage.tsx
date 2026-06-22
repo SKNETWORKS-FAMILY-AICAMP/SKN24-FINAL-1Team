@@ -123,8 +123,18 @@ export default function ProjectCreatePage() {
   useEffect(() => {
     if (!jiraConnected || !currentUserId) return;
     setJiraLoading(true);
+    setJiraProjects([]);
+    setSelectedJiraProject(null);
     api.get(`/jira/projects/?user_id=${currentUserId}`)
-      .then(res => setJiraProjects(res.data))
+      .then(res => {
+        const projects = res.data as JiraProject[];
+        setJiraProjects(projects);
+        setSelectedJiraProject((selected) =>
+          selected && projects.some((project) => project.key === selected)
+            ? selected
+            : null,
+        );
+      })
       .catch(() => setJiraErrorModal(true))
       .finally(() => setJiraLoading(false));
   }, [currentUserId, jiraConnected]);
@@ -289,6 +299,30 @@ export default function ProjectCreatePage() {
 
                 {jiraLoading ? (
                   <div className="text-sm text-gray-400 text-center py-10">Jira 프로젝트 불러오는 중...</div>
+                ) : jiraProjects.length === 0 ? (
+                  <div className="bg-[#ECECF2] rounded-2xl p-10 mb-6 text-center">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      연동 가능한 Jira 프로젝트가 없습니다.
+                    </h3>
+                    <p className="mt-4 text-sm leading-relaxed text-gray-500">
+                      이미 서비스 프로젝트와 연결된 Jira 프로젝트는 목록에 표시되지 않습니다.<br />
+                      다른 Jira 계정이나 워크스페이스로 다시 연동할 수 있습니다.
+                    </p>
+                    <div className="mt-8 flex justify-center gap-3">
+                      <button
+                        onClick={() => navigate("/projects")}
+                        className="px-5 py-2.5 rounded-lg bg-[#EDE9FF] text-sm text-[#623FB5] hover:bg-[#ddd6ff]"
+                      >
+                        프로젝트 목록으로 돌아가기
+                      </button>
+                      <button
+                        onClick={handleJiraConnect}
+                        className="px-5 py-2.5 rounded-lg bg-[#623FB5] text-sm text-white hover:bg-[#512fa0]"
+                      >
+                        Jira 다시 연동
+                      </button>
+                    </div>
+                  </div>
                 ) : (
                   <div className="bg-[#ECECF2] rounded-2xl p-4 mb-6 max-h-[360px] overflow-y-auto">
                     {jiraProjects.map(p => {
@@ -321,6 +355,7 @@ export default function ProjectCreatePage() {
                   </div>
                 )}
 
+                {jiraProjects.length > 0 && (
                 <div className="flex justify-end">
                   <button
                     onClick={() => setStep(2)}
@@ -333,6 +368,7 @@ export default function ProjectCreatePage() {
                     다음
                   </button>
                 </div>
+                )}
               </div>
             )}
 
