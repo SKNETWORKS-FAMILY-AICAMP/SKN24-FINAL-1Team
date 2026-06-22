@@ -2,6 +2,8 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
+import boto3
+
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -137,3 +139,7 @@ SIMPLE_JWT = {
 }
 
 DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
+
+# AWS SES
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
+DEFAULT_FROM_EMAIL = os.environ.get("SES_FROM_EMAIL")

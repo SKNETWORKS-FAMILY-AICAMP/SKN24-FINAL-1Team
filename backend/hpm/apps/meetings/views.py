@@ -2,6 +2,7 @@ import os
 import re
 import requests
 from datetime import datetime
+import boto3
 
 from django.conf import settings
 from rest_framework import status
@@ -41,6 +42,27 @@ def _create_notification(user, notification_type, content, target_id=None):
         is_read=False,
     )
 
+def _send_invite_email(user, meeting) :
+    """AWS SES로 회의 초대 이메일 발송"""
+    try :
+        client=boto3.client("ses", region_name = settings.AWS_REGION)
+        client.send_email(
+            Source=settings.DEFAULT_FROM_EMAIL,
+            Destination={"ToAddresses" : [user.email]},
+            Message={
+                "Subject" : {
+                    "Data" : f"[HPM] {meeting.title}회의에 초대 되었습니다."
+                },
+                "Body" : {
+                    "Text" : {
+                        "Data" : f"{user.name}님, \n\n '{meeting.title}' 회의에 초대되었습니다. \n\n 일시 : {meeting.meeting_at} \n\n 장소 : {meeting.location} \n\n https://hpm-meeting.site/meetings/{meeting.meeting_id}/"
+                    }
+                }
+            }
+        )
+
+    except Exception as e:
+        print(f"이메일 발송 실패 ({user.email}) : {e}")
 
 def _notify_task_assigned(task):
     if not task.meeting_users_id or not task.meeting_users:
@@ -93,6 +115,7 @@ def meeting_list(request):
                 content=f"[{meeting.title}] 회의에 초대되었습니다.",
                 target_id=meeting.meeting_id,
             )
+            _send_invite_email(participant, meeting)
         except Users.DoesNotExist:
             pass
 
