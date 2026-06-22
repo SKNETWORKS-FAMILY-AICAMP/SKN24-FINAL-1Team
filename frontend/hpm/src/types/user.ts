@@ -1,8 +1,9 @@
 export interface User {
   user_id: number;
+  users_id: number;
   email: string;
   name?: string;
-  is_initial_password?: boolean;
+  account_status?: number;
   jira_connected?: boolean; 
 }
 

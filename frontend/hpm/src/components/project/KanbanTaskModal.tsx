@@ -1,8 +1,7 @@
 import { type ChangeEvent } from "react";
 import closeIcon from "../../assets/kanban/icon-close.svg";
-import { KANBAN_CATEGORIES, KANBAN_PRIORITIES } from "../../constants/kanban";
+import { KANBAN_PRIORITIES } from "../../constants/kanban";
 import type {
-  KanbanCategory,
   KanbanModalState,
   KanbanPriority,
   KanbanTaskFormValues,
@@ -36,36 +35,47 @@ function PriorityChip({
   );
 }
 
-function CategoryChip({
-  category,
+function OptionChip({
+  label,
   selected,
+  disabled,
   onClick,
 }: {
-  category: KanbanCategory;
+  label: string;
   selected: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "h-[22px] rounded-[20px] border px-[8px] py-px text-[11px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
+        "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-px text-[11px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
         selected
           ? "border-[#623FB5] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
           : "border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
+        disabled && "cursor-not-allowed opacity-60",
       )}
     >
-      {category}
+      {label}
     </button>
   );
+}
+
+interface KanbanSelectOption {
+  value: string;
+  label: string;
 }
 
 interface KanbanTaskModalProps {
   modal: KanbanModalState;
   onCancel: () => void;
   onChange: (values: KanbanTaskFormValues) => void;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
+  assigneeOptions: KanbanSelectOption[];
+  parentOptions: KanbanSelectOption[];
 }
 
 export default function KanbanTaskModal({
@@ -73,6 +83,8 @@ export default function KanbanTaskModal({
   onCancel,
   onChange,
   onSubmit,
+  assigneeOptions,
+  parentOptions,
 }: KanbanTaskModalProps) {
   const { values } = modal;
   const canSubmit = Boolean(values.title.trim()) && Boolean(values.priority);
@@ -138,10 +150,26 @@ export default function KanbanTaskModal({
         <label className="absolute left-[33px] top-[350px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           담당자
         </label>
-        <div className="absolute left-[32px] top-[374px] flex h-[36px] w-[135px] items-center rounded-[7px] border border-[#969696] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414]">
-          {values.assignee}
-        </div>
-        <label className="absolute left-[231px] top-[349px] text-[15px] font-medium leading-[1.2] text-[#141414]">
+        <select
+          value={values.assigneeId}
+          onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+            const selected = assigneeOptions.find((option) => option.value === event.target.value);
+            onChange({
+              ...values,
+              assigneeId: event.target.value,
+              assignee: selected?.label || "",
+            });
+          }}
+          className="absolute left-[32px] top-[374px] h-[36px] w-[170px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#623FB5]"
+        >
+          <option value="">담당자 없음</option>
+          {assigneeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <label className="absolute left-[244px] top-[349px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           마감 기한
         </label>
         <input
@@ -150,7 +178,7 @@ export default function KanbanTaskModal({
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
             update("dueDate", event.target.value)
           }
-          className="absolute left-[231px] top-[374px] h-[36px] w-[135px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#623FB5]"
+          className="absolute left-[244px] top-[374px] h-[36px] w-[135px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#623FB5]"
         />
 
         <label className="absolute left-[32px] top-[436px] text-[15px] font-medium leading-[1.2] text-[#141414]">
@@ -170,13 +198,26 @@ export default function KanbanTaskModal({
         <label className="absolute left-[32px] top-[512px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           {isEdit ? "상위 업무(수정 불가)" : "상위 업무"}
         </label>
-        <div className="absolute left-[32px] top-[537px] flex gap-[12px]">
-          {KANBAN_CATEGORIES.map((category) => (
-            <CategoryChip
-              key={category}
-              category={category}
-              selected={values.category === category}
-              onClick={() => update("category", category)}
+        <div className="absolute left-[32px] top-[537px] flex w-[414px] gap-[10px] overflow-x-auto pb-[4px]">
+          <OptionChip
+            label="Epic 없음"
+            selected={!values.parentKey}
+            disabled={isEdit}
+            onClick={() => onChange({ ...values, parentKey: "", category: "" })}
+          />
+          {parentOptions.map((option) => (
+            <OptionChip
+              key={option.value}
+              label={option.label}
+              selected={values.parentKey === option.value}
+              disabled={isEdit}
+              onClick={() =>
+                onChange({
+                  ...values,
+                  parentKey: option.value,
+                  category: option.label,
+                })
+              }
             />
           ))}
         </div>

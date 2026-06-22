@@ -19,6 +19,13 @@ COLUMN_TO_TRANSITION_NAME = {
     "done":     "Done",
 }
 
+COLUMN_TO_STATUS_NAMES = {
+    "todo": ["To Do", "해야 할 일"],
+    "progress": ["In Progress", "진행 중"],
+    "review": ["In Review", "검토 중"],
+    "done": ["Done", "완료"],
+}
+
 
 def get_jira_config():
     return {
@@ -147,9 +154,17 @@ def get_jira_issues(access_token : str, cloud_id: str, project_key : str) -> dic
         
 
 
-def update_jira_issue_status(issue_key: str, column_id: str, access_token: str, cloud_id: str) -> dict:
+def update_jira_issue_status(
+    issue_key: str,
+    column_id: str,
+    access_token: str,
+    cloud_id: str,
+    target_status_names: list[str] | None = None,
+) -> dict:
 
     transition_name = COLUMN_TO_TRANSITION_NAME.get(column_id)
+    if not transition_name and target_status_names:
+        transition_name = target_status_names[0]
     if not transition_name:
         return {"success" : False, "error" : f"알 수 없는 column_id: {column_id}"}
     
@@ -169,9 +184,13 @@ def update_jira_issue_status(issue_key: str, column_id: str, access_token: str, 
     except requests.RequestException as e:
         return {"success" : False, "error" : f"transition 조회 실패: {str(e)}"}
     
+    status_names = target_status_names or COLUMN_TO_STATUS_NAMES.get(column_id, [transition_name])
+    desired_names = {name.lower() for name in status_names if name}
     transition_id = None
     for t in transitions:
-        if t.get("name") == transition_name:
+        transition_label = (t.get("name") or "").lower()
+        target_label = ((t.get("to") or {}).get("name") or "").lower()
+        if transition_label in desired_names or target_label in desired_names:
             transition_id = t.get("id")
             break
 
@@ -227,7 +246,17 @@ def delete_jira_issue(issue_key: str, access_token: str, cloud_id: str) -> dict:
         return {"success" : False, "error" : str(e), "detail" : error_detail}
 
 
-def create_jira_issue_for_board(title: str, access_token: str, cloud_id: str, project_key: str) -> dict:
+def create_jira_issue_for_board(
+    title: str,
+    access_token: str,
+    cloud_id: str,
+    project_key: str,
+    description: str = "",
+    due_date: str | None = None,
+    priority: str | None = None,
+    assignee_account_id: str | None = None,
+    parent_key: str | None = None,
+) -> dict:
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json",
@@ -269,13 +298,33 @@ def create_jira_issue_for_board(title: str, access_token: str, cloud_id: str, pr
 
     # 2. 이슈 생성
     url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue"
-    payload = {
-        "fields": {
-            "project": {"key": project_key},
-            "summary": title,
-            "issuetype": {"id": issue_type_id},
-        }
+    fields = {
+        "project": {"key": project_key},
+        "summary": title,
+        "issuetype": {"id": issue_type_id},
     }
+
+    if description:
+        fields["description"] = {
+            "version": 1,
+            "type": "doc",
+            "content": [
+                {
+                    "type": "paragraph",
+                    "content": [{"type": "text", "text": description}],
+                }
+            ],
+        }
+    if due_date:
+        fields["duedate"] = due_date
+    if priority:
+        fields["priority"] = {"name": priority}
+    if assignee_account_id:
+        fields["assignee"] = {"accountId": assignee_account_id}
+    if parent_key:
+        fields["parent"] = {"key": parent_key}
+
+    payload = {"fields": fields}
 
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=10)

@@ -2,7 +2,7 @@ import json
 import time
 
 from django.db import close_old_connections
-from django.http import StreamingHttpResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
@@ -22,21 +22,18 @@ def notification_list(request):
     return Response(NotificationSerializer(qs, many=True).data)
 
 
-@api_view(["GET"])
-@authentication_classes([])
-@permission_classes([AllowAny])
 def notification_stream(request):
-    raw_token = request.query_params.get("token")
+    raw_token = request.GET.get("token")
     if not raw_token:
-        return Response({"error": "token is required"}, status=status.HTTP_401_UNAUTHORIZED)
+        return JsonResponse({"error": "token is required"}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         token = AccessToken(raw_token)
         user_id = token["user_id"]
     except (KeyError, TokenError):
-        return Response({"error": "invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
+        return JsonResponse({"error": "invalid token"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    last_id = int(request.query_params.get("last_id") or 0)
+    last_id = int(request.GET.get("last_id") or 0)
 
     def event_stream():
         nonlocal last_id

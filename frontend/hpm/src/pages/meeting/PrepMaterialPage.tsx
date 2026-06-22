@@ -1,11 +1,12 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { getPrepMaterial, savePrepMaterial, generatePrepMaterial } from "../../services/meeting";
 
 const MAX = { purpose: 500, currentState: 1000, regulations: 1000, expected: 500 };
 
-// 더미 데이터
+// 더미 데이터 (에러 시 폴백용)
 const DUMMY = {
   purpose:
     "- 상반기 채용 진행 상황 공유\n- 신규 입사자 온보딩 현황 공유\n- 조직 개편 현황 공유\n- 직원 만족도 조사 결과 공유\n- 채용 프로세스 개선 방안 논의\n- 온보딩 자료 개선 방안 논의\n- 유연근무제 확대, 복지 포인트 확대 등 논의\n- 리더십 교육, 신규 입사자 멘토 제도 재운영 검토",
@@ -24,14 +25,74 @@ const DUMMY = {
 export default function PrepMaterialPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false } =
-    (location.state as { showAgenda?: boolean }) ?? {};
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const [purpose, setPurpose] = useState("");
+  const [currentState, setCurrentState] = useState("");
+  const [regulations, setRegulations] = useState("");
+  const [expected, setExpected] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const loadData = async () => {
+      try {
+        const prep = await getPrepMaterial(meetingId);
+        if (active) {
+          if (prep.purpose || prep.project_status || prep.rule || prep.effect) {
+            setPurpose(prep.purpose || "");
+            setCurrentState(prep.project_status || "");
+            setRegulations(prep.rule || "");
+            setExpected(prep.effect || "");
+            setLoading(false);
+          } else {
+            const generated = await generatePrepMaterial(meetingId);
+            if (active) {
+              setPurpose(generated.purpose || "");
+              setCurrentState(generated.project_status || "");
+              setRegulations(generated.rule || "");
+              setExpected(generated.effect || "");
+              setLoading(false);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("준비자료 로드/생성 실패:", err);
+        if (active) {
+          setPurpose(DUMMY.purpose);
+          setCurrentState(DUMMY.currentState);
+          setRegulations(DUMMY.regulations);
+          setExpected(DUMMY.expected);
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      active = false;
+    };
+  }, [meetingId]);
+
+  const handleSave = async () => {
+    try {
+      await savePrepMaterial(meetingId, {
+        purpose,
+        project_status: currentState,
+        rule: regulations,
+        effect: expected,
+      });
+    } catch (err) {
+      console.error("저장 실패:", err);
+    }
+  };
 
   const handlePdfDownload = async () => {
     if (downloading) return;
@@ -129,10 +190,6 @@ export default function PrepMaterialPage() {
       setDownloading(false);
     }
   };
-  const [purpose, setPurpose] = useState(DUMMY.purpose);
-  const [currentState, setCurrentState] = useState(DUMMY.currentState);
-  const [regulations, setRegulations] = useState(DUMMY.regulations);
-  const [expected, setExpected] = useState(DUMMY.expected);
 
   const sections = [
     { label: "회의 목적", value: purpose, onChange: setPurpose, max: MAX.purpose },
@@ -140,6 +197,21 @@ export default function PrepMaterialPage() {
     { label: "관련 규정 및 제약사항", value: regulations, onChange: setRegulations, max: MAX.regulations },
     { label: "회의 종료 후 기대 결과", value: expected, onChange: setExpected, max: MAX.expected },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 px-6">
+        <div className="relative w-16 h-16 mb-6">
+          <div className="absolute inset-0 rounded-full border-4 border-[#623FB5]/20 animate-ping"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-t-[#623FB5] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+        </div>
+        <h3 className="text-lg font-bold text-[#141414] mb-2">회의 준비 자료 생성 중</h3>
+        <p className="text-xs text-[#969696] text-center max-w-sm">
+          RunPod AI와 내부 문서를 기반으로 프로젝트 컨텍스트를 파악하여 회의 준비 자료를 자동 생성하고 있습니다. 잠시만 기다려 주세요.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto w-full py-10 px-6">
@@ -151,7 +223,12 @@ export default function PrepMaterialPage() {
         </div>
         <div className="flex gap-2 mt-1">
           <button
-            onClick={() => setIsEditing(v => !v)}
+            onClick={async () => {
+              if (isEditing) {
+                await handleSave();
+              }
+              setIsEditing(v => !v);
+            }}
             className="px-4 py-2 text-[13px] rounded-lg border transition"
             style={isEditing
               ? { backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }
@@ -209,7 +286,10 @@ export default function PrepMaterialPage() {
       {/* 다음 버튼 */}
       <div className="flex justify-end mt-8">
         <button
-          onClick={() => navigate(`/meetings/${meetingId}/complete`)}
+          onClick={async () => {
+            await handleSave();
+            navigate(`/meetings/${meetingId}/complete`);
+          }}
           className="px-8 py-2.5 text-white text-[14px] rounded-lg transition"
           style={{ backgroundColor: "#623FB5" }}
         >

@@ -1,34 +1,48 @@
 import os
+
 from django.conf import settings
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
 from apps.projects.models import ProjectUsers
 from .models import Document
 from .serializers import DocumentSerializer
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
-MAX_FILE_SIZE = 20 * 1024 * 1024  # 20MB
+MAX_FILE_SIZE = 20 * 1024 * 1024
+
+
+def get_project_user_or_response(project_id, user_id):
+    try:
+        return ProjectUsers.objects.select_related("user", "user__dept").get(
+            project_id=project_id,
+            user_id=user_id,
+        )
+    except ProjectUsers.DoesNotExist:
+        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
 
 
 @api_view(["GET", "POST"])
 def document_list(request, project_id):
-    if request.method == "GET":
-        docs = Document.objects.filter(project_id=project_id).order_by("-uploaded_at")
-        return Response(DocumentSerializer(docs, many=True).data)
+    uploader = get_project_user_or_response(project_id, request.auth["user_id"])
+    if isinstance(uploader, Response):
+        return uploader
 
-    # POST - 파일 업로드 (최대 10개)
+    if request.method == "GET":
+        docs = (
+            Document.objects.filter(project_id=project_id)
+            .select_related("uploader__user", "uploader__user__dept")
+            .order_by("-uploaded_at")
+        )
+        serializer = DocumentSerializer(docs, many=True, context={"request": request})
+        return Response(serializer.data)
+
     files = request.FILES.getlist("files")
     if not files:
         return Response({"error": "파일이 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
     if len(files) > 10:
-        return Response({"error": "한 번에 최대 10개까지 업로드 가능합니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    user_id = request.auth["user_id"]
-    try:
-        uploader = ProjectUsers.objects.get(project_id=project_id, user_id=user_id)
-    except ProjectUsers.DoesNotExist:
-        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
+        return Response({"error": "한 번에 최대 10개까지 업로드할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     created = []
     errors = []
@@ -46,7 +60,6 @@ def document_list(request, project_id):
         os.makedirs(save_dir, exist_ok=True)
         file_path = os.path.join(save_dir, file.name)
 
-        # 중복 파일명 처리
         base, extension = os.path.splitext(file.name)
         counter = 1
         while os.path.exists(file_path):
@@ -63,19 +76,22 @@ def document_list(request, project_id):
             title=os.path.basename(file_path),
             path=file_path,
         )
-        created.append(DocumentSerializer(doc).data)
+        created.append(DocumentSerializer(doc, context={"request": request}).data)
 
     return Response({"created": created, "errors": errors}, status=status.HTTP_201_CREATED)
 
 
 @api_view(["DELETE"])
 def document_delete(request, project_id, document_id):
+    project_user = get_project_user_or_response(project_id, request.auth["user_id"])
+    if isinstance(project_user, Response):
+        return project_user
+
     try:
         doc = Document.objects.get(document_id=document_id, project_id=project_id)
     except Document.DoesNotExist:
         return Response({"error": "문서를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    # 파일 실제 삭제
     if os.path.exists(doc.path):
         os.remove(doc.path)
     doc.delete()

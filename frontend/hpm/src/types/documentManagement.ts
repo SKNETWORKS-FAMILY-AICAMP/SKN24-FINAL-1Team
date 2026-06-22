@@ -5,6 +5,7 @@ export interface DocumentRecord {
   department: string;
   uploadedAt: string;
   size: number;
+  fileUrl?: string;
   file?: File;
 }
 

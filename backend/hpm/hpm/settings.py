@@ -7,7 +7,7 @@ from datetime import timedelta
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 절대경로 → 상대경로로 변경 (parents[3]는 .env 위치에 맞게 조정)
-load_dotenv(Path(__file__).resolve().parents[3] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-^ai6lg-1&n^afjylo6rs$2s(!5)j(449z=!vfje)7h7xb71!*v")
 
@@ -97,6 +97,9 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 # ── 미디어 파일 ───────────────────────────────────────────────────

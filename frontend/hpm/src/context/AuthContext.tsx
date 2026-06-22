@@ -4,6 +4,16 @@ import { getMe } from "../services/users";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const normalizeUser = (user: Partial<User> & { user_id?: number; users_id?: number }): User => {
+  const id = user.users_id ?? user.user_id ?? 0;
+  return {
+    ...user,
+    user_id: id,
+    users_id: id,
+    email: user.email ?? "",
+  };
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -18,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchMe = async () => {
       try {
         const data = await getMe();
-        setUser(data);
+        setUser(normalizeUser(data));
       } catch (error) {
         setUser(null);
       } finally {
@@ -31,7 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const login = (u: User) => {
-    setUser(u);
+    setUser(normalizeUser(u));
   };
 
   const logout = () => {
