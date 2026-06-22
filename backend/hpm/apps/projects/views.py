@@ -39,7 +39,7 @@ DEFAULT_JIRA_COLUMNS = [
         "id": "done",
         "label": "완료",
         "status_ids": [],
-        "status_names": ["Done", "완료"],
+        "status_names": ["Done", "완료", "해결됨"],
     },
 ]
 
@@ -61,59 +61,70 @@ def _status_name_map(access_token, cloud_id):
 
 
 def _get_jira_board_columns(access_token, cloud_id, project_key):
+    """
+    /rest/api/3/project/{key}/statuses 로 status category별 컬럼을 동적 생성.
+    read:jira-work 스코프만으로 동작.
+    """
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
 
     try:
-        boards_res = requests.get(
-            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board",
-            headers=headers,
-            params={"projectKeyOrId": project_key, "type": "kanban", "maxResults": 50},
-            timeout=10,
-        )
-    except requests.RequestException:
-        return DEFAULT_JIRA_COLUMNS
-
-    if not boards_res.ok:
-        return DEFAULT_JIRA_COLUMNS
-
-    boards = boards_res.json().get("values", [])
-    if not boards:
-        return DEFAULT_JIRA_COLUMNS
-
-    board_id = boards[0].get("id")
-    if not board_id:
-        return DEFAULT_JIRA_COLUMNS
-
-    try:
-        config_res = requests.get(
-            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board/{board_id}/configuration",
+        res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project/{project_key}/statuses",
             headers=headers,
             timeout=10,
         )
-    except requests.RequestException:
+    except requests.RequestException as e:
+        print(f"[BOARD] statuses 요청 실패: {e}")
         return DEFAULT_JIRA_COLUMNS
 
-    if not config_res.ok:
+    if not res.ok:
+        print(f"[BOARD] statuses 응답 오류: {res.status_code} {res.text[:200]}")
         return DEFAULT_JIRA_COLUMNS
 
-    status_names_by_id = _status_name_map(access_token, cloud_id)
+    # status category별로 status_name / status_id 수집
+    # statusCategory.key: "new"(할 일) / "indeterminate"(진행중) / "done"(완료) / 기타
+    cat_data: dict[str, dict] = {}
+    for issue_type in res.json():
+        for st in issue_type.get("statuses", []):
+            cat = st.get("statusCategory", {})
+            cat_key = cat.get("key", "undefined")
+            cat_name = cat.get("name", cat_key)
+            if cat_key not in cat_data:
+                cat_data[cat_key] = {
+                    "category_name": cat_name,
+                    "status_names": [],
+                    "status_ids": [],
+                }
+            name = st.get("name", "")
+            sid = str(st.get("id", ""))
+            if name and name not in cat_data[cat_key]["status_names"]:
+                cat_data[cat_key]["status_names"].append(name)
+            if sid and sid not in cat_data[cat_key]["status_ids"]:
+                cat_data[cat_key]["status_ids"].append(sid)
+
+    # 고정 순서: new → indeterminate → done → 기타
+    CATEGORY_ORDER = ["new", "indeterminate", "done"]
+    CATEGORY_LABELS = {"new": "할 일", "indeterminate": "진행중", "done": "완료"}
+
     columns = []
-    for index, column in enumerate(config_res.json().get("columnConfig", {}).get("columns", [])):
-        label = column.get("name") or f"Column {index + 1}"
-        statuses = column.get("statuses", [])
-        status_ids = [str(item.get("id")) for item in statuses if item.get("id")]
-        status_names = [
-            status_names_by_id.get(status_id)
-            for status_id in status_ids
-            if status_names_by_id.get(status_id)
-        ]
-        columns.append({
-            "id": f"jira-{index}",
-            "label": label,
-            "status_ids": status_ids,
-            "status_names": status_names or [label],
-        })
+    for cat_key in CATEGORY_ORDER:
+        if cat_key in cat_data:
+            columns.append({
+                "id": f"jira-{cat_key}",
+                "label": CATEGORY_LABELS.get(cat_key, cat_data[cat_key]["category_name"]),
+                "status_ids": cat_data[cat_key]["status_ids"],
+                "status_names": cat_data[cat_key]["status_names"],
+            })
+    for cat_key, data in cat_data.items():
+        if cat_key not in CATEGORY_ORDER:
+            columns.append({
+                "id": f"jira-{cat_key}",
+                "label": data["category_name"],
+                "status_ids": data["status_ids"],
+                "status_names": data["status_names"],
+            })
 
+    print(f"[BOARD] 동적 컬럼: {[(c['label'], c['status_names']) for c in columns]}")
     return columns or DEFAULT_JIRA_COLUMNS
 
 
@@ -128,7 +139,8 @@ def _match_jira_column(columns, jira_status):
         if status_name_lower in {name.lower() for name in column.get("status_names", [])}:
             return column["id"]
 
-    return JIRA_STATUS_TO_COLUMN.get(status_name, columns[0]["id"] if columns else "todo")
+    # fallback: status category로 매핑
+    return columns[0]["id"] if columns else "jira-new"
 
 
 @api_view(["GET", "POST"])
@@ -277,11 +289,14 @@ def project_jira_board(request, project_id):
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
+    raw_issues = res.json().get("issues", [])
+    print(f"[BOARD] JQL 결과 이슈 수: {len(raw_issues)}")
     issues_by_column = {column["id"]: [] for column in jira_columns}
-    for issue in res.json().get("issues", []):
+    for issue in raw_issues:
         fields = issue.get("fields", {})
         jira_status = fields.get("status", {})
         column_id = _match_jira_column(jira_columns, jira_status)
+        print(f"[BOARD] 이슈 {issue.get('key')} 상태={jira_status.get('name')} → 컬럼={column_id}")
         assignee = fields.get("assignee") or {}
         priority = fields.get("priority") or {}
         parent = fields.get("parent") or {}
@@ -309,6 +324,57 @@ def project_jira_board(request, project_id):
         "issues": issues_by_column,
     })
 
+
+@api_view(["PATCH"])
+def project_jira_board_issue_status(request, project_id, issue_key):
+    user_id = request.auth["user_id"]
+
+    # 1) 프로젝트 존재 확인
+    try:
+        project = Project.objects.get(project_id=project_id)
+    except Project.DoesNotExist:
+        return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    # 2) 권한 확인 (소유자 또는 구성원만)
+    is_member = ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
+    if project.project_owner_id != user_id and not is_member:
+        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    # 3) 사용자 / Jira 토큰 확인
+    try:
+        user = Users.objects.get(users_id=user_id)
+    except Users.DoesNotExist:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    access_token = get_valid_access_token(user)
+    if not access_token:
+        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.jira_cloud_id:
+        return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 4) 요청 본문 파싱
+    column_id = request.data.get("column_id")
+    target_status_names = request.data.get("target_status_names") or []
+    if not column_id:
+        return Response({"error": "column_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # 5) Jira 상태 전환 (기존 jira_client 함수 재사용)
+    result = update_jira_issue_status(
+        issue_key,
+        column_id,
+        access_token,
+        user.jira_cloud_id,
+        target_status_names=target_status_names,
+    )
+
+    if not result.get("success"):
+        return Response(
+            {"error": "Jira 상태 변경에 실패했습니다.", "detail": result},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response(result, status=status.HTTP_200_OK)
 
 @api_view(["GET", "PATCH", "DELETE"])
 def project_detail(request, project_id):
@@ -371,3 +437,5 @@ def project_detail(request, project_id):
     # DELETE
     project.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+

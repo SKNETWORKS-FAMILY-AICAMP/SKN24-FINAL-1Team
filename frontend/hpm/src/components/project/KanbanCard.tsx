@@ -4,12 +4,31 @@ interface KanbanCardProps {
   task: KanbanTask;
   top: number;
   onClick: () => void;
+  onDragStart?: (task: KanbanTask) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }
 
-export default function KanbanCard({ task, top, onClick }: KanbanCardProps) {
+export default function KanbanCard({
+  task,
+  top,
+  onClick,
+  onDragStart,
+  onDragEnd,
+  isDragging = false,
+}: KanbanCardProps) {
   return (
     <article
-      className="absolute left-[23px] h-[142px] w-[306px] rounded-[10px] border-0 bg-[#FFFDFD] p-0 text-left transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:brightness-[0.96] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985] active:bg-[#EFECEF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", task.code);
+        onDragStart?.(task);
+      }}
+      onDragEnd={() => onDragEnd?.()}
+      className={`absolute left-[23px] h-[142px] w-[306px] cursor-grab rounded-[10px] border-0 bg-[#FFFDFD] p-0 text-left transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:brightness-[0.96] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985] active:bg-[#EFECEF] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5] ${
+        isDragging ? "opacity-40" : "opacity-100"
+      }`}
       style={{ top }}
       data-name="dashboard=card"
     >

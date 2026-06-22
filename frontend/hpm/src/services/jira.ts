@@ -3,19 +3,6 @@ import axios from "axios";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   withCredentials: true,
-<<<<<<< HEAD
-=======
-});
-
-api.interceptors.request.use((config) => {
-  try {
-    const user = JSON.parse(localStorage.getItem("hpm_user") || "null");
-    if (user?.access) {
-      config.headers.Authorization = `Bearer ${user.access}`;
-    }
-  } catch {}
-  return config;
->>>>>>> 0c770f839b293ecbb755a76d08a3cad9728ee324
 });
 
 // ── 타입 ──────────────────────────────────────────────────────────

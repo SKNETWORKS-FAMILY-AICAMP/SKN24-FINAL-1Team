@@ -111,10 +111,9 @@ export default function ProjectCreatePage() {
   const handleCreate = async () => {
     setCreating(true);
     try {
+      const projectName = jiraProjects.find(p => p.key === selectedJiraProject)?.name ?? "새 프로젝트";
       const res = await api.post("/projects/", {
-        project_name: selectedJiraProject
-          ? jiraProjects.find(p => p.key === selectedJiraProject)?.name ?? "새 프로젝트"
-          : "새 프로젝트",
+        project_name: projectName || "새 프로젝트",
         description: "",
         owner_id: currentUserId,
         member_ids: members.map(m => m.users_id),
@@ -224,15 +223,14 @@ export default function ProjectCreatePage() {
             {step === 1 && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">프로젝트 선택</h2>
-                <p className="text-sm text-gray-500 text-center mb-8 leading-relaxed">
-                  Jira에서 연동할 프로젝트를 선택해주세요.<br />
-                  선택한 프로젝트명이 서비스 프로젝트명으로 자동 설정됩니다.
+                <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+                  연결할 Jira 프로젝트를 선택하세요.
                 </p>
 
                 {jiraLoading ? (
                   <div className="text-sm text-gray-400 text-center py-10">Jira 프로젝트 불러오는 중...</div>
                 ) : (
-                  <div className="bg-[#ECECF2] rounded-2xl p-4 mb-6 max-h-[360px] overflow-y-auto">
+                  <div className="bg-[#ECECF2] rounded-2xl p-4 mb-6 max-h-[300px] overflow-y-auto">
                     {jiraProjects.map(p => {
                       const isSelected = selectedJiraProject === p.key;
                       return (
@@ -243,19 +241,8 @@ export default function ProjectCreatePage() {
                         >
                           <span className="text-sm font-medium text-gray-700">{p.name}</span>
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <circle
-                              cx="10" cy="10" r="9"
-                              fill={isSelected ? "#623FB5" : "none"}
-                              stroke={isSelected ? "#623FB5" : "#D1D5DB"}
-                              strokeWidth="1.5"
-                            />
-                            <path
-                              d="M6 10.5l2.5 2.5 5.5-5.5"
-                              stroke={isSelected ? "#ffffff" : "#D1D5DB"}
-                              strokeWidth="1.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
+                            <circle cx="10" cy="10" r="9" fill={isSelected ? "#623FB5" : "none"} stroke={isSelected ? "#623FB5" : "#D1D5DB"} strokeWidth="1.5" />
+                            <path d="M6 10.5l2.5 2.5 5.5-5.5" stroke={isSelected ? "#ffffff" : "#D1D5DB"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </div>
                       );
@@ -265,12 +252,13 @@ export default function ProjectCreatePage() {
 
                 <div className="flex justify-end">
                   <button
-                    onClick={() => setStep(2)}
+                    onClick={() => { if (selectedJiraProject) setStep(2); }}
                     disabled={!selectedJiraProject}
-                    className={`px-5 py-2.5 text-white rounded-lg text-sm transition
-                      ${selectedJiraProject
+                    className={`px-5 py-2.5 text-white rounded-lg text-sm transition ${
+                      selectedJiraProject
                         ? "bg-[#623FB5] hover:bg-[#512fa0] cursor-pointer"
-                        : "bg-[#969696] cursor-not-allowed"}`}
+                        : "bg-[#969696] cursor-not-allowed"
+                    }`}
                   >
                     다음
                   </button>

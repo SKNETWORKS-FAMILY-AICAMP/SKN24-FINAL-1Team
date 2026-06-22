@@ -315,6 +315,19 @@ export const createProjectJiraIssue = async (
   return res.data;
 };
 
+export const updateProjectJiraIssueStatus = async (
+  projectId: number,
+  issueKey: string,
+  columnId: string,
+  targetStatusNames?: string[],
+): Promise<{ success: boolean; column_id: string }> => {
+  const res = await api.patch(
+    `/projects/${projectId}/jira-board/issue/${issueKey}/status/`,
+    { column_id: columnId, target_status_names: targetStatusNames ?? [] },
+  );
+  return res.data;
+};
+
 export const addProjectMembers = async (projectId: number, memberIds: number[]): Promise<void> => {
   await api.patch(`/projects/${projectId}/`, { add_member_ids: memberIds });
 };
@@ -366,4 +379,3 @@ export const generatePrepMaterial = async (meetingId: number): Promise<MeetingPr
   const res = await api.post(`/meetings/${meetingId}/prep/generate/`);
   return res.data;
 };
-
