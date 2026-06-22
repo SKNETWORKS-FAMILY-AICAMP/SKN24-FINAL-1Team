@@ -62,6 +62,7 @@ interface KanbanColumnProps {
   tasks: KanbanTask[];
   onAddTask: (columnId: KanbanColumnId) => void;
   onEditTask: (task: KanbanTask) => void;
+  readOnly?: boolean;
 }
 
 export default function KanbanColumn({
@@ -69,6 +70,7 @@ export default function KanbanColumn({
   tasks,
   onAddTask,
   onEditTask,
+  readOnly = false,
 }: KanbanColumnProps) {
   const hasTasks = tasks.length > 0;
   const columnHeight = getKanbanColumnHeight(tasks.length);
@@ -102,17 +104,22 @@ export default function KanbanColumn({
                   key={task.id}
                   task={task}
                   top={KANBAN_FIRST_CARD_TOP + index * KANBAN_CARD_GAP}
-                  onClick={() => onEditTask(task)}
+                  disabled={readOnly}
+                  onClick={() => {
+                    if (!readOnly) onEditTask(task);
+                  }}
                 />
               ))}
-              <AddTaskButton
-                className="left-[23px]"
-                style={{ top: addButtonTop }}
-                onClick={() => onAddTask(column.id)}
-              />
+              {!readOnly ? (
+                <AddTaskButton
+                  className="left-[23px]"
+                  style={{ top: addButtonTop }}
+                  onClick={() => onAddTask(column.id)}
+                />
+              ) : null}
             </>
           ) : (
-            <EmptyAddCard onClick={() => onAddTask(column.id)} />
+            !readOnly ? <EmptyAddCard onClick={() => onAddTask(column.id)} /> : null
           )}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import requests
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -42,6 +43,59 @@ DEFAULT_JIRA_COLUMNS = [
         "status_names": ["Done", "완료"],
     },
 ]
+
+
+RANK_PRIORITY = [
+    "회장",
+    "대표",
+    "대표이사",
+    "사장",
+    "부사장",
+    "전무",
+    "상무",
+    "이사",
+    "본부장",
+    "실장",
+    "팀장",
+    "부장",
+    "차장",
+    "과장",
+    "대리",
+    "주임",
+    "사원",
+    "인턴",
+]
+
+
+def _user_rank_sort_key(user):
+    rank_name = user.rank.rank_name
+    try:
+        priority = RANK_PRIORITY.index(rank_name)
+    except ValueError:
+        priority = len(RANK_PRIORITY)
+
+    return (priority, user.rank_id or 9999, user.name)
+
+
+def _project_card_data(project):
+    project_members = list(
+        ProjectUsers.objects.filter(project=project)
+        .select_related("user", "user__rank")
+    )
+    users_by_id = {member.user_id: member.user for member in project_members}
+    users_by_id.setdefault(project.project_owner_id, project.project_owner)
+    members = sorted(users_by_id.values(), key=_user_rank_sort_key)
+
+    return {
+        **ProjectSerializer(project).data,
+        "startDate": f"{timezone.localtime(project.created_at).strftime('%Y.%m.%d')} ~",
+        "members": [
+            f"{member.name}(생성자)"
+            if member.users_id == project.project_owner_id
+            else member.name
+            for member in members
+        ],
+    }
 
 
 def _status_name_map(access_token, cloud_id):
@@ -137,12 +191,23 @@ def project_list(request):
     if request.method == "GET":
         owned = Project.objects.filter(project_owner_id = user_id)
         joined = Project.objects.filter(projectusers__user_id=user_id)
-        qs = (owned | joined).distinct().order_by("-created_at")
+        qs = (
+            (owned | joined)
+            .distinct()
+            .select_related("project_owner", "project_owner__rank")
+            .order_by("-created_at")
+        )
 
-        return Response(ProjectSerializer(qs, many=True).data)
+        return Response([_project_card_data(project) for project in qs])
 
     # POST - 프로젝트 생성
     data = request.data
+    jira_project_key = data.get("jira_project_key") or None
+    if jira_project_key and Project.objects.filter(jira_project_key=jira_project_key).exists():
+        return Response(
+            {"error": "이미 해당 Jira 프로젝트와 연결된 프로젝트가 있습니다."},
+            status=status.HTTP_409_CONFLICT,
+        )
     try:
         owner = Users.objects.get(pk=user_id)
     except Users.DoesNotExist:
@@ -151,7 +216,7 @@ def project_list(request):
     project = Project.objects.create(
         project_owner=owner,
         project_name=data.get("project_name", ""),
-        jira_project_key=data.get("jira_project_key") or None,
+        jira_project_key=jira_project_key,
     )
     # 생성자를 구성원으로 자동 추가
     ProjectUsers.objects.get_or_create(project=project, user=owner)
@@ -194,10 +259,7 @@ def project_jira_board(request, project_id):
     if not project.jira_project_key:
         return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    user = project.project_owner
 
     access_token = get_valid_access_token(user)
     if not access_token:
@@ -209,6 +271,18 @@ def project_jira_board(request, project_id):
     jira_columns = _get_jira_board_columns(access_token, user.jira_cloud_id, project.jira_project_key)
 
     if request.method == "POST":
+        try:
+            requester = Users.objects.get(users_id=user_id)
+        except Users.DoesNotExist:
+            return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        requester_token = get_valid_access_token(requester)
+        if not requester_token or not requester.jira_cloud_id:
+            return Response({"error": "Jira connection is required to manage board tasks."}, status=status.HTTP_403_FORBIDDEN)
+
+        access_token = requester_token
+        user = requester
+
         title = (request.data.get("title") or "").strip()
         if not title:
             return Response({"error": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -368,6 +442,8 @@ def project_detail(request, project_id):
 
         return Response(ProjectSerializer(project).data)
 
-    # DELETE
+    if project.project_owner_id != request.auth["user_id"]:
+        return Response({"error": "프로젝트 생성자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
     project.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
