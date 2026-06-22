@@ -6,6 +6,7 @@ import Table from "../../components/ui/Table";
 import type { TableColumn } from "../../components/ui/Table";
 import Pagination from "../../components/ui/Pagination";
 import Button from "../../components/ui/Button";
+import searchIcon from "../../assets/meeting/search.png"
 import * as DESIGN from "../../constants/design";
 
 const MOCK_MEETINGS: Meeting[] = [
@@ -462,10 +463,24 @@ export default function MeetingListPage() {
               setPage(1);
             }}
             placeholder="회의 명이나 생성자를 입력해주세요"
-            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-10 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-12 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
           />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer">
-          </span>
+
+          <button
+            type="button"
+            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center"
+            onClick={() => {
+              setPage(1);
+              // 검색 함수 있으면 여기 호출
+              // handleSearch();
+            }}
+          >
+            <img
+              src={searchIcon}
+              alt="검색"
+              className="w-5 h-5"
+            />
+          </button>
         </div>
 
         {/* 하단 세부 필터 (상태, 기간, 삭제 버튼) */}
