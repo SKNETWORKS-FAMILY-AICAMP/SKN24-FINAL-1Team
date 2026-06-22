@@ -22,8 +22,15 @@ export const getUserDetail = async (userId: number): Promise<User> => {
   return response.data;
 };
 
-export const changePassword = async (userId: number, password: string): Promise<User> => {
-  const response = await api.patch<User>(`/users/${userId}/`, { password });
+export const changePassword = async (
+  userId: number,
+  password: string,
+  currentPassword?: string,
+): Promise<User> => {
+  const payload: { password: string; current_password?: string } = { password };
+  if (currentPassword) payload.current_password = currentPassword;
+
+  const response = await api.patch<User>(`/users/${userId}/`, payload);
   return response.data;
 };
 
