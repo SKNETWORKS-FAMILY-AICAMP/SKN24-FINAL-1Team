@@ -36,7 +36,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
 JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET", "")
 JIRA_REDIRECT_URI = os.getenv("JIRA_REDIRECT_URI", "http://localhost:8000/api/jira/callback/")
-JIRA_SCOPES = "read:jira-work write:jira-work manage:jira-project offline_access"
+JIRA_SCOPES = "read:jira-work write:jira-work offline_access"
 
 
 def _hash_pw(raw: str) -> str:
@@ -410,10 +410,9 @@ def jira_oauth_status(request):
         "jira_cloud_id": user.jira_cloud_id if connected else None,
     })
 
-# GET /POST /api/jira/projects/
-@api_view(["GET", "POST"])
+# GET /api/jira/projects/
+@api_view(["GET"])
 def jira_projects(request):
-    from apps.meetings.jira_client import create_jira_project
     user_id = request.auth['user_id']
 
     try:
@@ -424,15 +423,6 @@ def jira_projects(request):
     access_token = get_valid_access_token(user)
     if not access_token:
         return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if request.method == "POST":
-        project_name = (request.data.get("project_name") or "").strip()
-        if not project_name:
-            return Response({"error": "project_name is required."}, status=status.HTTP_400_BAD_REQUEST)
-        result = create_jira_project(project_name, access_token, user.jira_cloud_id)
-        if not result.get("success"):
-            return Response({"error": "Jira 프로젝트 생성 실패", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
-        return Response({"key": result["key"], "name": result["name"]}, status=status.HTTP_201_CREATED)
 
     res = requests.get(
         f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/project",

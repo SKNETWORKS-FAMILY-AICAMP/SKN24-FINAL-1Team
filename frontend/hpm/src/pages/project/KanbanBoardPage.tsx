@@ -12,6 +12,7 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import {
   createProjectJiraIssue,
+  getJiraStatus,
   getProjectDetail,
   getProjectJiraBoard,
   updateProjectJiraIssueStatus,
@@ -97,7 +98,7 @@ const getApiErrorMessage = (error: unknown) => {
 };
 
 export default function KanbanBoardPage() {
-  const { projectId, projectName } = useAuth();
+  const { projectId, projectName, user } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [boardColumns, setBoardColumns] = useState<KanbanColumnConfig[]>(KANBAN_COLUMNS);
   const [members, setMembers] = useState<ProjectMember[]>([]);
@@ -106,6 +107,27 @@ export default function KanbanBoardPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [draggingTask, setDraggingTask] = useState<KanbanTask | null>(null);
+  const [canManageJira, setCanManageJira] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setCanManageJira(false);
+      return;
+    }
+
+    let active = true;
+    getJiraStatus()
+      .then((status) => {
+        if (active) setCanManageJira(status.connected);
+      })
+      .catch(() => {
+        if (active) setCanManageJira(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     if (!projectId) {
@@ -197,6 +219,8 @@ export default function KanbanBoardPage() {
   );
 
   const openAddModal = (columnId: KanbanColumnId) => {
+    if (!canManageJira) return;
+
     const defaultAssignee = assigneeOptions[0];
     setModal({
       mode: "add",
@@ -210,6 +234,8 @@ export default function KanbanBoardPage() {
   };
 
   const openEditModal = (task: KanbanTask) => {
+    if (!canManageJira) return;
+
     setModal({
       mode: "edit",
       columnId: task.columnId,
@@ -220,10 +246,18 @@ export default function KanbanBoardPage() {
 
   const closeModal = () => setModal(null);
 
-  const handleCardDragStart = (task: KanbanTask) => setDraggingTask(task);
+  const handleCardDragStart = (task: KanbanTask) => {
+    if (!canManageJira) return;
+    setDraggingTask(task);
+  };
   const handleCardDragEnd = () => setDraggingTask(null);
 
   const handleDropTask = async (targetColumnId: KanbanColumnId) => {
+    if (!canManageJira) {
+      setDraggingTask(null);
+      return;
+    }
+
     const task = draggingTask;
     setDraggingTask(null);
     if (!task || task.columnId === targetColumnId) return;
@@ -261,6 +295,7 @@ export default function KanbanBoardPage() {
   };
 
   const submitTask = async () => {
+    if (!canManageJira) return;
     if (!modal || !modal.values.title.trim() || !modal.values.priority || saving) return;
 
     if (modal.mode === "edit" && modal.taskId) {
@@ -355,6 +390,11 @@ export default function KanbanBoardPage() {
             {error}
           </div>
         ) : null}
+        {!canManageJira && !loading && !error ? (
+          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#969696]">
+            Jira 미연동 계정은 칸반 조회만 가능합니다.
+          </div>
+        ) : null}
         {boardColumns.map((column) => (
           <KanbanColumn
             key={column.id}
@@ -367,6 +407,7 @@ export default function KanbanBoardPage() {
             onDropTask={handleDropTask}
             draggingTaskId={draggingTask?.id ?? null}
             isDragActive={draggingTask !== null}
+            canManage={canManageJira}
           />
         ))}
       </section>
