@@ -14,7 +14,7 @@ import {
   createProjectJiraIssue,
   getProjectDetail,
   getProjectJiraBoard,
-  getJiraStatus,
+  updateProjectJiraIssueStatus,
   type ProjectMember,
   type ProjectJiraBoard,
   type JiraBoardColumn,
@@ -104,8 +104,8 @@ export default function KanbanBoardPage() {
   const [modal, setModal] = useState<KanbanModalState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canManageJira, setCanManageJira] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [draggingTask, setDraggingTask] = useState<KanbanTask | null>(null);
 
   useEffect(() => {
     if (!projectId) {
@@ -121,9 +121,14 @@ export default function KanbanBoardPage() {
 
     getProjectJiraBoard(projectId)
       .then((board) => {
+        console.log("[KANBAN] board.columns:", board.columns);
+        console.log("[KANBAN] board.issues keys:", Object.keys(board.issues || {}));
         const nextColumns = toKanbanColumns(board.columns || []);
+        console.log("[KANBAN] nextColumns:", nextColumns.map(c => c.id));
+        const nextTasks = jiraBoardToTasks(board, nextColumns);
+        console.log("[KANBAN] tasks 수:", nextTasks.length);
         setBoardColumns(nextColumns);
-        setTasks(jiraBoardToTasks(board, nextColumns));
+        setTasks(nextTasks);
       })
       .catch((error) => {
         console.error("Jira 칸반 조회 실패:", error);
@@ -135,12 +140,6 @@ export default function KanbanBoardPage() {
         setLoading(false);
       });
   }, [projectId]);
-
-  useEffect(() => {
-    getJiraStatus()
-      .then((status) => setCanManageJira(status.connected))
-      .catch(() => setCanManageJira(false));
-  }, []);
 
   useEffect(() => {
     if (!projectId) {
@@ -157,13 +156,15 @@ export default function KanbanBoardPage() {
   }, [projectId]);
 
   const tasksByColumn = useMemo(() => {
-    return boardColumns.reduce<Record<KanbanColumnId, KanbanTask[]>>(
+    const result = boardColumns.reduce<Record<KanbanColumnId, KanbanTask[]>>(
       (acc, column) => {
         acc[column.id] = tasks.filter((task) => task.columnId === column.id);
         return acc;
       },
       {},
     );
+    console.log("[KANBAN] tasksByColumn:", Object.entries(result).map(([k,v]) => `${k}:${v.length}개`));
+    return result;
   }, [boardColumns, tasks]);
 
   const boardHeight = useMemo(
@@ -196,8 +197,6 @@ export default function KanbanBoardPage() {
   );
 
   const openAddModal = (columnId: KanbanColumnId) => {
-    if (!canManageJira) return;
-
     const defaultAssignee = assigneeOptions[0];
     setModal({
       mode: "add",
@@ -211,8 +210,6 @@ export default function KanbanBoardPage() {
   };
 
   const openEditModal = (task: KanbanTask) => {
-    if (!canManageJira) return;
-
     setModal({
       mode: "edit",
       columnId: task.columnId,
@@ -222,6 +219,46 @@ export default function KanbanBoardPage() {
   };
 
   const closeModal = () => setModal(null);
+
+  const handleCardDragStart = (task: KanbanTask) => setDraggingTask(task);
+  const handleCardDragEnd = () => setDraggingTask(null);
+
+  const handleDropTask = async (targetColumnId: KanbanColumnId) => {
+    const task = draggingTask;
+    setDraggingTask(null);
+    if (!task || task.columnId === targetColumnId) return;
+    if (!projectId) return;
+
+    const fromColumnId = task.columnId; // 롤백용 원래 컬럼 기억
+    const targetStatusNames =
+      boardColumns.find((column) => column.id === targetColumnId)?.statusNames || [];
+
+    // 1) 낙관적 업데이트: 화면에서 먼저 카드 이동
+    setTasks((current) =>
+      current.map((item) =>
+        item.id === task.id ? { ...item, columnId: targetColumnId } : item,
+      ),
+    );
+
+    // 2) 실제 Jira 반영
+    try {
+      await updateProjectJiraIssueStatus(
+        projectId,
+        task.code, // Jira issue_key
+        targetColumnId,
+        targetStatusNames,
+      );
+    } catch (error) {
+      // 3) 실패 시 원래 컬럼으로 롤백
+      console.error("Jira 상태 변경 실패:", error);
+      setTasks((current) =>
+        current.map((item) =>
+          item.id === task.id ? { ...item, columnId: fromColumnId } : item,
+        ),
+      );
+      alert("Jira 상태 변경에 실패했습니다.");
+    }
+  };
 
   const submitTask = async () => {
     if (!modal || !modal.values.title.trim() || !modal.values.priority || saving) return;
@@ -325,7 +362,11 @@ export default function KanbanBoardPage() {
             tasks={tasksByColumn[column.id]}
             onAddTask={openAddModal}
             onEditTask={openEditModal}
-            readOnly={!canManageJira}
+            onCardDragStart={handleCardDragStart}
+            onCardDragEnd={handleCardDragEnd}
+            onDropTask={handleDropTask}
+            draggingTaskId={draggingTask?.id ?? null}
+            isDragActive={draggingTask !== null}
           />
         ))}
       </section>
