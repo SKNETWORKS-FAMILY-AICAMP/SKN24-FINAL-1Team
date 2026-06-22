@@ -103,9 +103,22 @@ export default function ProjectCreatePage() {
   useEffect(() => {
     api.get("/users/").then(res => {
       console.log("allUsers 로드됨:", res.data.length, "명", res.data[0]);
-      setAllUsers(res.data);
+      const users = res.data as UserOption[];
+      setAllUsers(users);
+
+      if (currentUserId) {
+        const owner =
+          users.find((u) => u.users_id === currentUserId) ||
+          { users_id: currentUserId, name: user?.name || "-", work: "", email: user?.email };
+
+        setMembers((current) =>
+          current.some((member) => member.users_id === owner.users_id)
+            ? current
+            : [{ ...owner, isJira: false }, ...current],
+        );
+      }
     }).catch((e) => console.error("/api/users/ 실패:", e));
-  }, [user]);
+  }, [currentUserId, user]);
 
   useEffect(() => {
     if (!jiraConnected || !currentUserId) return;
@@ -133,14 +146,19 @@ export default function ProjectCreatePage() {
     : [];
 
   const handleToggleMember = (u: UserOption) => {
+    const isOwner = u.users_id === currentUserId;
     if (members.find(m => m.users_id === u.users_id)) {
-      setMembers(prev => prev.filter(m => m.users_id !== u.users_id));
+      if (!isOwner) {
+        setMembers(prev => prev.filter(m => m.users_id !== u.users_id));
+      }
     } else {
       setMembers(prev => [...prev, { ...u, isJira: false }]);
     }
+    setSearchName("");
   };
 
   const handleRemoveMember = (id: number) => {
+    if (id === currentUserId) return;
     setMembers(prev => prev.filter(m => m.users_id !== id));
   };
 
@@ -335,10 +353,12 @@ export default function ProjectCreatePage() {
                             className="inline-flex items-center gap-1 bg-[#ECECF2] rounded-lg px-3 py-1 text-sm text-gray-700"
                           >
                             {m.name}
+                            {m.users_id !== currentUserId ? (
                             <button
                               onClick={() => handleRemoveMember(m.users_id)}
                               className="text-gray-400 hover:text-gray-600 ml-1 leading-none"
                             >×</button>
+                            ) : null}
                           </span>
                         ))}
                       </div>

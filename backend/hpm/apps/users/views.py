@@ -432,7 +432,18 @@ def jira_projects(request):
     if not res.ok:
         return Response({"error": "Jira 프로젝트 조회 실패"}, status=status.HTTP_502_BAD_GATEWAY)
 
-    projects = [{"key": p["key"], "name": p["name"]} for p in res.json()]
+    from apps.projects.models import Project
+
+    linked_keys = set(
+        Project.objects.exclude(jira_project_key__isnull=True)
+        .exclude(jira_project_key="")
+        .values_list("jira_project_key", flat=True)
+    )
+    projects = [
+        {"key": p["key"], "name": p["name"]}
+        for p in res.json()
+        if p["key"] not in linked_keys
+    ]
     return Response(projects)
 
 
