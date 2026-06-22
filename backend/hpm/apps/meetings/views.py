@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 from datetime import datetime
 
@@ -9,8 +10,8 @@ from rest_framework.response import Response
 
 from apps.notifications.models import Notification
 from apps.users.models import Users
-from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance
-from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, RecordUtteranceSerializer
+from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance, MeetingPreparation, PreparationDocument
+from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, RecordUtteranceSerializer, MeetingPreparationSerializer
 
 
 def _minutes_payload(meeting, text):
@@ -569,3 +570,178 @@ def generate_agenda(request, meeting_id):
         "ocr_text": ocr_text,
         "agenda": MeetingAgendaSerializer(created, many=True).data,
     }, status=status.HTTP_201_CREATED)
+
+
+def _parse_prep_markdown(text):
+    sections = {
+        "purpose": "",
+        "project_status": "",
+        "rule": "",
+        "effect": ""
+    }
+    
+    parts = re.split(r'(####?\s+\d+\.\s+[^\n]+)', text)
+    current_section = None
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        
+        header_match = re.match(r'####?\s+(\d+)\.\s+([^\n]+)', part)
+        if header_match:
+            num = int(header_match.group(1))
+            title = header_match.group(2)
+            if num == 2 or "목적" in title:
+                current_section = "purpose"
+            elif num in [3, 5] or "맥락" in title or "상태" in title or "논의" in title:
+                current_section = "project_status"
+            elif num in [4, 6] or "근거" in title or "규정" in title or "리스크" in title:
+                current_section = "rule"
+            elif num == 7 or "준비" in title or "기대" in title or "효과" in title or "결과" in title:
+                current_section = "effect"
+            else:
+                current_section = None
+        else:
+            if current_section and part:
+                if sections[current_section]:
+                    sections[current_section] += "\n\n" + part
+                else:
+                    sections[current_section] = part
+                    
+    for k in sections:
+        sections[k] = sections[k].strip()
+    return sections
+
+
+def _compile_prep_markdown(prep):
+    lines = [
+        "### 회의 준비 자료",
+        "",
+        "#### 1. 회의 목적",
+        prep.purpose or "",
+        "",
+        "#### 2. 프로젝트 현재 상태",
+        prep.project_status or "",
+        "",
+        "#### 3. 관련 규정 및 제약사항",
+        prep.rule or "",
+        "",
+        "#### 4. 회의 종료 후 기대 결과",
+        prep.effect or ""
+    ]
+    return "\n".join(lines)
+
+
+@api_view(["GET", "POST", "PATCH"])
+def prep_material_detail(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    prep = MeetingPreparation.objects.filter(meeting=meeting).first()
+
+    if request.method == "GET":
+        if not prep:
+            return Response({
+                "preration_id": None,
+                "meeting": meeting_id,
+                "purpose": "",
+                "project_status": "",
+                "rule": "",
+                "effect": ""
+            })
+        serializer = MeetingPreparationSerializer(prep)
+        return Response(serializer.data)
+
+    data = request.data
+    if not prep:
+        prep = MeetingPreparation.objects.create(
+            meeting=meeting,
+            purpose=data.get("purpose", ""),
+            project_status=data.get("project_status", ""),
+            rule=data.get("rule", ""),
+            effect=data.get("effect", "")
+        )
+    else:
+        prep.purpose = data.get("purpose", prep.purpose)
+        prep.project_status = data.get("project_status", prep.project_status)
+        prep.rule = data.get("rule", prep.rule)
+        prep.effect = data.get("effect", prep.effect)
+        prep.save()
+
+    meeting.meeting_document = _compile_prep_markdown(prep)
+    meeting.save(update_fields=["meeting_document"])
+
+    serializer = MeetingPreparationSerializer(prep)
+    return Response(serializer.data)
+
+
+@api_view(["POST"])
+def generate_prep_material(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    participants = []
+    meeting_users = MeetingUsers.objects.filter(meeting=meeting).select_related("user")
+    for mu in meeting_users:
+        participants.append({
+            "name": mu.user.name,
+            "work": mu.user.work or ""
+        })
+
+    agendas = [agenda.content for agenda in MeetingAgendas.objects.filter(meeting=meeting)]
+
+    payload = {
+        "title": meeting.title,
+        "meeting_id": str(meeting.meeting_id),
+        "project_id": str(meeting.project_id),
+        "meeting_datetime": meeting.meeting_at.isoformat() if meeting.meeting_at else "",
+        "location": meeting.location or "",
+        "project_context": meeting.project.context or "",
+        "participants": participants,
+        "agendas": agendas,
+        "max_previous_meetings": 5
+    }
+
+    base_url = settings.RUNPOD_BASE_URL
+    try:
+        response = requests.post(f"{base_url}/generate-preparation", json=payload, timeout=300)
+        response.raise_for_status()
+        resp_data = response.json()
+    except Exception as e:
+        return Response({"error": f"준비자료 생성 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+    result_data = resp_data.get("result", {})
+    text = result_data.get("text") or result_data.get("document") or ""
+
+    parsed = _parse_prep_markdown(text)
+
+    prep, created = MeetingPreparation.objects.get_or_create(meeting=meeting)
+    prep.purpose = parsed["purpose"]
+    prep.project_status = parsed["project_status"]
+    prep.rule = parsed["rule"]
+    prep.effect = parsed["effect"]
+    prep.save()
+
+    meeting.meeting_document = _compile_prep_markdown(prep)
+    meeting.save(update_fields=["meeting_document"])
+
+    PreparationDocument.objects.filter(preparation=prep).delete()
+    for source in result_data.get("sources", []):
+        viewer = source.get("viewer", {})
+        if viewer.get("type") == "document" and viewer.get("id"):
+            try:
+                doc_id = int(viewer.get("id"))
+                PreparationDocument.objects.create(
+                    preparation=prep,
+                    document_id=doc_id
+                )
+            except (ValueError, TypeError):
+                pass
+
+    serializer = MeetingPreparationSerializer(prep)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+

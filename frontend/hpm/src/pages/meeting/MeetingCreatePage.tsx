@@ -122,8 +122,9 @@ export default function MeetingCreatePage() {
   const canSubmit = title.trim().length >= 1 && meetingDate && meetingTime && participants.length >= 2 && !isPastDateTime();
 
   const handleJiraLink = () => {
-    if (user?.users_id) {
-      window.open(`${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${user.users_id}`, "_blank");
+    const currentUserId = user?.users_id ?? user?.user_id;
+    if (currentUserId) {
+      window.open(`${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${currentUserId}`, "_blank");
     }
     setShowJiraModal(false);
     setShowSelectModal(true);

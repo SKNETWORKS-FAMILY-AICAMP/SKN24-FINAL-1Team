@@ -24,9 +24,8 @@ export const KANBAN_EMPTY_COLUMN_HEIGHT = 226;
 
 export const KANBAN_COLUMNS: KanbanColumnConfig[] = [
   { id: "todo", label: "할 일", left: 68, height: 742 },
-  { id: "progress", label: "진행 중", left: 452, height: 742 },
-  { id: "review", label: "검토 중", left: 836, height: 226 },
-  { id: "done", label: "완료", left: 1220, height: 742 },
+  { id: "progress", label: "진행중", left: 452, height: 742 },
+  { id: "done", label: "완료", left: 836, height: 742 },
 ];
 
 export const KANBAN_PRIORITIES: KanbanPriority[] = [
@@ -43,6 +42,12 @@ export const KANBAN_CATEGORIES: KanbanCategory[] = [
   "백엔드 로직",
   "고객 요청",
 ];
+
+const getTodayDate = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
 
 export const INITIAL_KANBAN_TASKS: KanbanTask[] = [
   {
@@ -151,15 +156,21 @@ export const INITIAL_KANBAN_TASKS: KanbanTask[] = [
   },
 ];
 
-export const emptyKanbanForm = (): KanbanTaskFormValues => ({
-  title: "",
-  description: "",
-  category: "UI/UX 디자인",
-  dueDate: "2026-06-15",
-  startDate: "2026-06-15",
-  assignee: "박수영(팀장)",
-  priority: "",
-});
+export const emptyKanbanForm = (): KanbanTaskFormValues => {
+  const today = getTodayDate();
+
+  return {
+    title: "",
+    description: "",
+    category: "",
+    dueDate: today,
+    startDate: today,
+    assignee: "",
+    assigneeId: "",
+    priority: KANBAN_PRIORITIES[2],
+    parentKey: "",
+  };
+};
 
 export const toKanbanFormValues = (task: KanbanTask): KanbanTaskFormValues => ({
   title: task.title,
@@ -168,7 +179,9 @@ export const toKanbanFormValues = (task: KanbanTask): KanbanTaskFormValues => ({
   dueDate: task.dueDate,
   startDate: task.startDate,
   assignee: task.assignee,
+  assigneeId: "",
   priority: task.priority,
+  parentKey: task.parentKey || "",
 });
 
 export const getKanbanColumnHeight = (taskCount: number) => {
@@ -187,9 +200,10 @@ export const getKanbanColumnHeight = (taskCount: number) => {
 
 export const getKanbanBoardHeight = (
   tasksByColumn: Record<KanbanColumnId, KanbanTask[]>,
+  columns: KanbanColumnConfig[] = KANBAN_COLUMNS,
 ) => {
   const maxColumnHeight = Math.max(
-    ...KANBAN_COLUMNS.map((column) =>
+    ...columns.map((column) =>
       getKanbanColumnHeight(tasksByColumn[column.id].length),
     ),
   );

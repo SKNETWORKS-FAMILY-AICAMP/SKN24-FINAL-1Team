@@ -1,22 +1,30 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DocumentManagementPanel from "../../components/document/DocumentManagementPanel";
 import {
   ALL_DOCUMENT_FILTER,
   EMPTY_UPLOAD_DATE_FILTER,
 } from "../../constants/documentManagement";
-import { useDocumentManagement } from "../../context/DocumentManagementContext";
+import { useAuth } from "../../context/AuthContext";
+import { deleteDocument, getDocuments } from "../../services/documents";
 import type { DocumentRecord } from "../../types/documentManagement";
 
 function downloadDocumentFile(item: DocumentRecord) {
+  if (item.fileUrl) {
+    const link = document.createElement("a");
+    link.href = item.fileUrl;
+    link.download = item.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    return;
+  }
+
   const blob =
     item.file ??
-    new Blob(
-      [`${item.name}\n생성자: ${item.creator}\n업로드 날짜: ${item.uploadedAt}`],
-      {
-        type: "text/plain;charset=utf-8",
-      },
-    );
+    new Blob([`${item.name}\n생성자: ${item.creator}\n업로드 날짜: ${item.uploadedAt}`], {
+      type: "text/plain;charset=utf-8",
+    });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -29,11 +37,30 @@ function downloadDocumentFile(item: DocumentRecord) {
 
 export default function DocumentManagementPage() {
   const navigate = useNavigate();
-  const { documents, deleteDocuments } = useDocumentManagement();
+  const { projectId } = useAuth();
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [query, setQuery] = useState("");
   const [creatorFilter, setCreatorFilter] = useState(ALL_DOCUMENT_FILTER);
   const [uploadDateFilter, setUploadDateFilter] = useState(EMPTY_UPLOAD_DATE_FILTER);
+
+  const loadDocuments = useCallback(async () => {
+    if (!projectId) {
+      setDocuments([]);
+      return;
+    }
+
+    try {
+      const data = await getDocuments(projectId);
+      setDocuments(data);
+    } catch {
+      setDocuments([]);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void loadDocuments();
+  }, [loadDocuments]);
 
   const creators = useMemo(
     () => [ALL_DOCUMENT_FILTER, ...Array.from(new Set(documents.map((item) => item.creator)))],
@@ -95,9 +122,14 @@ export default function DocumentManagementPage() {
     });
   };
 
-  const deleteSelected = () => {
-    deleteDocuments(selectedIds);
+  const deleteSelected = async () => {
+    if (!projectId || selectedIds.size === 0) return;
+
+    await Promise.all(
+      Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
+    );
     setSelectedIds(new Set());
+    await loadDocuments();
   };
 
   const downloadSelected = () => {
@@ -119,8 +151,7 @@ export default function DocumentManagementPage() {
           uploadDateFilter={uploadDateFilter}
           uploadDates={uploadDates}
           onCreatorFilterChange={setCreatorFilter}
-          onDeleteSelected={deleteSelected}
-          onDownloadDocument={downloadDocumentFile}
+          onDeleteSelected={() => void deleteSelected()}
           onDownloadSelected={downloadSelected}
           onOpenUpload={() => navigate("/documents/upload")}
           onQueryChange={setQuery}
