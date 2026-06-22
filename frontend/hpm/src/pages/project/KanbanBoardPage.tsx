@@ -90,18 +90,27 @@ const jiraBoardToTasks = (board: ProjectJiraBoard, columns: KanbanColumnConfig[]
   );
 };
 
+const getApiErrorMessage = (error: unknown) => {
+  const data = (error as { response?: { data?: { error?: string; detail?: string } } }).response?.data;
+  return data?.error || data?.detail || "Failed to load Jira board.";
+};
+
 export default function KanbanBoardPage() {
   const { projectId, projectName } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [boardColumns, setBoardColumns] = useState<KanbanColumnConfig[]>(KANBAN_COLUMNS);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [modal, setModal] = useState<KanbanModalState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!projectId) {
       setTasks([]);
       setBoardColumns(KANBAN_COLUMNS);
+      setLoading(false);
+      setError(null);
       return;
     }
 
@@ -118,6 +127,7 @@ export default function KanbanBoardPage() {
         console.error("Jira 칸반 조회 실패:", error);
         setBoardColumns(KANBAN_COLUMNS);
         setTasks([]);
+        setError(getApiErrorMessage(error));
       })
       .finally(() => {
         setLoading(false);
@@ -286,6 +296,16 @@ export default function KanbanBoardPage() {
             {projectName || "Jira 칸반"}
           </h1>
         </section>
+        {loading ? (
+          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#623FB5]">
+            Loading Jira board...
+          </div>
+        ) : null}
+        {error ? (
+          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#B42318]">
+            {error}
+          </div>
+        ) : null}
         {boardColumns.map((column) => (
           <KanbanColumn
             key={column.id}
