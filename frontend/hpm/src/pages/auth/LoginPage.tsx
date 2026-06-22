@@ -42,7 +42,7 @@ const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
     const res = await api.post("/users/login/", { email, password });
     login(res.data);
 
-    if (res.data.is_initial_password==0) {
+    if (res.data.account_status === 0) {
       navigate("/change-password");
     } else {
       navigate("/projects");
