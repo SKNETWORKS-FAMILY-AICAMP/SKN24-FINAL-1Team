@@ -143,6 +143,12 @@ def project_list(request):
 
     # POST - 프로젝트 생성
     data = request.data
+    jira_project_key = data.get("jira_project_key") or None
+    if jira_project_key and Project.objects.filter(jira_project_key=jira_project_key).exists():
+        return Response(
+            {"error": "이미 해당 Jira 프로젝트와 연결된 프로젝트가 있습니다."},
+            status=status.HTTP_409_CONFLICT,
+        )
     try:
         owner = Users.objects.get(pk=user_id)
     except Users.DoesNotExist:
@@ -151,7 +157,7 @@ def project_list(request):
     project = Project.objects.create(
         project_owner=owner,
         project_name=data.get("project_name", ""),
-        jira_project_key=data.get("jira_project_key") or None,
+        jira_project_key=jira_project_key,
     )
     # 생성자를 구성원으로 자동 추가
     ProjectUsers.objects.get_or_create(project=project, user=owner)
