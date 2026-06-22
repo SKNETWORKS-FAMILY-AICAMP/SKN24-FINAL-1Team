@@ -18,48 +18,15 @@ import type {
   KanbanPriority,
   KanbanTask,
 } from "../../types/kanban";
-import { getJiraBoard } from "../../services/jira";
-import type { JiraBoard } from "../../services/jira";
 
-const PRIORITY_MAP: Record<string, KanbanPriority> = {
-  Highest: "매우 높음",
-  High: "높음",
-  Medium: "중간",
-  Low: "낮음",
-  Lowest: "매우 낮음",
-};
+const mapJiraPriority = (priority?: string): KanbanPriority => {
+  const normalized = (priority ?? "").toLowerCase();
 
-function jiraBoardToTasks(board: JiraBoard): KanbanTask[] {
-  const tasks: KanbanTask[] = [];
-  let id = 1;
-
-  (Object.keys(board) as KanbanColumnId[]).forEach((columnId) => {
-    board[columnId].forEach((issue) => {
-      tasks.push({
-        id: id++,
-        columnId,
-        title: issue.title,
-        description: "",
-        category: "서비스 기획",
-        dueDate: issue.due_date ?? "",
-        startDate: "",
-        assignee: issue.assignee,
-        priority: PRIORITY_MAP[issue.priority] ?? "중간",
-        code: issue.issue_key,
-        owner: issue.assignee,
-      });
-    });
-  });
-
-  return tasks;
-}
-
-const mapJiraPriority = (priority: string): KanbanPriority => {
-  const normalized = priority.toLowerCase();
   if (normalized.includes("highest")) return KANBAN_PRIORITIES[4];
   if (normalized.includes("high")) return KANBAN_PRIORITIES[3];
   if (normalized.includes("lowest")) return KANBAN_PRIORITIES[0];
   if (normalized.includes("low")) return KANBAN_PRIORITIES[1];
+
   return KANBAN_PRIORITIES[2];
 };
 
@@ -71,11 +38,11 @@ const jiraBoardToTasks = (board: ProjectJiraBoard): KanbanTask[] => {
       id: nextId++,
       columnId: column.id,
       title: issue.title,
-      description: issue.description,
+      description: issue.description ?? "",
       category: KANBAN_CATEGORIES[2],
       dueDate: issue.due_date || "",
       startDate: issue.created ? issue.created.slice(0, 10) : "",
-      assignee: issue.assignee,
+      assignee: issue.assignee || "-",
       priority: mapJiraPriority(issue.priority),
       code: issue.issue_key,
       owner: issue.assignee || "-",
@@ -91,29 +58,26 @@ export default function KanbanBoardPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getJiraBoard()
-      .then((board) => {
-        setTasks(jiraBoardToTasks(board));
-      })
-      .catch(() => {
-        setError("Jira 보드를 불러오지 못했습니다.");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
     if (!projectId) {
       setTasks([]);
+      setLoading(false);
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     getProjectJiraBoard(projectId)
-      .then((board) => setTasks(jiraBoardToTasks(board)))
+      .then((board) => {
+        setTasks(jiraBoardToTasks(board));
+      })
       .catch((error) => {
         console.error("Jira 칸반 조회 실패:", error);
+        setError("Jira 보드를 불러오지 못했습니다.");
         setTasks([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [projectId]);
 
@@ -166,6 +130,7 @@ export default function KanbanBoardPage() {
 
     setTasks((current) => {
       const nextId = Math.max(0, ...current.map((task) => task.id)) + 1;
+
       return [
         ...current,
         {
@@ -183,6 +148,7 @@ export default function KanbanBoardPage() {
         },
       ];
     });
+
     closeModal();
   };
 
@@ -216,6 +182,7 @@ export default function KanbanBoardPage() {
             {projectName || "Jira 칸반"}
           </h1>
         </section>
+
         {KANBAN_COLUMNS.map((column) => (
           <KanbanColumn
             key={column.id}

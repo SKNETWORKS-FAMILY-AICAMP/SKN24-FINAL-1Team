@@ -5,7 +5,7 @@ import ServiceLogo from "../../components/ui/ServiceLogo";
 import { changePassword } from "../../services/users";
 import * as DESIGN from "../../constants/design";
 import Input from "../../components/ui/Input";
-import Button from "../../components/ui/button";
+import Button from "../../components/ui/Button";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
