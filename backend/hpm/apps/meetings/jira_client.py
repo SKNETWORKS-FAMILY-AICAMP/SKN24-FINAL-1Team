@@ -154,9 +154,17 @@ def get_jira_issues(access_token : str, cloud_id: str, project_key : str) -> dic
         
 
 
-def update_jira_issue_status(issue_key: str, column_id: str, access_token: str, cloud_id: str) -> dict:
+def update_jira_issue_status(
+    issue_key: str,
+    column_id: str,
+    access_token: str,
+    cloud_id: str,
+    target_status_names: list[str] | None = None,
+) -> dict:
 
     transition_name = COLUMN_TO_TRANSITION_NAME.get(column_id)
+    if not transition_name and target_status_names:
+        transition_name = target_status_names[0]
     if not transition_name:
         return {"success" : False, "error" : f"알 수 없는 column_id: {column_id}"}
     
@@ -176,11 +184,8 @@ def update_jira_issue_status(issue_key: str, column_id: str, access_token: str, 
     except requests.RequestException as e:
         return {"success" : False, "error" : f"transition 조회 실패: {str(e)}"}
     
-    desired_names = {
-        name.lower()
-        for name in COLUMN_TO_STATUS_NAMES.get(column_id, [transition_name])
-        if name
-    }
+    status_names = target_status_names or COLUMN_TO_STATUS_NAMES.get(column_id, [transition_name])
+    desired_names = {name.lower() for name in status_names if name}
     transition_id = None
     for t in transitions:
         transition_label = (t.get("name") or "").lower()

@@ -1,4 +1,4 @@
-export type KanbanColumnId = "todo" | "progress" | "review" | "done";
+export type KanbanColumnId = string;
 
 export type KanbanPriority = "매우 낮음" | "낮음" | "중간" | "높음" | "매우 높음";
 
@@ -39,6 +39,7 @@ export interface KanbanColumnConfig {
   label: string;
   left: number;
   height: number;
+  statusNames?: string[];
 }
 
 export interface KanbanModalState {
