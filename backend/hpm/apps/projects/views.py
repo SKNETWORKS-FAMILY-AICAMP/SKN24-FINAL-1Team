@@ -1,4 +1,5 @@
 import requests
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -42,6 +43,59 @@ DEFAULT_JIRA_COLUMNS = [
         "status_names": ["Done", "완료"],
     },
 ]
+
+
+RANK_PRIORITY = [
+    "회장",
+    "대표",
+    "대표이사",
+    "사장",
+    "부사장",
+    "전무",
+    "상무",
+    "이사",
+    "본부장",
+    "실장",
+    "팀장",
+    "부장",
+    "차장",
+    "과장",
+    "대리",
+    "주임",
+    "사원",
+    "인턴",
+]
+
+
+def _user_rank_sort_key(user):
+    rank_name = user.rank.rank_name
+    try:
+        priority = RANK_PRIORITY.index(rank_name)
+    except ValueError:
+        priority = len(RANK_PRIORITY)
+
+    return (priority, user.rank_id or 9999, user.name)
+
+
+def _project_card_data(project):
+    project_members = list(
+        ProjectUsers.objects.filter(project=project)
+        .select_related("user", "user__rank")
+    )
+    users_by_id = {member.user_id: member.user for member in project_members}
+    users_by_id.setdefault(project.project_owner_id, project.project_owner)
+    members = sorted(users_by_id.values(), key=_user_rank_sort_key)
+
+    return {
+        **ProjectSerializer(project).data,
+        "startDate": f"{timezone.localtime(project.created_at).strftime('%Y.%m.%d')} ~",
+        "members": [
+            f"{member.name}(생성자)"
+            if member.users_id == project.project_owner_id
+            else member.name
+            for member in members
+        ],
+    }
 
 
 def _status_name_map(access_token, cloud_id):
@@ -137,9 +191,14 @@ def project_list(request):
     if request.method == "GET":
         owned = Project.objects.filter(project_owner_id = user_id)
         joined = Project.objects.filter(projectusers__user_id=user_id)
-        qs = (owned | joined).distinct().order_by("-created_at")
+        qs = (
+            (owned | joined)
+            .distinct()
+            .select_related("project_owner", "project_owner__rank")
+            .order_by("-created_at")
+        )
 
-        return Response(ProjectSerializer(qs, many=True).data)
+        return Response([_project_card_data(project) for project in qs])
 
     # POST - 프로젝트 생성
     data = request.data
@@ -383,6 +442,8 @@ def project_detail(request, project_id):
 
         return Response(ProjectSerializer(project).data)
 
-    # DELETE
+    if project.project_owner_id != request.auth["user_id"]:
+        return Response({"error": "프로젝트 생성자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
     project.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)

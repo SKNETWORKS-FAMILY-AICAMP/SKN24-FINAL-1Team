@@ -15,4 +15,5 @@ export interface AuthContextType {
   login: (user: User) => void;
   logout: () => void;
   selectProject: (id: number, name: string) => void;
+  clearProject: () => void;
 }
