@@ -17,9 +17,8 @@ const DUMMY_RECIPIENTS_INIT = [
 const MAX_GREETING = 200;
 
 export default function MeetingInviteEmailPage() {
-  const { id } = useParams();
+  useParams();
   const navigate = useNavigate();
-  const meetingId = Number(id);
 
   const [greeting, setGreeting] = useState(
     "안녕하세요.\n아래와 같이 회의를 진행하고자 하오니 참석 부탁드립니다.\n감사합니다."

@@ -46,7 +46,7 @@ export default function ChangePasswordPage() {
     setLoading(true);
     try {
       const updatedUser = await changePassword(user!.user_id, next);
-      login({ ...user!, ...updatedUser, is_initial_password: false });
+      login({ ...user!, ...updatedUser, account_status: 1 });
       navigate("/projects");
     } catch {
       setError("비밀번호 변경에 실패했습니다.");

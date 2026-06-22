@@ -188,7 +188,7 @@ export default function MeetingListPage() {
   const { projectId } = useAuth();
 
   const [meetings, setMeetings] = useState<Meeting[]>(MOCK_MEETINGS);
-  const [loading, setLoading] = useState(false);
+  const loading = false;
 
   // 필터 관련 상태들
   const [search, setSearch] = useState("");

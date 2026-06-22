@@ -25,10 +25,7 @@ const DUMMY = {
 export default function PrepMaterialPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false } =
-    (location.state as { showAgenda?: boolean }) ?? {};
 
   const contentRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(false);

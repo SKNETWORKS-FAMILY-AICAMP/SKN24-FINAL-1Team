@@ -52,12 +52,13 @@ export interface AgendaItem {
 
 export interface Task {
   meeting_task_id: number;
+  meeting_id?: number;
   title: string;
-  content: string;
+  content?: string;
   owner: string;
   due_date: string | null;
   priority: string;
-  status: number;
+  status?: number;
   is_jira_synced?: boolean;
   jira_key?: string;
 }
@@ -273,17 +274,44 @@ export interface JiraBoardIssue {
   due_date: string;
   created: string;
   status: string;
+  parent_key?: string;
+  parent_title?: string;
+  issue_type?: string;
+  issue_type_icon_url?: string;
+  issue_type_hierarchy_level?: number | null;
+}
+
+export interface JiraBoardColumn {
+  id: string;
+  label: string;
+  status_ids: string[];
+  status_names: string[];
 }
 
 export interface ProjectJiraBoard {
-  todo: JiraBoardIssue[];
-  progress: JiraBoardIssue[];
-  review: JiraBoardIssue[];
-  done: JiraBoardIssue[];
+  columns: JiraBoardColumn[];
+  issues: Record<string, JiraBoardIssue[]>;
 }
 
 export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
   const res = await api.get(`/projects/${projectId}/jira-board/`);
+  return res.data;
+};
+
+export const createProjectJiraIssue = async (
+  projectId: number,
+  data: {
+    title: string;
+    description?: string;
+    due_date?: string;
+    priority?: string;
+    column_id?: string;
+    target_status_names?: string[];
+    assignee_user_id?: number;
+    parent_key?: string;
+  },
+): Promise<{ success: boolean; issue_key: string; column_id: string }> => {
+  const res = await api.post(`/projects/${projectId}/jira-board/`, data);
   return res.data;
 };
 
