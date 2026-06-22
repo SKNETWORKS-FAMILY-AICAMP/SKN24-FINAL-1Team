@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMeeting, getUserList, getJiraStatus } from "../../services/meeting";
+import { createMeeting, getUserList } from "../../services/meeting";
 import { useAuth } from "../../context/AuthContext";
 import * as DESIGN from "../../constants/design";
 import Button from "../../components/ui/Button";
@@ -18,23 +18,15 @@ export default function MeetingCreatePage() {
   const [users, setUsers] = useState<UserOption[]>([]);
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
-  const [meetingDate, setMeetingDate] = useState(() => {
-    return new Date().toISOString().split("T")[0];
-  });
-  const [meetingTime, setMeetingTime] = useState(() => {
-    return new Date().toTimeString().split(" ")[0].slice(0, 5);
-  });
+  const [meetingDate, setMeetingDate] = useState("");
+  const [meetingTime, setMeetingTime] = useState("");
   const [participants, setParticipants] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [createdMeetingId, setCreatedMeetingId] = useState<number | null>(null);
   const [showJiraModal, setShowJiraModal] = useState(false);
-  const [showSelectModal, setShowSelectModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [selectAgenda, setSelectAgenda] = useState(true);
-  const [selectPrepMaterial, setSelectPrepMaterial] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,30 +60,31 @@ export default function MeetingCreatePage() {
   };
 
   const handleCreateMeeting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit || submitting) return;
-    
-    setSubmitting(true);
-    try {
-      const combinedDateTime = `${meetingDate}T${meetingTime}:00`;
-      const meeting = await createMeeting({
-        project_id: projectId ?? 1,
-        title,
-        location,
-        meeting_at: combinedDateTime,
-        participants,
-      });
-      setCreatedMeetingId(meeting.meeting_id);
+  e.preventDefault();
 
-      const { connected } = await getJiraStatus().catch(() => ({ connected: true }));
-      if (!connected) {
-        setShowJiraModal(true);
-      } else {
-        setShowSelectModal(true);
-      }
-    } catch (e) {
-      console.error(e);
-      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "회의 생성에 실패했습니다.";
+  if (!canSubmit || submitting) return;
+
+  setSubmitting(true);
+
+  try {
+    const combinedDateTime = `${meetingDate}T${meetingTime}:00`;
+
+    const meeting = await createMeeting({
+      project_id: projectId ?? 1,
+      title,
+      location,
+      meeting_at: combinedDateTime,
+      participants,
+    });
+
+    navigate(`/meetings/${meeting.meeting_id}`);
+  } catch (e) {
+    console.error(e);
+
+      const msg =
+        (e as { response?: { data?: { error?: string } } })
+          .response?.data?.error ?? "회의 생성에 실패했습니다.";
+
       setErrorMessage(msg);
       setShowErrorModal(true);
     } finally {
@@ -101,8 +94,11 @@ export default function MeetingCreatePage() {
 
   const filteredUsers = users.filter(
     u =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase())
+      u.users_id !== user?.users_id &&
+      (
+        u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email.toLowerCase().includes(searchQuery.toLowerCase())
+      )
   );
 
   // 날짜 제약 추가
@@ -127,23 +123,9 @@ export default function MeetingCreatePage() {
       window.open(`${import.meta.env.VITE_API_BASE_URL}/jira/start/?user_id=${currentUserId}`, "_blank");
     }
     setShowJiraModal(false);
-    setShowSelectModal(true);
   };
 
-  const handleSelectConfirm = () => {
-    setShowSelectModal(false);
-    navigate(`/meetings/${createdMeetingId}/upload`, {
-      state: { showAgenda: selectAgenda, showPrepMaterial: selectPrepMaterial },
-    });
-  };
 
-  const handleSelectSkip = () => {
-    setShowSelectModal(false);
-    // 건너뛰기(기초 안건/회의 준비 자료 모두 숨김)
-    navigate(`/meetings/${createdMeetingId}`, {
-      state: { showAgenda: false, showPrepMaterial: false },
-    });
-  };
 
   return (
 <div className="max-w-4xl mx-auto w-full min-h-[calc(100vh-120px)] flex flex-col justify-center items-center">
@@ -187,74 +169,8 @@ export default function MeetingCreatePage() {
             </div>
             <div className="border-t border-gray-200">
               <button
-                onClick={() => { setShowJiraModal(false); setShowSelectModal(true); }}
+                onClick={() => { setShowJiraModal(false); }}
                 className={`w-full py-4 text-center ${DESIGN.FONT_SIZES.md} font-bold ${DESIGN.COLORS.black} hover:bg-gray-50 transition`}
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/*자료 선택 */}
-      {showSelectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-2xl w-[420px] shadow-xl p-8">
-            <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} leading-relaxed mb-6`}>
-              생성하실 자료를 선택해주세요<br />
-              <span className={`${DESIGN.COLORS.gray}`}>필요하지 않다면 바로 넘어갈 수 있어요.</span>
-            </p>
-            <div className="flex flex-col gap-4 mb-8">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectAgenda}
-                  onChange={e => setSelectAgenda(e.target.checked)}
-                  className="hidden"
-                />
-                <div
-                  className={`w-5 h-5 rounded flex items-center justify-center border-2 transition flex-shrink-0
-                    ${selectAgenda ? "bg-[#623FB5] border-[#623FB5]" : "border-gray-300 bg-white"}`}
-                >
-                  {selectAgenda && (
-                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                      <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-                <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black}`}>기초 안건</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={selectPrepMaterial}
-                  onChange={e => setSelectPrepMaterial(e.target.checked)}
-                  className="hidden"
-                />
-                <div
-                  className={`w-5 h-5 rounded flex items-center justify-center border-2 transition flex-shrink-0
-                    ${selectPrepMaterial ? "bg-[#623FB5] border-[#623FB5]" : "border-gray-300 bg-white"}`}
-                >
-                  {selectPrepMaterial && (
-                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
-                      <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-                <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black}`}>회의 준비 자료</span>
-              </label>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={handleSelectSkip}
-                className="px-5 py-2.5 bg-[#623FB5] text-white text-sm rounded-lg hover:opacity-90"
-              >
-                건너 뛰기
-              </button>
-              <button
-                onClick={handleSelectConfirm}
-                className="px-5 py-2.5 bg-[#623FB5] text-white text-sm rounded-lg hover:opacity-90"
               >
                 확인
               </button>
@@ -286,7 +202,7 @@ export default function MeetingCreatePage() {
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 maxLength={30}
-                placeholder="AI 매칭 엔진 고도화 및 프로젝트 진행 상황 점검 회의"
+                placeholder="회의 주제를 입력해주세요"
                 className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
                 required
               />
@@ -305,7 +221,7 @@ export default function MeetingCreatePage() {
                 value={location}
                 onChange={e => setLocation(e.target.value)}
                 maxLength={50}
-                placeholder="3층 회의실 A"
+                placeholder="회의 장소를 입력해주세요"
                 className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
               />
               <p className={`text-right mt-1.5 ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>{location.length}/50</p>
@@ -321,8 +237,8 @@ export default function MeetingCreatePage() {
               <input
                 type="date"
                 value={meetingDate}
-                min={todayDate} // 날짜 제약 추가
-                onChange={e => setMeetingDate(e.target.value)}
+                min={todayDate}
+                onChange={(e) => setMeetingDate(e.target.value)}
                 className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] transition`}
                 required
               />
@@ -352,7 +268,9 @@ export default function MeetingCreatePage() {
               onClick={() => setShowDropdown(v => !v)}
               className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} p-2.5 min-h-[48px] flex flex-wrap gap-2 items-center cursor-pointer`}
             >
-              {participants.map(id => {
+              {participants  
+              .filter(id => id !== user?.users_id)
+              .map(id => {
                 const u = users.find(user => user.users_id === id);
                 if (!u) return null;
                 return (

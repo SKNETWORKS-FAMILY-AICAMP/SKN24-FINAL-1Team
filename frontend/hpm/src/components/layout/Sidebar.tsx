@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../../assets/sidebar/logo.png";
 import dashboard from "../../assets/sidebar/dashboard.png";
@@ -9,7 +8,6 @@ import hamburgerIcon from "../../assets/sidebar/hamburger.png";
 import * as DESIGN from "../../constants/design";
 import ProjectDropdown from "./ProjectDropdown";
 import MeetingDropdown from "./MeetingDropdown";
-import { useRecording } from "../../context/RecordingContext";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -19,31 +17,8 @@ interface SidebarProps {
 export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { meetingId: recMeetingId, startTime: recStartTime } = useRecording();
 
   const isActive = (path: string) => location.pathname.startsWith(path);
-
-  // 미니 타이머 표시
-  const isOnRecordingPage =
-    recMeetingId !== null &&
-    location.pathname === `/meetings/${recMeetingId}`;
-  const showMiniTimer = recMeetingId !== null && !isOnRecordingPage;
-
-  const [miniElapsed, setMiniElapsed] = useState(0);
-  useEffect(() => {
-    if (!showMiniTimer || recStartTime === null) {
-      setMiniElapsed(0);
-      return;
-    }
-    setMiniElapsed(Math.floor((Date.now() - recStartTime) / 1000));
-    const interval = setInterval(() => {
-      setMiniElapsed(Math.floor((Date.now() - recStartTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [showMiniTimer, recStartTime]);
-
-  const fmtTime = (s: number) =>
-    `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
     <aside
@@ -63,8 +38,13 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         </div>
       ) : (
         <div className="relative flex flex-col items-center justify-center mt-[20px] mb-8">
-          <img src={logo} alt="" />
-          <p className={`${DESIGN.FONT_SIZES.sm} mt-1`}>회의피하지마</p>
+          <img
+            src={logo}
+            alt="logo"
+            className="cursor-pointer"
+            onClick={() => navigate("/dashboard")}
+          />
+          <p onClick={() => navigate("/dashboard")} className={`${DESIGN.FONT_SIZES.sm} mt-1`}>회의피하지마</p>
           <button
             onClick={toggleCollapse}
             className="absolute top-1 right-3 p-1 hover:bg-white/10 rounded transition"
@@ -128,19 +108,6 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
             <span>구성원 관리</span>
           </button>
         </nav>
-      )}
-
-      {/* 녹음 중 미니 타이머(사이드바 최하단 고정) */}
-      {showMiniTimer && (
-        <button
-          onClick={() => navigate(`/meetings/${recMeetingId}`)}
-          className="mt-auto mb-5 w-full flex justify-center group"
-          title="녹음 중인 회의로 돌아가기"
-        >
-          <span className="font-bold tabular-nums text-[22px] leading-none transition-colors duration-200 group-hover:text-[#C4B5F5] text-white">
-            {fmtTime(miniElapsed)}
-          </span>
-        </button>
       )}
     </aside>
   );

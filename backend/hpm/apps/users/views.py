@@ -1,4 +1,6 @@
 import hashlib
+import base64
+import json
 
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -39,6 +41,52 @@ JIRA_SCOPES = "read:jira-work write:jira-work manage:jira-project offline_access
 
 def _hash_pw(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _is_safe_frontend_path(path: str | None) -> bool:
+    return bool(path) and path.startswith("/") and not path.startswith("//") and "\r" not in path and "\n" not in path
+
+
+def _encode_jira_state(user_id: str, next_path: str | None = None) -> str:
+    payload = {"user_id": str(user_id)}
+    if _is_safe_frontend_path(next_path):
+        payload["next"] = next_path
+
+    raw = json.dumps(payload, separators=(",", ":")).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _decode_jira_state(state: str | None) -> tuple[str, str]:
+    if not state:
+        return "", ""
+
+    # Backward compatibility: older links used state=user_id.
+    if str(state).isdigit():
+        return str(state), ""
+
+    try:
+        padded = state + "=" * (-len(state) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    except Exception:
+        return "", ""
+
+    user_id = str(payload.get("user_id") or "")
+    next_path = payload.get("next") or ""
+    return user_id, next_path if _is_safe_frontend_path(next_path) else ""
+
+
+def _jira_redirect(next_path: str = "", result: str = "success"):
+    if _is_safe_frontend_path(next_path):
+        separator = "&" if "?" in next_path else "?"
+        return redirect(f"{FRONTEND_URL}{next_path}{separator}jira={result}")
+
+    return redirect(f"{FRONTEND_URL}/projects/create?jira={result}")
+
+
+def _password_matches(user: Users, raw: str) -> bool:
+    return (
+        raw == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD
+    ) or user.password == _hash_pw(raw)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken()
@@ -167,6 +215,16 @@ def user_detail(request, users_id):
     # 비밀번호 변경
     new_pw = request.data.get("password")
     if new_pw:
+        if len(new_pw) < 6:
+            return Response({"error": "password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.account_status != 0:
+            current_pw = request.data.get("current_password", "")
+            if not current_pw:
+                return Response({"error": "current_password is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not _password_matches(user, current_pw):
+                return Response({"error": "current_password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
+
         user.password = _hash_pw(new_pw)
         user.account_status = 1
 
@@ -182,13 +240,14 @@ def jira_oauth_start(request):
     if not user_id:
         return redirect(f"{FRONTEND_URL}/projects/create?jira=error&reason=not_logged_in")
 
+    state = _encode_jira_state(user_id, request.GET.get("next"))
     auth_url = (
         "https://auth.atlassian.com/authorize"
         f"?audience=api.atlassian.com"
         f"&client_id={JIRA_CLIENT_ID}"
         f"&scope={JIRA_SCOPES.replace(' ', '%20')}"
         f"&redirect_uri={JIRA_REDIRECT_URI}"
-        f"&state={user_id}"
+        f"&state={state}"
         f"&response_type=code"
         f"&prompt=login%20consent"
     )
@@ -203,8 +262,12 @@ def jira_oauth_callback(request):
     code = request.GET.get("code")
     user_id = request.GET.get("state")  # start에서 넣었던 user_id
 
+    state_user_id, next_path = _decode_jira_state(request.GET.get("state"))
+    if state_user_id:
+        user_id = state_user_id
+
     if not code or not user_id or not str(user_id).isdigit():
-        return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
+        return _jira_redirect(next_path, "error")
     
     # code → access_token 교환
     token_response = requests.post(
@@ -221,7 +284,7 @@ def jira_oauth_callback(request):
     )
 
     if not token_response.ok:
-        return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
+        return _jira_redirect(next_path, "error")
 
     token_data = token_response.json()
     access_token = token_data.get("access_token")
@@ -255,9 +318,9 @@ def jira_oauth_callback(request):
             "jira_cloud_id",
         ])
     except (Users.DoesNotExist, ValueError):
-        return redirect(f"{FRONTEND_URL}/projects/create?jira=error")
+        return _jira_redirect(next_path, "error")
 
-    return redirect(f"{FRONTEND_URL}/projects/create?jira=success")
+    return _jira_redirect(next_path, "success")
 
 # ── 토큰 갱신 ─────────────────────────────────────────────────────────────
 def refresh_jira_token(user: Users) -> bool:

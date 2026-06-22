@@ -31,7 +31,7 @@ export default function Input({
       <input
         id={id}
         {...props}
-        className={`w-full ${DESIGN.PADDING_SIZES.sm} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.FONT_SIZES[size]} ${inputClassName} ${error ? DESIGN.BORDER_COLORS.purple : ""}`}
+        className={`w-full ${DESIGN.PADDING_SIZES.sm} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.FONT_SIZES[size]} focus:border-[#623FB5] focus:outline-none ${inputClassName} ${error ? DESIGN.BORDER_COLORS.purple : ""}`}
       />
       <div className="relative">
         {error && <p className={`${DESIGN.COLORS.purple} ${DESIGN.FONT_SIZES.md} ml-1 absolute ${DESIGN.MARGIN_TOP_SIZES.sm}`}>{error}</p>}

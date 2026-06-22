@@ -332,6 +332,10 @@ export const addProjectMembers = async (projectId: number, memberIds: number[]):
   await api.patch(`/projects/${projectId}/`, { add_member_ids: memberIds });
 };
 
+export const deleteProject = async (projectId: number): Promise<void> => {
+  await api.delete(`/projects/${projectId}/`);
+};
+
 export const createProject = async (data: { name: string; description: string }) => {
   const res = await api.post("/projects/", data);
   return res.data;
