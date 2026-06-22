@@ -33,9 +33,6 @@ export default function MeetingCreatePage() {
     getUserList()
       .then(list => {
         setUsers(list);
-        if (list.length > 0) {
-          setParticipants([list[0].users_id]);
-        }
       })
       .catch(console.error);
   }, []);
@@ -94,7 +91,8 @@ export default function MeetingCreatePage() {
 
   const filteredUsers = users.filter(
     u =>
-      u.users_id !== user?.users_id &&
+      u.users_id !== Number(user?.users_id) &&
+      u.users_id !== Number(user?.user_id) &&
       (
         u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         u.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -115,7 +113,7 @@ export default function MeetingCreatePage() {
   };
 
   // 활성화 제약 추가
-  const canSubmit = title.trim().length >= 1 && meetingDate && meetingTime && participants.length >= 2 && !isPastDateTime();
+  const canSubmit = title.trim().length >= 1 && meetingDate && meetingTime && participants.length >= 1 && !isPastDateTime();
 
   const handleJiraLink = () => {
     const currentUserId = user?.users_id ?? user?.user_id;

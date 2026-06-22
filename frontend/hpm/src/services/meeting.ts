@@ -76,6 +76,10 @@ export interface Meeting {
   participants?: { user_id: number; name: string }[];
   agenda?: AgendaItem[];
   tasks?: Task[];
+  creator?: number;
+  is_paused?: boolean;
+  elapsed_seconds?: number;
+  creator_name?: string;
 }
 
 export interface MeetingCreatePayload {
@@ -169,6 +173,18 @@ export const endMeeting = async (meetingId: number, audio?: File): Promise<{ min
   return res.data;
 };
 
+export const pauseMeeting = async (meetingId: number): Promise<void> => {
+  await api.post(`/meetings/${meetingId}/pause/`);
+};
+
+export const resumeMeeting = async (meetingId: number): Promise<void> => {
+  await api.post(`/meetings/${meetingId}/resume/`);
+};
+
+export const deleteMeeting = async (meetingId: number): Promise<void> => {
+  await api.delete(`/meetings/${meetingId}/`);
+};
+
 // ── 기초 안건 ──────────────────────────────────────────────────────
 export const getAgendaList = async (meetingId: number): Promise<AgendaItem[]> => {
   const res = await api.get(`/meetings/${meetingId}/agenda/`);
@@ -216,7 +232,7 @@ export const registerJiraTasks = async (meetingId: number, taskIds: number[]): P
 
 // ── 챗봇 ─────────────────────────────────────────────────────────
 export const sendChatMessage = async (meetingId: number, query: string): Promise<{ answer: string; sources?: string[] }> => {
-  const res = await api.post("/chatbot/", { meeting_id: meetingId, query });
+  const res = await api.post(`/chat/${meetingId}/`, { question: query });
   return res.data;
 };
 
@@ -364,6 +380,11 @@ export interface MeetingPreparation {
   project_status: string | null;
   rule: string | null;
   effect: string | null;
+  sources?: {
+    document_id: number;
+    title: string;
+    file_url: string;
+  }[];
 }
 
 export const getPrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {

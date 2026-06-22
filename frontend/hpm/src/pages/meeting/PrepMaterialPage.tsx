@@ -288,7 +288,7 @@ export default function PrepMaterialPage() {
         <button
           onClick={async () => {
             await handleSave();
-            navigate(`/meetings/${meetingId}/complete`);
+            navigate(`/meetings/${meetingId}`);
           }}
           className="px-8 py-2.5 text-white text-[14px] rounded-lg transition"
           style={{ backgroundColor: "#623FB5" }}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMeetingList, type Meeting } from "../../services/meeting";
+import { getMeetingList, deleteMeeting, type Meeting } from "../../services/meeting";
 import { useAuth } from "../../context/AuthContext";
 import Table from "../../components/ui/Table";
 import type { TableColumn } from "../../components/ui/Table";
@@ -220,7 +220,7 @@ export default function MeetingListPage() {
   const filteredMeetings = useMemo(() => {
     return meetings.filter((m) => {
       // 검색어 필터 
-      const creatorName = m.participants?.[0]?.name || "";
+      const creatorName = m.creator_name || m.participants?.[0]?.name || "";
       const matchSearch =
         m.title.toLowerCase().includes(search.toLowerCase()) ||
         creatorName.toLowerCase().includes(search.toLowerCase());
@@ -283,14 +283,22 @@ export default function MeetingListPage() {
     setSelectedIds(next);
   };
 
-  // 선택된 회의록들 가상 삭제 처리
-  const handleDeleteSelected = () => {
+  // 선택된 회의록들 실제 삭제 처리
+  const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     if (window.confirm(`선택한 ${selectedIds.size}개의 회의를 삭제하시겠습니까?`)) {
-      setMeetings((prev) => prev.filter((m) => !selectedIds.has(m.meeting_id)));
-      setSelectedIds(new Set());
-      setPage(1);
-      alert("삭제되었습니다.");
+      try {
+        await Promise.all(
+          Array.from(selectedIds).map((meetingId) => deleteMeeting(meetingId))
+        );
+        setMeetings((prev) => prev.filter((m) => !selectedIds.has(m.meeting_id)));
+        setSelectedIds(new Set());
+        setPage(1);
+        alert("삭제되었습니다.");
+      } catch (err) {
+        console.error("회의 삭제 실패:", err);
+        alert("회의 삭제에 실패했습니다.");
+      }
     }
   };
 
@@ -337,9 +345,9 @@ export default function MeetingListPage() {
               navigate(`/meetings/${row.meeting_id}`);
             }
           }}
-          className="flex items-center text-start gap-1 font-semibold text-[#141414] hover:text-[#623FB5] transition-colors"
+          className="flex items-center text-start gap-1 font-medium text-[#141414] hover:text-[#623FB5] transition-colors"
         >
-          {row.title} <span className="text-[12px] text-gray-400 font-bold">&rsaquo;</span>
+          {row.title} <span className="text-[15px] text-gray-400 font-medium">&rsaquo;</span>
         </button>
       ),
     },
@@ -352,7 +360,7 @@ export default function MeetingListPage() {
     {
       key: "status",
       header: "상태",
-      width: "110px",
+      width: "130px",
       align: "center",
       render: (row) => {
         if (row.status === "scheduled") {
@@ -362,7 +370,7 @@ export default function MeetingListPage() {
                 e.stopPropagation();
                 navigate(`/meetings/${row.meeting_id}`, { state: { status: "scheduled" } });
               }}
-              className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-[#2196F3] text-white hover:opacity-80 transition cursor-pointer"
+              className="px-4 py-1 text-[15px] font-medium rounded-[5px] inline-block w-[92px] text-center bg-[#2196F3] text-white hover:opacity-80 transition cursor-pointer whitespace-nowrap"
             >
               예정
             </button>
@@ -375,14 +383,14 @@ export default function MeetingListPage() {
                 e.stopPropagation();
                 navigate(`/meetings/${row.meeting_id}`, { state: { status: "in_progress" } });
               }}
-              className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-[#623FB5] text-white hover:opacity-80 transition cursor-pointer"
+              className="px-4 py-1 text-[15px] font-medium rounded-[5px] inline-block w-[92px] text-center bg-[#623FB5] text-white hover:opacity-80 transition cursor-pointer whitespace-nowrap"
             >
               진행 중
             </button>
           );
         }
         return (
-          <span className="px-4 py-1 text-[12px] font-semibold rounded-[5px] inline-block w-[72px] text-center bg-gray-100 text-gray-500">
+          <span className="px-4 py-1 text-[15px] font-medium rounded-[5px] inline-block w-[92px] text-center bg-gray-100 text-gray-500 whitespace-nowrap">
             종료
           </span>
         );
@@ -393,7 +401,7 @@ export default function MeetingListPage() {
       header: "생성자",
       width: "100px",
       align: "center",
-      render: (row) => <span>{row.participants?.[0]?.name || "알수없음"}</span>,
+      render: (row) => <span>{row.creator_name || row.participants?.[0]?.name || "알수없음"}</span>,
     },
     {
       key: "date",
@@ -420,7 +428,7 @@ export default function MeetingListPage() {
           <div className="leading-relaxed text-[#141414]">
             <span className="break-keep">{shownNames}</span>
             {extraCount > 0 && (
-              <span className={`inline-block whitespace-nowrap ml-1.5 px-2 py-0.5 border border-gray-300 ${DESIGN.RADIUS_SIZES.xl} ${DESIGN.FONT_SIZES.sm} text-gray-500 font-semibold bg-[#F4F5F8] align-middle`}>
+              <span className={`inline-block whitespace-nowrap ml-1.5 px-2 py-0.5 border border-gray-300 ${DESIGN.RADIUS_SIZES.xl} ${DESIGN.FONT_SIZES.md} text-gray-500 font-medium bg-[#F4F5F8] align-middle`}>
                 +{extraCount}명
               </span>
             )}
@@ -431,10 +439,10 @@ export default function MeetingListPage() {
     {
       key: "email",
       header: "이메일 발송",
-      width: "140px",
+      width: "170px",
       align: "center",
       render: (row) => (
-        <Button onClick={(e) => handleSendEmail(e, row.title)}>
+        <Button className={`${DESIGN.FONT_SIZES.md} whitespace-nowrap`} onClick={(e) => handleSendEmail(e, row.title)}>
           이메일 발송
         </Button>
       ),
@@ -445,8 +453,8 @@ export default function MeetingListPage() {
     <div className="w-full flex flex-col py-6">
       {/* 타이틀 영역 */}
       <div className="mb-6">
-        <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold`}>회의 목록</h1>
-        <p className={`${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray} mt-1`}>
+        <h1 className={`${DESIGN.FONT_SIZES.h2} ${DESIGN.COLORS.black}`}>회의 목록</h1>
+        <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.gray} mt-1`}>
           회의를 등록하고 관리할 수 있습니다.
         </p>
       </div>
@@ -463,7 +471,7 @@ export default function MeetingListPage() {
               setPage(1);
             }}
             placeholder="회의 명이나 생성자를 입력해주세요"
-            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-12 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} pl-4 pr-12 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
           />
 
           <button
@@ -488,14 +496,14 @@ export default function MeetingListPage() {
           <div className="flex flex-wrap items-center gap-6">
             {/* 상태 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.black} font-semibold`}>상태</span>
+              <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>상태</span>
               <select
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
-                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none cursor-pointer focus:border-[#623FB5]`}
+                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none cursor-pointer focus:border-[#623FB5]`}
               >
                 <option value="all">전체</option>
                 <option value="scheduled">예정</option>
@@ -506,14 +514,14 @@ export default function MeetingListPage() {
 
             {/* 기간 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.black} font-semibold`}>기간</span>
+              <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>기간</span>
               <select
                 value={periodFilter}
                 onChange={(e) => {
                   setPeriodFilter(e.target.value);
                   setPage(1);
                 }}
-                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none cursor-pointer focus:border-[#623FB5]`}
+                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none cursor-pointer focus:border-[#623FB5]`}
               >
                 <option value="all">전체</option>
                 <option value="week">최근 1주일</option>
@@ -533,7 +541,7 @@ export default function MeetingListPage() {
                     setStartDate(e.target.value);
                     setPage(1);
                   }}
-                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none focus:border-[#623FB5]`}
+                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none focus:border-[#623FB5]`}
                 />
                 <span className="text-gray-400">-</span>
                 <input
@@ -543,20 +551,28 @@ export default function MeetingListPage() {
                     setEndDate(e.target.value);
                     setPage(1);
                   }}
-                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none focus:border-[#623FB5]`}
+                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none focus:border-[#623FB5]`}
                 />
               </div>
             )}
           </div>
 
-          {/* 삭제 버튼 */}
-          <Button
-            onClick={handleDeleteSelected}
-            disabled={selectedIds.size === 0}
-            className="px-6"
-          >
-            삭제
-          </Button>
+          {/* 회의 추가 및 삭제 버튼 영역 */}
+          <div className="flex gap-2">
+            <Button
+              onClick={() => navigate("/meetings/create")}
+              className={`px-6 bg-[#623FB5] hover:bg-[#50309c] text-white ${DESIGN.FONT_SIZES.md}`}
+            >
+              회의 추가 +
+            </Button>
+            <Button
+              onClick={handleDeleteSelected}
+              disabled={selectedIds.size === 0}
+              className={`px-6 ${DESIGN.FONT_SIZES.md}`}
+            >
+              삭제
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useRecording } from "../../context/RecordingContext";
+import { useAuth } from "../../context/AuthContext";
 import mikeImg from "../../assets/meeting/mike.png";
 import recordingImg from "../../assets/meeting/recording.png";
 import stopImg from "../../assets/meeting/stop.png";
 import {
   getMeetingDetail,
   startMeeting,
+  pauseMeeting,
+  resumeMeeting,
   endMeeting,
   sendChatMessage,
+  saveAgendaList,
+  getPrepMaterial,
+  savePrepMaterial,
   type Meeting,
+  type MeetingPreparation,
 } from "../../services/meeting";
 import * as DESIGN from "../../constants/design";
 
@@ -30,6 +37,8 @@ export default function MeetingDetailPage() {
   const initialStatus = isReturningToRecording || navStatus === "in_progress" ? "in_progress" : "scheduled";
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const { user } = useAuth();
+  const isCreator = Boolean(meeting && user && meeting.creator === user.users_id);
   const [elapsed, setElapsed] = useState(() =>
     isReturningToRecording && ctxStartTime !== null
       ? Math.floor((Date.now() - ctxStartTime) / 1000)
@@ -43,6 +52,18 @@ export default function MeetingDetailPage() {
   const [agendaOpen, setAgendaOpen] = useState(true);
   const [materialsOpen, setMaterialsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
+
+  const [isEditingAgenda, setIsEditingAgenda] = useState(false);
+  const [editedAgendas, setEditedAgendas] = useState<string[]>([]);
+
+  const [prepMaterial, setPrepMaterial] = useState<MeetingPreparation | null>(null);
+  const [isEditingPrep, setIsEditingPrep] = useState(false);
+  const [editedPrep, setEditedPrep] = useState({
+    purpose: "",
+    project_status: "",
+    rule: "",
+    effect: ""
+  });
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -72,8 +93,18 @@ export default function MeetingDetailPage() {
 
         setMeeting({
           ...data,
-          status: initialStatus,
+          status: data.status,
         });
+
+        if (data.elapsed_seconds !== undefined) {
+          setElapsed(data.elapsed_seconds);
+        }
+
+        if (data.meeting_document) {
+          getPrepMaterial(meetingId)
+            .then((prep) => setPrepMaterial(prep))
+            .catch((err) => console.error("준비자료 로드 실패:", err));
+        }
       })
       .catch((error) => {
         console.error("회의 상세 조회 실패:", error);
@@ -98,6 +129,91 @@ export default function MeetingDetailPage() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [meeting?.status, isPaused]);
+
+  // Poll meeting status for participants to sync start/end/pause in real-time
+  useEffect(() => {
+    if (isCreator) return;
+    if (!meeting || meeting.status === "finished") return;
+
+    const interval = setInterval(async () => {
+      try {
+        const data = await getMeetingDetail(meetingId);
+        if (data) {
+          const statusChanged = data.status !== meeting.status;
+          const pauseChanged = data.is_paused !== meeting.is_paused;
+
+          if (statusChanged || pauseChanged) {
+            setMeeting(data);
+            if (data.status === "finished") {
+              navigate(`/meetings/${meetingId}/minutes`, { replace: true });
+            }
+          }
+
+          if (data.status === "in_progress") {
+            if (data.is_paused) {
+              setElapsed(data.elapsed_seconds ?? 0);
+            } else if (data.elapsed_seconds !== undefined) {
+              setElapsed((prev) => {
+                if (Math.abs(data.elapsed_seconds! - prev) > 3) {
+                  return data.elapsed_seconds!;
+                }
+                return prev;
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("폴링 중 오류:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [meeting?.status, meeting?.is_paused, meetingId, isCreator]);
+
+  // Sync local isPaused state with backend meeting.is_paused value
+  useEffect(() => {
+    if (meeting) {
+      setIsPaused(meeting.is_paused || false);
+    }
+  }, [meeting?.is_paused]);
+
+  // Refetch meeting details when page is shown (bfcache restore) or tab visibility changes
+  useEffect(() => {
+    const refetch = async () => {
+      try {
+        const data = await getMeetingDetail(meetingId);
+        if (data && data.title) {
+          setMeeting(data);
+          if (data.elapsed_seconds !== undefined) {
+            setElapsed(data.elapsed_seconds);
+          }
+          if (data.status !== "scheduled" && data.status !== "in_progress") {
+            navigate(`/meetings/${meetingId}/minutes`, { replace: true });
+          }
+        }
+      } catch (err) {
+        console.error("Refetch failed:", err);
+      }
+    };
+
+    const handlePageShow = () => {
+      refetch();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refetch();
+      }
+    };
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [meetingId, navigate]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -129,7 +245,8 @@ export default function MeetingDetailPage() {
       startRecording(meetingId);
       setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
       setElapsed(0);
-    } catch {
+    } catch (err) {
+      console.error("회의 시작 중 에러 발생:", err);
       alert("회의 시작에 실패했습니다. (데모 환경에서는 가상으로 회의를 시작합니다.)");
       startRecording(meetingId);
       setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
@@ -137,22 +254,34 @@ export default function MeetingDetailPage() {
     }
   };
 
-  const handlePause = () => {
+  const handlePause = async () => {
     if (mediaRef.current && mediaRef.current.state === "recording") {
       mediaRef.current.pause();
     }
 
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPaused(true);
+
+    try {
+      await pauseMeeting(meetingId);
+    } catch (err) {
+      console.error("회의 일시중지 백엔드 반영 실패:", err);
+    }
   };
 
-  const handleResume = () => {
+  const handleResume = async () => {
     if (mediaRef.current && mediaRef.current.state === "paused") {
       mediaRef.current.resume();
     }
 
     timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     setIsPaused(false);
+
+    try {
+      await resumeMeeting(meetingId);
+    } catch (err) {
+      console.error("회의 재개 백엔드 반영 실패:", err);
+    }
   };
 
   const handleEnd = async () => {
@@ -176,9 +305,10 @@ export default function MeetingDetailPage() {
 
       await endMeeting(meetingId, audioFile);
       navigate(`/meetings/${meetingId}/minutes`);
-    } catch {
+    } catch (err) {
+      console.error("회의 종료 에러:", err);
       alert("회의가 종료되었습니다. (회의록 상세화면으로 이동합니다.)");
-      navigate(`/meetings`);
+      navigate(`/meetings/${meetingId}/minutes`);
     } finally {
       setEndLoading(false);
     }
@@ -204,8 +334,92 @@ export default function MeetingDetailPage() {
     }
   };
 
+  const startEditingAgenda = () => {
+    setEditedAgendas(meeting?.agenda?.map(item => item.content) || []);
+    setIsEditingAgenda(true);
+  };
+
+  const handleAgendaChange = (idx: number, value: string) => {
+    setEditedAgendas(prev => {
+      const copy = [...prev];
+      copy[idx] = value;
+      return copy;
+    });
+  };
+
+  const addAgendaItem = () => {
+    setEditedAgendas(prev => [...prev, ""]);
+  };
+
+  const removeAgendaItem = (idx: number) => {
+    setEditedAgendas(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const saveEditedAgendas = async () => {
+    try {
+      const payload = editedAgendas
+        .filter(content => content.trim() !== "")
+        .map(content => ({ title: content, reason: "" }));
+      await saveAgendaList(meetingId, payload);
+      
+      setMeeting(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          agenda: editedAgendas
+            .filter(content => content.trim() !== "")
+            .map((content, idx) => ({
+              agenda_id: prev.agenda?.[idx]?.agenda_id || idx,
+              meeting: meetingId,
+              content,
+              reason: "",
+            })),
+        };
+      });
+      setIsEditingAgenda(false);
+    } catch (e) {
+      alert("안건 수정 저장에 실패했습니다.");
+    }
+  };
+
+  const startEditingPrep = () => {
+    if (prepMaterial) {
+      setEditedPrep({
+        purpose: prepMaterial.purpose || "",
+        project_status: prepMaterial.project_status || "",
+        rule: prepMaterial.rule || "",
+        effect: prepMaterial.effect || ""
+      });
+    }
+    setIsEditingPrep(true);
+  };
+
+  const saveEditedPrep = async () => {
+    try {
+      const updated = await savePrepMaterial(meetingId, {
+        purpose: editedPrep.purpose,
+        project_status: editedPrep.project_status,
+        rule: editedPrep.rule,
+        effect: editedPrep.effect
+      });
+      setPrepMaterial(updated);
+      setIsEditingPrep(false);
+      
+      setMeeting(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          meeting_document: "compiled"
+        };
+      });
+    } catch (e) {
+      alert("준비자료 수정 저장에 실패했습니다.");
+    }
+  };
+
   const isScheduled = meeting.status === "scheduled";
   const isInProgress = meeting.status === "in_progress";
+  const isChatEnabled = isInProgress || !isCreator;
   const hasAgenda = Boolean(meeting.agenda && meeting.agenda.length > 0);
   const hasPrepMaterial = Boolean(meeting.meeting_document);
 
@@ -246,29 +460,33 @@ export default function MeetingDetailPage() {
               {isInProgress ? fmt(elapsed) : "00:00:00"}
             </div>
 
-            <button
-              onClick={isScheduled ? handleStart : isPaused ? handleResume : handlePause}
-              disabled={endLoading}
-              className="active:scale-95 transition w-[60px] h-[60px] flex items-center justify-center"
-            >
-              {isScheduled && <img src={mikeImg} alt="녹음 시작" className="w-full h-full object-contain" />}
-              {isInProgress && !isPaused && (
-                <img src={recordingImg} alt="녹음 중지" className="w-[38px] h-[38px] object-contain" />
-              )}
-              {isInProgress && isPaused && (
-                <img src={stopImg} alt="녹음 재개" className="w-[38px] h-[38px] object-contain" />
-              )}
-            </button>
-            {isInProgress ? (
-              <button
-                type="button"
-                onClick={handleEnd}
-                disabled={endLoading}
-                className="rounded-[8px] bg-[#623FB5] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
-              >
-                {endLoading ? "종료 중..." : "회의 종료"}
-              </button>
-            ) : null}
+            {isCreator && (
+              <>
+                <button
+                  onClick={isScheduled ? handleStart : isPaused ? handleResume : handlePause}
+                  disabled={endLoading}
+                  className="active:scale-95 transition w-[60px] h-[60px] flex items-center justify-center"
+                >
+                  {isScheduled && <img src={mikeImg} alt="녹음 시작" className="w-full h-full object-contain" />}
+                  {isInProgress && !isPaused && (
+                    <img src={recordingImg} alt="녹음 중지" className="w-[38px] h-[38px] object-contain" />
+                  )}
+                  {isInProgress && isPaused && (
+                    <img src={stopImg} alt="녹음 재개" className="w-[38px] h-[38px] object-contain" />
+                  )}
+                </button>
+                {isInProgress ? (
+                  <button
+                    type="button"
+                    onClick={handleEnd}
+                    disabled={endLoading}
+                    className="rounded-[8px] bg-[#623FB5] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
+                  >
+                    {endLoading ? "종료 중..." : "회의 종료"}
+                  </button>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 
@@ -290,19 +508,74 @@ export default function MeetingDetailPage() {
 
                 {agendaOpen && (
                   <div className="px-5 pb-5 pt-1 space-y-3">
-                    {meeting.agenda?.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className={`${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.RADIUS_SIZES.md} p-4 border border-[#E6E1E6] flex gap-3 items-start`}
-                      >
-                        <span className="text-[#623FB5] font-bold text-[15px]">{idx + 1}.</span>
-                        <div>
-                          <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>
-                            {item.content}
-                          </p>
+                    {isEditingAgenda ? (
+                      <>
+                        {editedAgendas.map((content, idx) => (
+                          <div
+                            key={idx}
+                            className={`${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.RADIUS_SIZES.md} p-4 border border-[#E6E1E6] flex gap-3 items-center`}
+                          >
+                            <span className="text-[#623FB5] font-bold text-[15px] flex-shrink-0">{idx + 1}.</span>
+                            <input
+                              type="text"
+                              value={content}
+                              onChange={(e) => handleAgendaChange(idx, e.target.value)}
+                              className="flex-1 border border-[#E6E1E6] rounded-lg px-3 py-2 text-sm text-[#141414] outline-none focus:border-[#623FB5] transition"
+                              placeholder="안건 내용을 입력하세요"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeAgendaItem(idx)}
+                              className="text-gray-400 hover:text-red-500 font-bold text-lg px-2"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={addAgendaItem}
+                          className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-sm hover:border-[#623FB5] hover:text-[#623FB5] transition"
+                        >
+                          + 안건 추가
+                        </button>
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={saveEditedAgendas}
+                            className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold"
+                            style={{ backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }}
+                          >
+                            완료
+                          </button>
                         </div>
-                      </div>
-                    ))}
+                      </>
+                    ) : (
+                      <>
+                        {meeting.agenda?.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={`${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.RADIUS_SIZES.md} p-4 border border-[#E6E1E6] flex gap-3 items-start`}
+                          >
+                            <span className="text-[#623FB5] font-bold text-[15px]">{idx + 1}.</span>
+                            <div>
+                              <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>
+                                {item.content}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={startEditingAgenda}
+                            className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold bg-white text-[#141414] border-[#E6E1E6] hover:bg-gray-50"
+                          >
+                            수정하기
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -349,12 +622,162 @@ export default function MeetingDetailPage() {
                 </button>
 
                 {materialsOpen && (
-                  <div className="px-5 pb-5 pt-1">
-                    <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
-                      <p className="whitespace-pre-wrap text-[13px] text-[#141414]">
-                        {String(meeting.meeting_document)}
-                      </p>
-                    </div>
+                  <div className="px-5 pb-5 pt-1 space-y-6">
+                    {isEditingPrep ? (
+                      <>
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">회의 목적</p>
+                          <textarea
+                            value={editedPrep.purpose}
+                            onChange={(e) => setEditedPrep(prev => ({ ...prev, purpose: e.target.value }))}
+                            rows={3}
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
+                          <textarea
+                            value={editedPrep.project_status}
+                            onChange={(e) => setEditedPrep(prev => ({ ...prev, project_status: e.target.value }))}
+                            rows={5}
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                          />
+                        </div>
+
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
+                          <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6]">
+                            <p className="whitespace-pre-wrap text-[13px] text-[#767676]">{editedPrep.rule || "-"}</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
+                          <textarea
+                            value={editedPrep.effect}
+                            onChange={(e) => setEditedPrep(prev => ({ ...prev, effect: e.target.value }))}
+                            rows={3}
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                          />
+                        </div>
+
+                        {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 && (
+                          <div>
+                            <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                              {prepMaterial.sources.map((src, i) => (
+                                <div key={i} className="flex items-center gap-2 text-[13px]">
+                                  <span className="text-[#767676]">- {src.title}</span>
+                                  {src.file_url ? (
+                                    <a
+                                      href={src.file_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                                    >
+                                      더보기
+                                    </a>
+                                  ) : (
+                                    <span className="text-gray-400 font-medium select-none">더보기 없음</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditingPrep(false)}
+                            className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold bg-white text-[#141414] border-[#E6E1E6] hover:bg-gray-50"
+                          >
+                            취소
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveEditedPrep}
+                            className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold"
+                            style={{ backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }}
+                          >
+                            완료
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {prepMaterial ? (
+                          <>
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">회의 목적</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
+                                <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.purpose || "-"}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
+                                <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.project_status || "-"}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
+                                <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.rule || "-"}</p>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
+                                <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.effect || "-"}</p>
+                              </div>
+                            </div>
+
+                            {prepMaterial.sources && prepMaterial.sources.length > 0 && (
+                              <div>
+                                <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                                <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                                  {prepMaterial.sources.map((src, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-[13px]">
+                                      <span className="text-[#141414]">- {src.title}</span>
+                                      {src.file_url ? (
+                                        <a
+                                          href={src.file_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                                        >
+                                          더보기
+                                        </a>
+                                      ) : (
+                                        <span className="text-gray-400 font-medium select-none">더보기 없음</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
+                            <p className="text-[13px] text-[#969696]">{String(meeting.meeting_document)}</p>
+                          </div>
+                        )}
+                        <div className="flex justify-end pt-2">
+                          <button
+                            type="button"
+                            onClick={startEditingPrep}
+                            className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold bg-white text-[#141414] border-[#E6E1E6] hover:bg-gray-50"
+                          >
+                            수정하기
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -371,7 +794,9 @@ export default function MeetingDetailPage() {
                   </div>
 
                   <button
-                    onClick={() => navigate(`/meetings/${meetingId}/prep-material`)}
+                    onClick={() => navigate(`/meetings/${meetingId}/upload`, {
+                      state: { type: "prep", projectId: meeting.project, showAgenda, showPrepMaterial }
+                    })}
                     className="px-4 py-2 rounded-lg bg-[#623FB5] text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition"
                   >
                     회의 준비 자료 생성
@@ -388,23 +813,27 @@ export default function MeetingDetailPage() {
           <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-bold`}>회의 챗봇</span>
         </div>
 
-        <div ref={chatRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {!isInProgress && chatMessages.length === 0 ? (
+        <div ref={chatRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-3">
+          {!isChatEnabled && chatMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-300">
               <p className={`${DESIGN.FONT_SIZES.sm} text-gray-400`}>회의 시작 후 사용 가능합니다</p>
+            </div>
+          ) : chatMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 p-4">
+              <p className="text-xs text-gray-400">회의 준비 자료나 안건에 대해 자유롭게 질문해 보세요!</p>
             </div>
           ) : (
             chatMessages.map((msg, i) => (
               <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                 <div
-                  className={`text-xs px-3 py-2 rounded-2xl max-w-[85%] border ${
+                  className={`text-xs px-3 py-2 rounded-2xl max-w-[85%] border break-all ${
                     msg.role === "user"
                       ? "bg-[#F3F0FF] border-[#623FB5] text-[#141414] rounded-tr-sm"
                       : "bg-[#FAF9F7] border-[#FAF9F7] text-[#141414] rounded-tl-sm"
                   }`}
                 >
-                  <p>{msg.content}</p>
-                  {msg.source && <p className="text-[10px] text-gray-400 mt-1">📎 {msg.source}</p>}
+                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.source && <p className="text-[10px] text-gray-400 mt-1 break-all">📎 {msg.source}</p>}
                 </div>
               </div>
             ))
@@ -425,14 +854,14 @@ export default function MeetingDetailPage() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendChat()}
-              disabled={!isInProgress}
-              placeholder={isInProgress ? "챗봇한테 질문해보세요" : "회의 시작 후 사용 가능합니다"}
+              disabled={!isChatEnabled}
+              placeholder={isChatEnabled ? "챗봇한테 질문해보세요" : "회의 시작 후 사용 가능합니다"}
               className="w-full text-xs pl-4 pr-10 py-3 border border-gray-200 rounded-xl outline-none focus:border-[#623FB5] disabled:bg-gray-50 disabled:text-gray-300 transition"
             />
 
             <button
               onClick={sendChat}
-              disabled={!isInProgress}
+              disabled={!isChatEnabled}
               className="absolute right-2.5 w-7 h-7 rounded-full bg-[#623FB5] flex items-center justify-center text-white hover:opacity-90 active:scale-95 disabled:opacity-30 transition"
               aria-label="전송"
             >
