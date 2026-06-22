@@ -4,7 +4,6 @@ import LoginPage from "../pages/auth/LoginPage";
 import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import ProjectSelectPage from "../pages/project/ProjectSelectPage";
 import ProjectCreatePage from "../pages/project/ProjectCreatePage";
-import DashboardPage from "../pages/project/DashboardPage";
 import KanbanBoardPage from "../pages/project/KanbanBoardPage";
 import MeetingListPage from "../pages/meeting/MeetingListPage";
 import MeetingCreatePage from "../pages/meeting/MeetingCreatePage";
