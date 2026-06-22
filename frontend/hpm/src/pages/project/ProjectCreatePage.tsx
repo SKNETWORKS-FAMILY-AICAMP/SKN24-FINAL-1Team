@@ -41,6 +41,7 @@ export default function ProjectCreatePage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [jiraProjects, setJiraProjects] = useState<JiraProject[]>([]);
   const [jiraLoading, setJiraLoading] = useState(false);
+  const [checkingJiraStatus, setCheckingJiraStatus] = useState(true);
   const [selectedJiraProject, setSelectedJiraProject] = useState<string | null>(null);
 
   const [allUsers, setAllUsers] = useState<UserOption[]>([]);
@@ -57,19 +58,67 @@ export default function ProjectCreatePage() {
     if (params.get("jira") === "success") {
       setJiraConnected(true);
       setStep(1);
+      setCheckingJiraStatus(false);
       window.history.replaceState({}, "", window.location.pathname);
+      return;
     } else if (params.get("jira") === "error") {
       setJiraErrorModal(true);
+      setCheckingJiraStatus(false);
       window.history.replaceState({}, "", window.location.pathname);
+      return;
     }
-  }, []);
+
+    if (!currentUserId) {
+      setCheckingJiraStatus(false);
+      return;
+    }
+
+    let active = true;
+    setCheckingJiraStatus(true);
+    api.get("/jira/status/")
+      .then((res) => {
+        if (!active) return;
+        if (res.data.connected) {
+          setJiraConnected(true);
+          setStep(1);
+        } else {
+          setJiraConnected(false);
+          setStep(0);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+        setJiraConnected(false);
+        setStep(0);
+      })
+      .finally(() => {
+        if (active) setCheckingJiraStatus(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     api.get("/users/").then(res => {
       console.log("allUsers 로드됨:", res.data.length, "명", res.data[0]);
-      setAllUsers(res.data);
+      const users = res.data as UserOption[];
+      setAllUsers(users);
+
+      if (currentUserId) {
+        const owner =
+          users.find((u) => u.users_id === currentUserId) ||
+          { users_id: currentUserId, name: user?.name || "-", work: "", email: user?.email };
+
+        setMembers((current) =>
+          current.some((member) => member.users_id === owner.users_id)
+            ? current
+            : [{ ...owner, isJira: false }, ...current],
+        );
+      }
     }).catch((e) => console.error("/api/users/ 실패:", e));
-  }, [user]);
+  }, [currentUserId, user]);
 
   useEffect(() => {
     if (!jiraConnected || !currentUserId) return;
@@ -97,14 +146,19 @@ export default function ProjectCreatePage() {
     : [];
 
   const handleToggleMember = (u: UserOption) => {
+    const isOwner = u.users_id === currentUserId;
     if (members.find(m => m.users_id === u.users_id)) {
-      setMembers(prev => prev.filter(m => m.users_id !== u.users_id));
+      if (!isOwner) {
+        setMembers(prev => prev.filter(m => m.users_id !== u.users_id));
+      }
     } else {
       setMembers(prev => [...prev, { ...u, isJira: false }]);
     }
+    setSearchName("");
   };
 
   const handleRemoveMember = (id: number) => {
+    if (id === currentUserId) return;
     setMembers(prev => prev.filter(m => m.users_id !== id));
   };
 
@@ -187,7 +241,11 @@ export default function ProjectCreatePage() {
           <div className="w-full max-w-[680px]">
             <StepBar current={step} />
 
-            {step === 0 && (
+            {checkingJiraStatus ? (
+              <div className="text-sm text-gray-400 text-center py-10">Jira 연동 상태 확인 중...</div>
+            ) : null}
+
+            {!checkingJiraStatus && step === 0 && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
                   jira 계정 연동
@@ -221,7 +279,7 @@ export default function ProjectCreatePage() {
               </div>
             )}
 
-            {step === 1 && (
+            {!checkingJiraStatus && step === 1 && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">프로젝트 선택</h2>
                 <p className="text-sm text-gray-500 text-center mb-8 leading-relaxed">
@@ -278,7 +336,7 @@ export default function ProjectCreatePage() {
               </div>
             )}
 
-            {step === 2 && (
+            {!checkingJiraStatus && step === 2 && (
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 text-center mb-[7px]">구성원 추가하기</h2>
                 <p className="text-sm text-gray-400 text-center mb-6">
@@ -295,10 +353,12 @@ export default function ProjectCreatePage() {
                             className="inline-flex items-center gap-1 bg-[#ECECF2] rounded-lg px-3 py-1 text-sm text-gray-700"
                           >
                             {m.name}
+                            {m.users_id !== currentUserId ? (
                             <button
                               onClick={() => handleRemoveMember(m.users_id)}
                               className="text-gray-400 hover:text-gray-600 ml-1 leading-none"
                             >×</button>
+                            ) : null}
                           </span>
                         ))}
                       </div>
@@ -356,7 +416,7 @@ export default function ProjectCreatePage() {
               </div>
             )}
 
-            {step === 3 && (
+            {!checkingJiraStatus && step === 3 && (
               <div className="flex flex-col items-center text-center py-8">
                 <h2 className="text-3xl font-bold text-gray-900 mb-3">프로젝트 생성 완료</h2>
                 <p className="text-sm text-gray-400 mb-12">자유롭게 프로젝트를 관리해 보세요!</p>
