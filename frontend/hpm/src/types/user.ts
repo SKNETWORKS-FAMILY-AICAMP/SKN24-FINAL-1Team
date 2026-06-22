@@ -4,7 +4,8 @@ export interface User {
   email: string;
   name?: string;
   account_status?: number;
-  jira_connected?: boolean; 
+  role?: string;
+  jira_connected?: boolean;
 }
 
 export interface AuthContextType {

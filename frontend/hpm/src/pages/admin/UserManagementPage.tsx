@@ -1,0 +1,697 @@
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import logo from "../../assets/logo.png";
+import resetIcon from "../../assets/reset.png";
+import { useAuth } from "../../context/AuthContext";
+import Dropdown from "../../components/ui/Dropdown";
+import Checkbox from "../../components/ui/Checkbox";
+
+interface AdminUser {
+  users_id: number;
+  emp_no: string;
+  name: string;
+  email: string;
+  dept: string;
+  rank: string;
+  work: string;
+  status: "재직" | "휴직" | "퇴사";
+}
+
+interface UserProject {
+  id: number;
+  project_name: string;
+  created_at: string;
+  created_by: string;
+  participants: string;
+}
+
+interface RegisterForm {
+  emp_no: string;
+  name: string;
+  emailPrefix: string;
+  dept: string;
+  rank: string;
+  work: string;
+  status: "재직" | "휴직" | "퇴사";
+}
+
+interface RegisterErrors {
+  emp_no: string;
+  name: string;
+  email: string;
+  dept: string;
+  rank: string;
+  work: string;
+}
+
+const INIT_USERS: AdminUser[] = [
+  { users_id: 1,  emp_no: "2026-DEV-1", name: "황인규", email: "hwangs@company.com",  dept: "개발팀",   rank: "대리", work: "백엔드 개발",     status: "재직" },
+  { users_id: 2,  emp_no: "2026-DEV-2", name: "김민준", email: "kimm@company.com",    dept: "개발팀",   rank: "과장", work: "백엔드개발",      status: "재직" },
+  { users_id: 3,  emp_no: "2026-DEV-3", name: "류지우", email: "ryuj@company.com",    dept: "개발팀",   rank: "사원", work: "풀스택 개발",     status: "휴직" },
+  { users_id: 4,  emp_no: "2026-DEV-4", name: "박수영", email: "parks@company.com",   dept: "개발팀",   rank: "사원", work: "프로젝트관리",    status: "재직" },
+  { users_id: 5,  emp_no: "2026-DEV-5", name: "이수진", email: "lees@company.com",    dept: "개발팀",   rank: "차장", work: "프로젝트엔드개발", status: "휴직" },
+  { users_id: 6,  emp_no: "2026-DEV-6", name: "송지은", email: "songje@company.com",  dept: "개발팀",   rank: "과장", work: "백엔드개발",      status: "재직" },
+  { users_id: 7,  emp_no: "2026-DEV-7", name: "배준혁", email: "baejh@company.com",   dept: "개발팀",   rank: "대리", work: "모바일 개발",     status: "재직" },
+  { users_id: 8,  emp_no: "2026-INF-1", name: "전지현", email: "jeonjh@company.com",  dept: "인프라팀", rank: "과장", work: "DevOps",         status: "휴직" },
+  { users_id: 9,  emp_no: "2026-QA-1",  name: "노송우", email: "rohsw@company.com",   dept: "QA팀",    rank: "사원", work: "QA",             status: "퇴사" },
+  { users_id: 10, emp_no: "2026-DAT-1", name: "신예원", email: "shinyw@company.com",  dept: "데이터팀", rank: "과장", work: "ML 엔지니어링",   status: "재직" },
+];
+
+const DUMMY_PROJECTS: UserProject[] = [
+  { id: 1, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
+  { id: 2, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
+];
+
+const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
+const NAME_PATTERN = /^[가-힣a-zA-Z]{1,30}$/;
+const EMAIL_PREFIX_PATTERN = /^[a-zA-Z0-9]{1,50}$/;
+
+const INIT_REGISTER: RegisterForm = {
+  emp_no: "", name: "", emailPrefix: "", dept: "", rank: "", work: "", status: "재직",
+};
+const INIT_ERRORS: RegisterErrors = {
+  emp_no: "", name: "", email: "", dept: "", rank: "", work: "",
+};
+
+export default function UserManagementPage() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && user.role !== "ADMIN") {
+      navigate("/login", { replace: true });
+    }
+  }, [user, navigate]);
+
+  // ── 사용자 목록 (CRUD 반영) ──────────────────────────────────────
+  const [users, setUsers] = useState<AdminUser[]>(INIT_USERS);
+
+  // ── 선택 상태 ───────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+
+  // ── 필터 ────────────────────────────────────────────────────────
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("전체");
+  const [rankFilter, setRankFilter] = useState("전체");
+  const [statusFilter, setStatusFilter] = useState("전체");
+
+  // ── 우측 편집 폼 ─────────────────────────────────────────────────
+  const [editForm, setEditForm] = useState({
+    emp_no: "", name: "", email: "",
+    dept: "", rank: "", work: "",
+    status: "재직" as AdminUser["status"],
+  });
+
+  // ── 모달 표시 여부 ────────────────────────────────────────────────
+  const [showAdminMenu, setShowAdminMenu]       = useState(false);
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal]   = useState(false);
+  const [showSaveModal, setShowSaveModal]       = useState(false);
+  const [showResetPwModal, setShowResetPwModal] = useState(false);
+
+  // ── 등록 폼 ─────────────────────────────────────────────────────
+  const [registerForm, setRegisterForm] = useState<RegisterForm>(INIT_REGISTER);
+  const [registerErrors, setRegisterErrors] = useState<RegisterErrors>(INIT_ERRORS);
+
+  // ── 관리자 메뉴 외부 클릭 닫기 ────────────────────────────────────
+  const adminMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    function handleOutside(e: MouseEvent) {
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
+        setShowAdminMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, []);
+
+  // ── 필터 적용 목록 ────────────────────────────────────────────────
+  const filteredUsers = users.filter((u) => {
+    const matchSearch = !search ||
+      u.name.includes(search) ||
+      u.emp_no.includes(search) ||
+      u.email.includes(search);
+    const matchDept   = deptFilter   === "전체" || u.dept   === deptFilter;
+    const matchRank   = rankFilter   === "전체" || u.rank   === rankFilter;
+    const matchStatus = statusFilter === "전체" || u.status === statusFilter;
+    return matchSearch && matchDept && matchRank && matchStatus;
+  });
+
+  // ── 체크박스 ─────────────────────────────────────────────────────
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? filteredUsers.map((u) => u.users_id) : []);
+  };
+  const handleSelectOne = (id: number, checked: boolean) => {
+    setSelectedIds((prev) => checked ? [...prev, id] : prev.filter((v) => v !== id));
+  };
+
+  // ── 상세보기 선택 ─────────────────────────────────────────────────
+  const handleSelectUser = (u: AdminUser) => {
+    setSelectedUser(u);
+    setEditForm({
+      emp_no: u.emp_no, name: u.name, email: u.email,
+      dept: u.dept, rank: u.rank, work: u.work, status: u.status,
+    });
+  };
+
+  // ── 삭제 ────────────────────────────────────────────────────────
+  const handleDelete = () => {
+    setUsers((prev) => prev.filter((u) => !selectedIds.includes(u.users_id)));
+    if (selectedUser && selectedIds.includes(selectedUser.users_id)) setSelectedUser(null);
+    setSelectedIds([]);
+    setShowDeleteModal(false);
+  };
+
+  // ── 저장 ────────────────────────────────────────────────────────
+  const handleSave = () => {
+    if (!selectedUser) return;
+    setUsers((prev) =>
+      prev.map((u) => u.users_id === selectedUser.users_id ? { ...u, ...editForm } : u)
+    );
+    setShowSaveModal(false);
+  };
+
+  // ── 등록 유효성 검사 ──────────────────────────────────────────────
+  const validateRegister = (): boolean => {
+    const errors: RegisterErrors = { ...INIT_ERRORS };
+    let valid = true;
+
+    if (!registerForm.emp_no) {
+      errors.emp_no = "필수 항목을 입력해주세요."; valid = false;
+    } else if (!EMP_NO_PATTERN.test(registerForm.emp_no)) {
+      errors.emp_no = "사원번호 형식에 맞지 않습니다."; valid = false;
+    }
+
+    if (!registerForm.name) {
+      errors.name = "필수 항목을 입력해주세요."; valid = false;
+    } else if (!NAME_PATTERN.test(registerForm.name)) {
+      errors.name = "한글, 영어만 포함하여 최대 30자 이내로 입력해 주세요."; valid = false;
+    }
+
+    if (!registerForm.emailPrefix) {
+      errors.email = "필수 항목을 입력해주세요."; valid = false;
+    } else if (!EMAIL_PREFIX_PATTERN.test(registerForm.emailPrefix)) {
+      errors.email = "영어,숫자만 포함하여 최대 50자 이내로 입력해 주세요."; valid = false;
+    }
+
+    if (!registerForm.dept) { errors.dept = "필수 항목을 입력해주세요."; valid = false; }
+    if (!registerForm.rank) { errors.rank = "필수 항목을 입력해주세요."; valid = false; }
+    if (!registerForm.work) { errors.work = "필수 항목을 입력해주세요."; valid = false; }
+
+    setRegisterErrors(errors);
+    return valid;
+  };
+
+  const handleRegisterSubmit = () => {
+    if (!validateRegister()) return;
+    const newId = users.length > 0 ? Math.max(...users.map((u) => u.users_id)) + 1 : 1;
+    setUsers((prev) => [{
+      users_id: newId,
+      emp_no: registerForm.emp_no,
+      name: registerForm.name,
+      email: `${registerForm.emailPrefix}@company.com`,
+      dept: registerForm.dept,
+      rank: registerForm.rank,
+      work: registerForm.work,
+      status: registerForm.status,
+    }, ...prev]);
+    setRegisterForm(INIT_REGISTER);
+    setRegisterErrors(INIT_ERRORS);
+    setShowRegisterModal(false);
+  };
+
+  const closeRegisterModal = () => {
+    setShowRegisterModal(false);
+    setRegisterForm(INIT_REGISTER);
+    setRegisterErrors(INIT_ERRORS);
+  };
+
+  const statusColor = (_s: string) => "text-[#0A0A0A]";
+
+  // 공통 모달 레이아웃 
+  const ConfirmModal = ({
+    message, onConfirm, onCancel,
+  }: { message: React.ReactNode; onConfirm: () => void; onCancel: () => void }) => (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl p-10 w-[560px] shrink-0">
+        <p className="text-[16px] text-[#623FB5] font-medium text-center leading-relaxed mb-10">{message}</p>
+        <div className="flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-3 border border-[#E5E5E5] rounded-md text-[15px] text-[#0A0A0A] hover:bg-[#F6F5FA] transition-colors">
+            취소
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-3 bg-[#623FB5] text-white rounded-md text-[15px] hover:opacity-90 transition-opacity">
+            확인
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#F6F5FA] flex flex-col">
+
+      {/* 헤더 */}
+      <header className="h-16 bg-white border-b border-[#E5E5E5] flex items-center justify-between px-8">
+        <img src={logo} alt="logo" className="w-9 h-9 object-contain" />
+
+        {/* 관리자 드롭다운 */}
+        <div ref={adminMenuRef} className="relative">
+          <button
+            onClick={() => setShowAdminMenu((prev) => !prev)}
+            className="flex items-center gap-2 px-4 py-2 border border-[#E5E5E5] rounded-full bg-white text-[15px] text-[#0A0A0A] hover:bg-[#F6F5FA] transition-colors"
+          >
+            {user?.name ?? "관리자"}님
+            <svg className={`w-4 h-4 transition-transform ${showAdminMenu ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showAdminMenu && (
+            <div className="absolute right-0 mt-2 w-[260px] bg-white rounded-2xl shadow-xl z-50 p-4">
+              {/* 프로필 카드 */}
+              <div className="bg-[#F6F5FA] rounded-xl px-4 py-4 mb-4">
+                <p className="text-[15px] font-bold text-[#0A0A0A]">{user?.name ?? "관리자"}</p>
+                <p className="text-[13px] text-[#623FB5] underline mt-1 break-all">{user?.email ?? ""}</p>
+              </div>
+              {/* 구분선 */}
+              <div className="h-px bg-[#E5E5E5] mb-3" />
+              {/* 비밀번호 변경 */}
+              <button
+                onClick={() => { setShowAdminMenu(false); navigate("/change-password"); }}
+                className="flex items-center gap-3 w-full px-2 py-2 text-[14px] text-[#0A0A0A] hover:bg-[#F6F5FA] rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                </svg>
+                비밀번호 변경
+              </button>
+              {/* 로그아웃 */}
+              <button
+                onClick={() => { logout(); navigate("/login"); }}
+                className="flex items-center gap-3 w-full px-2 py-2 text-[14px] text-[#0A0A0A] hover:bg-[#F6F5FA] rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                로그아웃
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div className="flex flex-1 p-4 max-w-[1680px] mx-auto w-full">
+        <div className="flex-1 bg-[#FDFDFD] rounded-2xl flex gap-[14px] p-6 overflow-hidden">
+
+        {/* 왼쪽: 사용자 목록 */}
+        <div className="flex-1 flex flex-col">
+          <h1 className="text-[24px] font-semibold text-[#0A0A0A] mb-1">사용자 관리</h1>
+          <p className="text-[15px] text-[#969696] mb-6">사용자 등록 및 목록 조회할 수 있습니다.</p>
+
+          {/* 검색 */}
+          <div className="flex items-center border border-[#E5E5E5] rounded-md px-4 mb-4 bg-white">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름, 사원번호, 이메일 검색"
+              className="flex-1 py-3 text-[15px] outline-none"
+            />
+            <svg className="w-5 h-5 text-[#969696]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+            </svg>
+          </div>
+
+          {/* 필터 + 버튼 */}
+          <div className="flex items-center gap-3 mb-5">
+            <span className="text-[15px] text-[#0A0A0A]">부서</span>
+            <Dropdown options={["전체", "개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={deptFilter} onChange={setDeptFilter} dropdownClassName="w-32" />
+            <span className="text-[15px] text-[#0A0A0A]">직급</span>
+            <Dropdown options={["전체", "인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석"]} value={rankFilter} onChange={setRankFilter} dropdownClassName="w-32" />
+            <span className="text-[15px] text-[#0A0A0A]">상태</span>
+            <Dropdown options={["전체", "재직", "휴직", "퇴사"]} value={statusFilter} onChange={setStatusFilter} dropdownClassName="w-32" />
+            <div className="flex gap-2 ml-auto">
+              <button
+                onClick={() => setShowRegisterModal(true)}
+                className="px-5 py-3 bg-[#623FB5] text-white text-[15px] rounded-md hover:opacity-90 transition-opacity"
+              >
+                등록
+              </button>
+              <button
+                onClick={() => selectedIds.length > 0 && setShowDeleteModal(true)}
+                className={`px-5 py-3 text-[15px] rounded-md text-white transition-all ${
+                  selectedIds.length > 0
+                    ? "bg-[#623FB5] hover:opacity-90 cursor-pointer"
+                    : "bg-[#969696] cursor-not-allowed"
+                }`}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+
+          {/* 테이블 */}
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-[15px]">
+              <thead>
+                <tr className="bg-[#F4F5F8] border border-[#969696]">
+                  <th className="p-3 w-10">
+                    <Checkbox
+                      checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                    />
+                  </th>
+                  {["사원번호", "이름", "이메일", "부서", "직급", "직무", "상태", "관리"].map((col) => (
+                    <th key={col} className="p-3 text-left font-medium text-[#0A0A0A]">{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-20">
+                      <div className="flex flex-col items-center gap-6">
+                        <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <circle cx="50" cy="50" r="44" stroke="#ADADAD" strokeWidth="6" />
+                          <rect x="46" y="24" width="8" height="38" rx="4" fill="#ADADAD" />
+                          <rect x="46" y="70" width="8" height="8" rx="4" fill="#ADADAD" />
+                        </svg>
+                        <p className="text-[17px] text-[#ADADAD]">존재하지 않는 사용자입니다.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <tr key={u.users_id} className="border-b border-[#E5E5E5] hover:bg-[#F6F5FA] transition-colors">
+                      <td className="p-3">
+                        <Checkbox
+                          checked={selectedIds.includes(u.users_id)}
+                          onChange={(e) => handleSelectOne(u.users_id, e.target.checked)}
+                        />
+                      </td>
+                      <td className="p-3">{u.emp_no}</td>
+                      <td className="p-3">{u.name}</td>
+                      <td className="p-3">{u.email}</td>
+                      <td className="p-3">{u.dept}</td>
+                      <td className="p-3">{u.rank}</td>
+                      <td className="p-3">{u.work}</td>
+                      <td className={`p-3 ${statusColor(u.status)}`}>{u.status}</td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => handleSelectUser(u)}
+                          className="px-3 py-1 bg-[#F4F5F8] text-[#0A0A0A] text-[13px] rounded-md border border-[#969696] hover:opacity-80 transition-opacity"
+                        >
+                          상세보기
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* 페이지네이션 */}
+          <div className="flex justify-center items-center gap-1 mt-5">
+            {["◀", "1", "2", "3", "4", "5", "▶"].map((p) => (
+              <button key={p} className="w-8 h-8 flex items-center justify-center rounded text-[15px] hover:bg-[#F6F5FA] transition-colors">{p}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* 오른쪽: 상세 패널 */}
+        <div className="w-[560px] bg-white rounded-xl flex flex-col overflow-y-auto border border-[#141414]">
+          {selectedUser === null ? (
+            // 기본 상태: 사용자 미선택
+            <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
+              <div className="w-20 h-20 rounded-full bg-[#F6F5FA] flex items-center justify-center">
+                <svg className="w-10 h-10 text-[#C4C4C4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-[17px] font-medium text-[#0A0A0A] mb-2">사용자를 선택하세요</p>
+                <p className="text-[13px] text-[#969696] leading-relaxed">
+                  목록에서 상세보기 버튼을 클릭하면<br />여기에서 정보를 수정할 수 있습니다.
+                </p>
+              </div>
+            </div>
+          ) : (
+            // 사용자 상세 폼
+            <div className="flex flex-col pt-[26px] px-[14px] pb-[16px]">
+              {/* 헤더: 이름 + 버튼 */}
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-[24px] font-semibold text-[#0A0A0A]">{selectedUser.name}</h2>
+                  <p className="text-[13px] text-[#969696] mt-[24px]">
+                    {selectedUser.emp_no} · {selectedUser.dept} · {selectedUser.rank}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSaveModal(true)}
+                    className="px-4 py-2 bg-[#623FB5] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    저장
+                  </button>
+                  <button
+                    onClick={() => setShowResetPwModal(true)}
+                    className="flex items-center gap-1 px-3 py-2 bg-[#623FB5] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
+                  >
+                    <img src={resetIcon} alt="reset" className="w-3 h-3 object-contain" />
+                    비밀번호 초기화
+                  </button>
+                </div>
+              </div>
+
+              {/* 기본 정보 */}
+              <div className="h-px bg-[#E0E0E0] mt-[14px] mx-[-14px]" />
+              <p className="text-[13px] text-[#969696] mt-[26px] mb-[14px]">기본 정보</p>
+              <div className="flex flex-col gap-[7px]">
+                <label className="text-[13px] text-[#0A0A0A]">사원번호</label>
+                <input value={editForm.emp_no} onChange={(e) => setEditForm({ ...editForm, emp_no: e.target.value })}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+              </div>
+              <div className="flex gap-[33px] mt-[32px]">
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">이름</label>
+                  <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                </div>
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">이메일</label>
+                  <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                </div>
+              </div>
+
+              {/* 소속 정보 */}
+              <div className="h-px bg-[#E0E0E0] mt-[14px] mx-[-14px]" />
+              <p className="text-[13px] text-[#969696] mt-[26px] mb-[14px]">소속 정보</p>
+              <div className="flex gap-[33px]">
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">부서</label>
+                  <Dropdown options={["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={editForm.dept} onChange={(v) => setEditForm({ ...editForm, dept: v })} />
+                </div>
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">직급</label>
+                  <Dropdown options={["인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석", "이사", "대표이사"]} value={editForm.rank} onChange={(v) => setEditForm({ ...editForm, rank: v })} />
+                </div>
+              </div>
+              <div className="flex gap-[33px] mt-[32px]">
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">직무</label>
+                  <input value={editForm.work} onChange={(e) => setEditForm({ ...editForm, work: e.target.value })}
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                </div>
+                <div className="flex flex-col gap-[7px] flex-1">
+                  <label className="text-[13px] text-[#0A0A0A]">재직 상태</label>
+                  <Dropdown options={["재직", "휴직", "퇴사"]} value={editForm.status} onChange={(v) => setEditForm({ ...editForm, status: v as AdminUser["status"] })} />
+                </div>
+              </div>
+
+              {/* 프로젝트 목록 */}
+              <div className="h-px bg-[#E0E0E0] mt-[14px] mx-[-14px]" />
+              <div className="border border-[#969696] rounded-xl overflow-hidden mt-[26px]">
+                <div className="px-4 py-3">
+                  <p className="text-[13px] text-[#969696]">프로젝트 목록</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[13px] whitespace-nowrap">
+                    <thead className="bg-[#F4F5F8] border-y border-[#969696]">
+                      <tr>
+                        {["", "프로젝트명", "생성시기", "생성자", "참여자"].map((col) => (
+                          <th key={col} className="px-3 py-2 text-left font-medium text-[#0A0A0A]">{col}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DUMMY_PROJECTS.map((project) => (
+                        <tr key={project.id} className="border-t border-[#E5E5E5]">
+                          <td className="px-3 py-2 text-[#969696]">{project.id}</td>
+                          <td className="px-3 py-2">{project.project_name}</td>
+                          <td className="px-3 py-2">{project.created_at}</td>
+                          <td className="px-3 py-2">{project.created_by}</td>
+                          <td className="px-3 py-2">{project.participants}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+
+      {/* ── 사용자 등록 모달 ── */}
+      {showRegisterModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl p-8 w-[480px] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center gap-2 mb-6">
+              <img src={logo} alt="logo" className="w-7 h-7 object-contain" />
+              <span className="text-[18px] font-semibold text-[#0A0A0A]">회의피하지마</span>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* 사원번호 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">사원번호 <span className="text-red-500">*</span></label>
+                <input value={registerForm.emp_no}
+                  onChange={(e) => setRegisterForm({ ...registerForm, emp_no: e.target.value })}
+                  placeholder="예: 2026-HR-3" maxLength={20}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.emp_no}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.emp_no.length}/20</span>
+                </div>
+              </div>
+
+              {/* 이름 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">이름 <span className="text-red-500">*</span></label>
+                <input value={registerForm.name}
+                  onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
+                  placeholder="이름" maxLength={30}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.name}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.name.length}/30</span>
+                </div>
+              </div>
+
+              {/* 이메일 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">이메일 <span className="text-red-500">*</span></label>
+                <div className="flex items-center gap-2">
+                  <input value={registerForm.emailPrefix}
+                    onChange={(e) => setRegisterForm({ ...registerForm, emailPrefix: e.target.value })}
+                    placeholder="예: hpm123" maxLength={50}
+                    className="flex-1 px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  <span className="text-[15px] text-[#0A0A0A] whitespace-nowrap">@company.com</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.email}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.emailPrefix.length}/50</span>
+                </div>
+              </div>
+
+              {/* 비밀번호 (고정, 수정 불가) */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">비밀번호</label>
+                <input value="abc123" disabled
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] bg-[#F4F5F8] text-[#969696] cursor-not-allowed" />
+              </div>
+
+              {/* 부서 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">부서 <span className="text-red-500">*</span></label>
+                <input value={registerForm.dept}
+                  onChange={(e) => setRegisterForm({ ...registerForm, dept: e.target.value })}
+                  placeholder="예: 개발팀" maxLength={50}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.dept}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.dept.length}/50</span>
+                </div>
+              </div>
+
+              {/* 직급 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">직급 <span className="text-red-500">*</span></label>
+                <input value={registerForm.rank}
+                  onChange={(e) => setRegisterForm({ ...registerForm, rank: e.target.value })}
+                  placeholder="예: 대리" maxLength={5}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.rank}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.rank.length}/5</span>
+                </div>
+              </div>
+
+              {/* 직무 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">직무 <span className="text-red-500">*</span></label>
+                <input value={registerForm.work}
+                  onChange={(e) => setRegisterForm({ ...registerForm, work: e.target.value })}
+                  placeholder="예: 백엔드 개발" maxLength={30}
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                <div className="flex justify-between items-center">
+                  <span className="text-[12px] text-blue-500">{registerErrors.work}</span>
+                  <span className="text-[12px] text-[#969696]">{registerForm.work.length}/30</span>
+                </div>
+              </div>
+
+              {/* 재직 상태 */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[14px] font-medium text-[#0A0A0A]">재직 상태</label>
+                <input value="재직" disabled
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] bg-[#F4F5F8] text-[#969696] cursor-not-allowed" />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={closeRegisterModal}
+                className="flex-1 py-3 border border-[#E5E5E5] rounded-md text-[15px] text-[#0A0A0A] hover:bg-[#F6F5FA] transition-colors">
+                취소
+              </button>
+              <button onClick={handleRegisterSubmit}
+                className="flex-1 py-3 rounded-md text-[15px] text-white bg-[#623FB5] hover:opacity-90 transition-opacity">
+                사용자 등록
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 삭제 확인 모달 ── */}
+      {showDeleteModal && (
+        <ConfirmModal
+          message={<>해당 사용자를 삭제하시겠습니까?<br />확인 버튼을 누를 경우<br />해당 사용자의 정보가 모두 삭제됩니다.</>}
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteModal(false)}
+        />
+      )}
+
+      {/* ── 저장 확인 모달 ── */}
+      {showSaveModal && (
+        <ConfirmModal
+          message={<>수정하신 내용으로 변경됩니다.<br />수정하시겠습니까?</>}
+          onConfirm={handleSave}
+          onCancel={() => setShowSaveModal(false)}
+        />
+      )}
+
+      {/* ── 비밀번호 초기화 모달 ── */}
+      {showResetPwModal && (
+        <ConfirmModal
+          message={<>비밀번호를 abc123으로 초기화하시겠습니까?<br />확인 클릭 시 해당 사용자의<br />비밀번호가 abc123으로 변경됩니다.</>}
+          onConfirm={() => setShowResetPwModal(false)}
+          onCancel={() => setShowResetPwModal(false)}
+        />
+      )}
+    </div>
+  );
+}

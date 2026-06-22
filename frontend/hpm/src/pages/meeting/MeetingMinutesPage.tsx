@@ -6,6 +6,7 @@ import {
   updateTask,
   approveMinutes,
   rejectMinutes,
+  requestMinutesApproval,
   type Meeting,
   type Task,
 } from "../../services/meeting";
@@ -29,62 +30,9 @@ export default function MeetingMinutesPage() {
   const navigate = useNavigate();
   const meetingId = Number(id);
 
-  const [meeting, setMeeting] = useState<Meeting | null>({
-    meeting_id: meetingId,
-    title: "AI 매칭 엔진 고도화 및 프로젝트 진행 상황 점검 회의",
-    location: "대룡 17차 18층",
-    meeting_at: "2025년 5월 29일 9:00",
-    status: "finished",
-    minutes_status: "draft",
-    meeting_document: `AI 매칭 엔진 고도화 및 포털 개편 관련 회의
-1. AI 매칭 엔진 고도화 현황
-  - 기존 키워드 매칭에서 임베딩 기반 시맨틱 매칭으로 전환 중.
-  - 프로토타입 결과: Top 5 적합 공급기업 표시를 기존 대비 약 23% 개선.
-  - 결정 사항: 우선 1차(LLM 리라이언) 방식으로 진행, 파인튜닝은 2차로 추진.
-2. 보안 및 인프라 검토
-  - 운영 서버에서 외부 API(LLM) 호출 시 보안 정책 준수 여부 확인 필요.
-3. 포털 프론트엔드 개편 및 기타 안건
-  - 수요기업 온보딩 플로우 내 업종 코드 자동 분류 기능 추가 요청.`,
-    is_meeting: true,
-    project: 1,
-    participants: [
-      { user_id: 1, name: "김규호" },
-      { user_id: 2, name: "김지원" },
-      { user_id: 3, name: "류지우" },
-      { user_id: 4, name: "박수영" },
-      { user_id: 5, name: "황인규" },
-    ],
-  });
-
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      meeting_task_id: 1,
-      meeting_id: meetingId,
-      title: "사내 클라우드 보호처 신청 절차 및 예산 코드 확인",
-      owner: "김규호",
-      due_date: "2026-06-18",
-      priority: "High",
-      jira_key: "",
-    },
-    {
-      meeting_task_id: 2,
-      meeting_id: meetingId,
-      title: "운영 서버 외부 API 호출 보안 정책 확인",
-      owner: "김규호",
-      due_date: "2026-06-05",
-      priority: "High",
-      jira_key: "",
-    },
-    {
-      meeting_task_id: 3,
-      meeting_id: meetingId,
-      title: "",
-      owner: "류지우",
-      due_date: "2026-06-05",
-      priority: "Medium",
-      jira_key: "",
-    },
-  ]);
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [collapsedTasks, setCollapsedTasks] = useState<Set<number>>(new Set());
   const [openPriorityDropdown, setOpenPriorityDropdown] = useState<number | null>(null);
@@ -99,30 +47,30 @@ export default function MeetingMinutesPage() {
     });
   };
 
-  const [taskMemos] = useState<Record<number, string>>({
-    1: "파인튜닝 GPU 서버 확보를 위해 사내 클라우드 보호처 신청 절차와 관련된 예산 코드 적정성을 확인하여 보고",
-    2: "LLM 라이브러리 방식 도입 시 운영 서버에서 외부 API를 호출하는 것이 보안 규정상 허용되는지 확인 요청",
-    3: "업종 코드 자동 분류 기능이 RFP 범위에 포함되는지 여부 확인 후 가입 변경 상의위원회 설정 여부 결정",
-  });
-
   useEffect(() => {
+    setLoading(true);
     Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
       .then(([m, t]) => {
-        if (m && m.title) setMeeting(m);
-        if (t && t.length > 0) setTasks(t);
+        if (m) setMeeting(m);
+        if (t) setTasks(t);
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [meetingId]);
 
+  if (loading) return <div className="p-8 text-gray-400">불러오는 중...</div>;
   if (!meeting) return <div className="p-8 text-gray-400">회의를 찾을 수 없습니다.</div>;
 
   const minutesStatus = meeting.minutes_status || "draft";
 
-  const handleRequestApproval = () => {
+  const handleRequestApproval = async () => {
     setRequested(true);
-    setTimeout(() => {
-      navigate(`/meetings/${meetingId}/jira`);
-    }, 400);
+    try {
+      await requestMinutesApproval(meetingId);
+    } catch {
+      // 엔드포인트 오류는 무시하고 진행
+    }
+    navigate(`/meetings/${meetingId}/jira`);
   };
 
   const handleApprove = async () => {
@@ -242,9 +190,12 @@ export default function MeetingMinutesPage() {
 
         {/* 회의 내용 본문 */}
         <div className="p-6">
-          <div className="border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line min-h-[120px]">
-            {meeting.meeting_document || "회의 내용이 없습니다."}
-          </div>
+          <textarea
+            value={meeting.meeting_document || ""}
+            onChange={e => setMeeting(m => m ? { ...m, meeting_document: e.target.value } : m)}
+            className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed min-h-[120px] resize-y outline-none focus:border-indigo-400"
+            placeholder="회의 내용이 없습니다."
+          />
         </div>
       </div>
 
@@ -376,19 +327,20 @@ export default function MeetingMinutesPage() {
                     )}
                   </div>
                   {/* 접기/펼치기 버튼 */}
-                  {taskMemos[task.meeting_task_id] && (
+                  {task.content && (
                     <button
                       onClick={() => toggleCollapse(task.meeting_task_id)}
-                      className="text-xs text-gray-400 hover:text-gray-600 whitespace-nowrap"
+                      className="text-xs font-medium whitespace-nowrap"
+                      style={{ color: "#623FB5" }}
                     >
-                      {isCollapsed ? "펼치기" : "접기"}
+                      {isCollapsed ? "펼치기 ▼" : "접기 ▲"}
                     </button>
                   )}
                 </div>
                 {/* 메모 - 접기 상태일 때 숨김 */}
-                {!isCollapsed && taskMemos[task.meeting_task_id] && (
+                {!isCollapsed && task.content && (
                   <div className="mt-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded px-3 py-2">
-                    {taskMemos[task.meeting_task_id]}
+                    {task.content}
                   </div>
                 )}
               </div>

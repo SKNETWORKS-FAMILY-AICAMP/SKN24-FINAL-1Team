@@ -437,12 +437,7 @@ export default function MeetingDetailPage() {
               className="absolute right-2.5 w-7 h-7 rounded-full bg-[#623FB5] flex items-center justify-center text-white hover:opacity-90 active:scale-95 disabled:opacity-30 transition"
               aria-label="전송"
             >
-              <svg
-                className="w-3.5 h-3.5 fill-current transform rotate-45 -translate-x-[1px] translate-y-[0.5px]"
-                viewBox="0 0 24 24"
-              >
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
+              <img src={sendImg} alt="전송" className="w-4 h-4" />
             </button>
           </div>
         </div>

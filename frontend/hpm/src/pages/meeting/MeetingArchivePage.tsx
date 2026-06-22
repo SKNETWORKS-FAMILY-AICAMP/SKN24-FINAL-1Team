@@ -14,15 +14,14 @@ import {
   SPEAKER_SEGMENTS,
 } from "../../constants/speakerMapping";
 
-type TabKey = "minutes" | "record" | "chatbot" | "prep" | "agenda" | "email";
+type TabKey = "minutes" | "record" | "chatbot" | "material" | "email";
 
 const TABS: { key: TabKey; label: string }[] = [
-  { key: "minutes", label: "회의록" },
-  { key: "record",  label: "녹음 원문" },
-  { key: "chatbot", label: "챗봇내역" },
-  { key: "prep",    label: "준비자료" },
-  { key: "agenda",  label: "기초안건" },
-  { key: "email",   label: "이메일 발송" },
+  { key: "minutes",  label: "회의록" },
+  { key: "record",   label: "녹음 원문" },
+  { key: "chatbot",  label: "챗봇내역" },
+  { key: "material", label: "회의 자료" },
+  { key: "email",    label: "이메일 발송" },
 ];
 
 const DUMMY_MEETING: Meeting = {
@@ -144,18 +143,18 @@ export default function MeetingArchivePage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // 이메일 발송
-  const [emailSelected, setEmailSelected] = useState<Set<number>>(new Set([1, 2]));
+  const [recipients, setRecipients] = useState(DUMMY_MEETING.participants ?? []);
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
   useEffect(() => {
     Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
       .then(([m, t]) => {
-        if (m?.title) setMeeting(m);
-        if (t?.length) {
-          setTasks(t);
-          setEmailSelected(new Set(t.map(task => task.meeting_task_id)));
+        if (m?.title) {
+          setMeeting(m);
+          if (m.participants?.length) setRecipients(m.participants);
         }
+        if (t?.length) setTasks(t);
       })
       .catch(() => {});
   }, [meetingId]);
@@ -182,64 +181,132 @@ export default function MeetingArchivePage() {
     if (downloading) return;
     setDownloading(true);
     try {
+      const W = 794;
       const wrapper = document.createElement("div");
       wrapper.style.cssText = `
         position:absolute; top:-9999px; left:-9999px;
-        width:700px; background:#fff;
+        width:${W}px; background:#fff;
         padding:48px 48px 60px;
         font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
-        box-sizing:border-box; color:#111;
+        box-sizing:border-box; color:#141414;
       `;
 
-      const titleEl = document.createElement("div");
-      titleEl.style.cssText = `text-align:center; font-size:17px; font-weight:700; margin-bottom:24px;`;
-      titleEl.textContent = "회의록";
-      wrapper.appendChild(titleEl);
+      // 회의록 카드
+      const card = document.createElement("div");
+      card.style.cssText = `border:1px solid #D0D0D0; border-radius:12px; margin-bottom:20px; overflow:hidden;`;
 
-      const outer = document.createElement("div");
-      outer.style.cssText = `width:100%;`;
+      const cardHeader = document.createElement("div");
+      cardHeader.style.cssText = `padding:14px 20px; border-bottom:1px solid #D0D0D0; font-size:15px; font-weight:700; text-align:left;`;
+      cardHeader.textContent = "회의록";
+      card.appendChild(cardHeader);
 
-      const addSection = (label: string, value: string, isFirst: boolean) => {
-        const header = document.createElement("div");
-        header.style.cssText = `
-          padding:10px; text-align:center; font-size:13px; font-weight:600;
-          border-left:1px solid #000; border-right:1px solid #000;
-          border-top:${isFirst ? "1px solid #000" : "none"};
-          border-bottom:1px solid #000; box-sizing:border-box;
-        `;
-        header.textContent = label;
-        outer.appendChild(header);
+      const table = document.createElement("table");
+      table.style.cssText = `width:100%; border-collapse:collapse; font-size:13px;`;
 
-        const content = document.createElement("div");
-        content.style.cssText = `
-          padding:14px 18px; font-size:12px; line-height:1.9;
-          white-space:pre-wrap; word-break:break-word; min-height:40px;
-          border-left:1px solid #000; border-right:1px solid #000;
-          border-top:none; border-bottom:1px solid #000; box-sizing:border-box;
-        `;
-        content.textContent = value;
-        outer.appendChild(content);
+    
+      const mkTd = (text: string, isLabel: boolean, opts: { colSpan?: number; borderRight?: boolean; borderBottom?: boolean } = {}) => {
+        const td = document.createElement("td");
+        if (opts.colSpan) td.colSpan = opts.colSpan;
+        const borderR = opts.borderRight !== false && isLabel ? "border-right:1px solid #D0D0D0;" : (opts.borderRight ? "border-right:1px solid #D0D0D0;" : "");
+        const borderB = opts.borderBottom !== false ? "border-bottom:1px solid #D0D0D0;" : "";
+        td.style.cssText = isLabel
+          ? `padding:14px 16px; font-weight:600; color:#555; background:#FAFAFA; width:110px; white-space:nowrap; ${borderR}${borderB}`
+          : `padding:14px 16px; color:#141414; ${borderR}${borderB}`;
+        td.textContent = text;
+        return td;
       };
 
-      addSection("회의 주제", meeting.title, true);
-      addSection("회의 일시", formatDate(meeting.meeting_at) + "   작성자: " + writer, false);
-      addSection("회의 장소", meeting.location || "-", false);
-      addSection("참석자", participantNames, false);
+      // 회의 주제
+      const r1 = document.createElement("tr");
+      r1.appendChild(mkTd("회의 주제", true, { borderBottom: true }));
+      r1.appendChild(mkTd(meeting.title, false, { borderBottom: true }));
+      table.appendChild(r1);
+
+      // 회의 일시 + 작성자
+      const r2 = document.createElement("tr");
+      r2.appendChild(mkTd("회의 일시", true, { borderBottom: true }));
+      r2.appendChild(mkTd(formatDate(meeting.meeting_at), false, { borderRight: true, borderBottom: true }));
+      r2.appendChild(mkTd("작성자", true, { borderBottom: true }));
+      r2.appendChild(mkTd(writer, false, { borderBottom: true }));
+      table.appendChild(r2);
+
+      // 회의 장소
+      const r3 = document.createElement("tr");
+      r3.appendChild(mkTd("회의 장소", true, { borderBottom: true }));
+      r3.appendChild(mkTd(meeting.location || "-", false, { borderBottom: true }));
+      table.appendChild(r3);
+
+      // 참석자 
+      const r4 = document.createElement("tr");
+      r4.appendChild(mkTd("참석자", true, { borderBottom: false }));
+      r4.appendChild(mkTd(participantNames, false, { borderBottom: false }));
+      table.appendChild(r4);
+
+      card.appendChild(table);
+
+      // 회의 내용
       if (meeting.meeting_document) {
-        addSection("회의 내용", meeting.meeting_document, false);
+        const secHeader = document.createElement("div");
+        secHeader.style.cssText = `padding:12px 20px; text-align:center; font-size:13px; font-weight:600; color:#141414; background:#F4F5F8; border-top:1px solid #D0D0D0; border-bottom:1px solid #D0D0D0;`;
+        secHeader.textContent = "회의 내용";
+        card.appendChild(secHeader);
+
+        const docBox = document.createElement("div");
+        docBox.style.cssText = `padding:16px 20px; font-size:13px; line-height:1.9; white-space:pre-wrap; color:#333;`;
+        docBox.textContent = meeting.meeting_document;
+        card.appendChild(docBox);
       }
 
-      const taskRows = tasks.map((t, i) =>
-        `${i + 1}. ${t.title}  담당자: ${t.owner}  기한: ${t.due_date || "-"}  우선순위: ${PRIORITY_LABEL[t.priority] || t.priority}`
-      ).join("\n");
-      addSection("업무", taskRows, false);
+      wrapper.appendChild(card);
 
-      wrapper.appendChild(outer);
+      // 업무 카드 
+      const taskCard = document.createElement("div");
+      taskCard.style.cssText = `border:1px solid #D0D0D0; border-radius:12px; overflow:hidden;`;
+
+      const taskHeader = document.createElement("div");
+      taskHeader.style.cssText = `padding:12px 20px; text-align:center; font-size:13px; font-weight:600; color:#141414; background:#F4F5F8; border-bottom:1px solid #D0D0D0;`;
+      taskHeader.textContent = "업무";
+      taskCard.appendChild(taskHeader);
+
+      // 컬럼 헤더
+      const taskColHeader = document.createElement("div");
+      taskColHeader.style.cssText = `display:grid; grid-template-columns:1fr 120px 130px 100px; padding:12px 20px; font-size:12px; font-weight:700; color:#555; background:#FAFAFA; border-bottom:1px solid #D0D0D0;`;
+      ["업무명", "담당자", "기한", "우선순위"].forEach((label, i) => {
+        const span = document.createElement("span");
+        span.textContent = label;
+        if (i > 0) span.style.textAlign = "center";
+        taskColHeader.appendChild(span);
+      });
+      taskCard.appendChild(taskColHeader);
+
+      tasks.forEach((t) => {
+        // 업무 메인 행
+        const row = document.createElement("div");
+        row.style.cssText = `display:grid; grid-template-columns:1fr 120px 130px 100px; padding:14px 20px; font-size:13px; align-items:center; border-bottom:1px solid #D0D0D0;`;
+
+        const nameSpan = document.createElement("span"); nameSpan.textContent = t.title; nameSpan.style.cssText = "color:#141414; font-weight:600;";
+        const ownerSpan = document.createElement("span"); ownerSpan.textContent = t.owner || "-"; ownerSpan.style.cssText = "text-align:center; color:#555;";
+        const dateSpan = document.createElement("span"); dateSpan.textContent = t.due_date || "-"; dateSpan.style.cssText = "text-align:center; color:#555;";
+        const prioSpan = document.createElement("span"); prioSpan.textContent = PRIORITY_LABEL[t.priority] || t.priority || "-"; prioSpan.style.cssText = "text-align:center; color:#555;";
+
+        row.appendChild(nameSpan); row.appendChild(ownerSpan); row.appendChild(dateSpan); row.appendChild(prioSpan);
+        taskCard.appendChild(row);
+
+        // 업무 상세 설명
+        if (t.content) {
+          const contentRow = document.createElement("div");
+          contentRow.style.cssText = `padding:12px 20px 12px 36px; font-size:12px; color:#666; line-height:1.7; background:#F8F8F8; border-bottom:1px solid #D0D0D0;`;
+          contentRow.textContent = t.content;
+          taskCard.appendChild(contentRow);
+        }
+      });
+
+      wrapper.appendChild(taskCard);
       document.body.appendChild(wrapper);
 
       const canvas = await html2canvas(wrapper, {
         scale: 2, useCORS: true, backgroundColor: "#ffffff",
-        windowWidth: 700, scrollX: 0, scrollY: 0,
+        windowWidth: W, scrollX: 0, scrollY: 0,
       });
       document.body.removeChild(wrapper);
 
@@ -272,12 +339,8 @@ export default function MeetingArchivePage() {
     }
   };
 
-  const toggleEmail = (taskId: number) => {
-    setEmailSelected(prev => {
-      const next = new Set(prev);
-      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
-      return next;
-    });
+  const removeRecipient = (userId: number) => {
+    setRecipients(prev => prev.filter(r => r.user_id !== userId));
   };
 
   const handleEmailSend = () => {
@@ -291,7 +354,7 @@ export default function MeetingArchivePage() {
   const transcript = getAllUtterances();
 
   return (
-    <div className="max-w-4xl mx-auto w-full py-10 px-6">
+    <div className="max-w-6xl mx-auto w-full py-10 px-6">
       <h2 className="text-[22px] font-bold mb-6" style={{ color: "#141414" }}>
         {meeting.title}
       </h2>
@@ -314,7 +377,7 @@ export default function MeetingArchivePage() {
         ))}
       </div>
 
-      {/* ── 회의록 탭 ── */}
+      {/* 회의록 탭  */}
       {tab === "minutes" && (
         <div>
           <div className="flex justify-end mb-4">
@@ -407,7 +470,7 @@ export default function MeetingArchivePage() {
             {tasks.map((task, idx) => (
               <div key={task.meeting_task_id} style={{ borderBottom: idx < tasks.length - 1 ? "1px solid #E6E1E6" : "none" }}>
                 <div className="grid items-center px-5 py-3" style={{ gridTemplateColumns: "1fr 120px 130px 100px" }}>
-                  {/* 접기/펼치기 버튼이 업무명 앞에 */}
+                  {/* 접기/펼치기 버튼 */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <button
                       onClick={() => toggleExpand(task.meeting_task_id)}
@@ -434,7 +497,7 @@ export default function MeetingArchivePage() {
         </div>
       )}
 
-      {/* ── 녹음 원문 탭 ── */}
+      {/* 녹음 원문 탭 */}
       {tab === "record" && (
         <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
           <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
@@ -460,7 +523,7 @@ export default function MeetingArchivePage() {
         </div>
       )}
 
-      {/* ── 챗봇 내역 탭 ── */}
+      {/* 챗봇 내역 탭 */}
       {tab === "chatbot" && (
         <div className="rounded-xl border flex flex-col" style={{ borderColor: "#E6E1E6", height: "520px" }}>
           <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
@@ -516,65 +579,75 @@ export default function MeetingArchivePage() {
         </div>
       )}
 
-      {/* ── 준비자료 탭 ── */}
-      {tab === "prep" && (
+      {/* 회의 자료 탭 */}
+      {tab === "material" && (
         <div>
-          <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
-            <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
-              회의 준비 자료
-            </div>
-            <div className="px-6 py-5 space-y-5">
-              {PREP_SECTIONS.map(section => (
-                <div key={section.label}>
-                  <p className="text-[13px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
-                  <div className="border rounded-xl px-4 py-3 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333", backgroundColor: "#F9F9FB" }}>
-                    {section.value}
-                  </div>
-                </div>
-              ))}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-[13px]" style={{ color: "#969696" }}>회의의 준비 자료입니다.</p>
+            <button
+              onClick={async () => {
+                const wrapper = document.createElement("div");
+                wrapper.style.cssText = `position:absolute;top:-9999px;left:-9999px;width:700px;background:#fff;padding:48px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;box-sizing:border-box;color:#111;`;
+                const titleEl = document.createElement("div");
+                titleEl.style.cssText = `text-align:center;font-size:17px;font-weight:700;margin-bottom:24px;`;
+                titleEl.textContent = "회의 준비 자료";
+                wrapper.appendChild(titleEl);
+                const agendaEl = document.createElement("div");
+                agendaEl.style.cssText = `margin-bottom:20px;font-size:13px;line-height:1.9;`;
+                agendaEl.innerHTML = `<b>기초안건</b><br/>${DUMMY_AGENDA.map((a,i) => `${i+1}. ${a}`).join("<br/>")}`;
+                wrapper.appendChild(agendaEl);
+                PREP_SECTIONS.forEach(s => {
+                  const sec = document.createElement("div");
+                  sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
+                  sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
+                  wrapper.appendChild(sec);
+                });
+                document.body.appendChild(wrapper);
+                const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+                document.body.removeChild(wrapper);
+                const imgData = canvas.toDataURL("image/png");
+                const pageW = 210;
+                const pageH = Math.ceil(canvas.height * pageW / canvas.width);
+                const pdf = new jsPDF({ orientation: "p", unit: "mm", format: [pageW, pageH] });
+                pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
+                pdf.save("회의_준비_자료.pdf");
+              }}
+              className="px-5 py-2 text-[13px] text-white rounded-lg"
+              style={{ backgroundColor: "#623FB5" }}
+            >
+              PDF 다운로드
+            </button>
+          </div>
 
-              <div>
-                <p className="text-[13px] font-bold mb-2" style={{ color: "#141414" }}>참조 문서 목록</p>
-                <div className="border rounded-xl px-4 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
-                  {PREP_REFERENCES.map((ref, i) => (
-                    <p key={i} className="text-[13px]">
-                      <span style={{ color: "#141414" }}>- {ref} </span>
-                      <span className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</span>
-                    </p>
-                  ))}
-                </div>
-              </div>
+          {/* 기초안건 */}
+          <div className="mb-5">
+            <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>기초 안건</p>
+            <div className="rounded-xl px-5 py-4 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#141414" }}>
+              {DUMMY_AGENDA.map((a, i) => (
+                <p key={i} className="leading-relaxed">{i + 1}. {a}</p>
+              ))}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* ── 기초안건 탭 ── */}
-      {tab === "agenda" && (
-        <div>
-          <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
-            <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
-              기초 안건
-            </div>
-            <div className="px-6 py-5">
-              <p className="text-[12px] mb-5" style={{ color: "#969696" }}>
-                회의 시 논의된 기초안건 목록입니다.
-              </p>
-              <div className="flex flex-col gap-3">
-                {DUMMY_AGENDA.map((agenda, idx) => (
-                  <div key={idx} className="flex items-center gap-4 rounded-xl px-5 py-4 border" style={{ borderColor: "#E6E1E6", backgroundColor: "#FAFAFA" }}>
-                    <div
-                      className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: "#623FB5" }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                        <path d="M5 10.5l2.5 2.5 7.5-7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                    <span className="text-[13px]" style={{ color: "#141414" }}>
-                      {agenda}
-                    </span>
-                  </div>
+          {/* 준비자료 섹션들 */}
+          <div className="space-y-5">
+            {PREP_SECTIONS.map(section => (
+              <div key={section.label}>
+                <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
+                <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
+                  {section.value}
+                </div>
+              </div>
+            ))}
+
+            <div>
+              <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>참고 자료</p>
+              <div className="border rounded-xl px-5 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
+                {PREP_REFERENCES.map((ref, i) => (
+                  <p key={i} className="text-[13px]">
+                    <span style={{ color: "#141414" }}>- {ref} </span>
+                    <span className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</span>
+                  </p>
                 ))}
               </div>
             </div>
@@ -582,77 +655,121 @@ export default function MeetingArchivePage() {
         </div>
       )}
 
-      {/* ── 이메일 발송 탭 ── */}
+      {/* 이메일 발송 탭 */}
       {tab === "email" && (
         <div>
-          <div className="rounded-xl border mb-5" style={{ borderColor: "#E6E1E6" }}>
-            <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
-              요약 메일 발송
-            </div>
-            <div className="px-6 py-4">
-              <p className="text-[12px] mb-5" style={{ color: "#969696" }}>
-                체크된 태스크 담당자에게 맞춤 메일이 발송됩니다.
-              </p>
-              {emailSent ? (
-                <div className="flex items-center justify-center py-10 text-[14px] font-medium" style={{ color: "#623FB5" }}>
-                  ✅ 메일이 발송되었습니다.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {tasks.map(task => {
-                    const isSelected = emailSelected.has(task.meeting_task_id);
-                    return (
-                      <button
-                        key={task.meeting_task_id}
-                        onClick={() => toggleEmail(task.meeting_task_id)}
-                        className="w-full text-left px-5 py-4 rounded-xl border transition-colors"
-                        style={isSelected
-                          ? { backgroundColor: "#F2F0FF", borderColor: "#C4B5E8" }
-                          : { backgroundColor: "#fff", borderColor: "#E6E1E6" }
-                        }
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold mb-0.5" style={{ color: isSelected ? "#3B1E8E" : "#141414" }}>
-                              {task.owner || "미배정"}
-                            </p>
-                            <p className="text-[12px]" style={{ color: isSelected ? "#7B5EA7" : "#969696" }}>
-                              담당 태스크: {task.title}{task.due_date ? ` (${task.due_date})` : ""}
-                            </p>
-                          </div>
-                          <div
-                            className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center"
-                            style={isSelected
-                              ? { backgroundColor: "#623FB5", border: "2px solid #623FB5" }
-                              : { border: "2px solid #D1D5DB", backgroundColor: "#fff" }
-                            }
-                          >
-                            {isSelected && (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#fff" strokeWidth={3}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+          <p className="text-[13px] mb-4" style={{ color: "#969696" }}>요약 이메일입니다.</p>
 
-          {!emailSent && (
-            <div className="flex justify-end">
-              <button
-                onClick={handleEmailSend}
-                disabled={emailSending || emailSelected.size === 0}
-                className="px-6 py-2.5 text-[13px] text-white rounded-lg font-semibold disabled:opacity-50"
-                style={{ backgroundColor: "#623FB5" }}
-              >
-                {emailSending ? "발송 중..." : "메일 발송"}
-              </button>
+          {emailSent ? (
+            <div className="flex items-center justify-center py-20 text-[14px] font-medium" style={{ color: "#623FB5" }}>
+              ✅ 메일이 발송되었습니다.
             </div>
+          ) : (
+            <>
+              <div className="flex gap-5">
+                {/* 왼쪽: 회의 정보 */}
+                <div className="flex-1 flex flex-col gap-4">
+                  {/* 회의 제목 */}
+                  <div className="rounded-xl border p-5" style={{ borderColor: "#E6E1E6" }}>
+                    <p className="text-[12px] mb-1" style={{ color: "#969696" }}>회의 제목(수정 불가)</p>
+                    <p className="text-[14px] font-medium" style={{ color: "#141414" }}>{meeting.title}</p>
+                  </div>
+
+                  {/* 회의 정보 */}
+                  <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
+                    <p className="px-5 pt-4 pb-2 text-[13px] font-bold" style={{ color: "#141414" }}>회의 정보</p>
+                    <div className="px-5 pb-4 flex flex-col gap-2 text-[13px]">
+                      <div className="flex gap-3">
+                        <span style={{ color: "#969696", minWidth: "70px" }}>회의 일시</span>
+                        <span style={{ color: "#141414" }}>{formatDate(meeting.meeting_at)}</span>
+                      </div>
+                      <div className="flex gap-3">
+                        <span style={{ color: "#969696", minWidth: "70px" }}>회의 참석자</span>
+                        <span style={{ color: "#141414" }}>{participantNames}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 부여된 태스크 */}
+                  <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
+                    <p className="px-5 pt-4 pb-2 text-[13px] font-bold" style={{ color: "#141414" }}>부여된 태스크</p>
+                    <table className="w-full text-[12px]" style={{ borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr style={{ backgroundColor: "#F4F5F8", borderTop: "1px solid #E6E1E6", borderBottom: "1px solid #E6E1E6" }}>
+                          <th className="px-4 py-2.5 text-left font-medium" style={{ color: "#555" }}>태스크</th>
+                          <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap" style={{ color: "#555", width: "80px" }}>담당자</th>
+                          <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap" style={{ color: "#555", width: "100px" }}>기한</th>
+                          <th className="px-4 py-2.5 text-left font-medium whitespace-nowrap" style={{ color: "#555", width: "70px" }}>우선순위</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {tasks.map((task, idx) => (
+                          <tr key={task.meeting_task_id} style={{ borderBottom: idx < tasks.length - 1 ? "1px solid #E6E1E6" : "none" }}>
+                            <td className="px-4 py-3" style={{ color: "#141414" }}>{task.title}</td>
+                            <td className="px-4 py-3 whitespace-nowrap" style={{ color: "#555" }}>{task.owner || "미배정"}</td>
+                            <td className="px-4 py-3 whitespace-nowrap" style={{ color: "#555" }}>{task.due_date || "-"}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="px-2 py-0.5 rounded-full text-[11px]" style={{ backgroundColor: "#F2F0FF", color: "#623FB5" }}>
+                                {PRIORITY_LABEL[task.priority] || task.priority}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* 이메일 수신자 */}
+                  <div className="rounded-xl border p-4" style={{ borderColor: "#E6E1E6" }}>
+                    <p className="text-[13px] font-bold mb-3" style={{ color: "#141414" }}>이메일 수신자</p>
+                    <div className="flex flex-wrap gap-2">
+                      {recipients.map(r => (
+                        <span
+                          key={r.user_id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
+                          style={{ backgroundColor: "#F4F5F8", color: "#141414", border: "1px solid #E6E1E6" }}
+                        >
+                          {r.name}
+                          <button onClick={() => removeRecipient(r.user_id)} style={{ color: "#969696" }}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 이메일 미리보기 */}
+                <div className="w-[440px] flex-shrink-0">
+                  <p className="text-[14px] font-bold mb-3" style={{ color: "#141414" }}>이메일 미리보기</p>
+                  <div className="rounded-xl border px-6 py-5 text-[13px] leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
+                    <p className="mb-4">안녕하세요, OOO.</p>
+                    <p className="mb-4">회의록이 확정되었습니다. 아래 태스크가 회원님께 부여되었으니 기한 내에 처리해 주세요.</p>
+                    <p className="font-bold mb-1">[회의 정보]</p>
+                    <p>• 회의 제목: {meeting.title}</p>
+                    <p className="mb-4">• 회의 일시: {formatDate(meeting.meeting_at)}</p>
+                    <p className="font-bold mb-1">[부여된 태스크]</p>
+                    {tasks.map((task, i) => (
+                      <p key={task.meeting_task_id}>
+                        {i + 1}. {task.title} (담당자: {task.owner}, 기한: {task.due_date || "-"}, 우선순위: {PRIORITY_LABEL[task.priority] || task.priority})
+                      </p>
+                    ))}
+                    <p className="mt-4">프로젝트에서 더 자세한 내용을 확인하실 수 있습니다.</p>
+                    <p>감사합니다.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 발송 버튼 */}
+              <div className="flex justify-end mt-5">
+                <button
+                  onClick={handleEmailSend}
+                  disabled={emailSending || recipients.length === 0}
+                  className="px-8 py-3 text-[14px] text-white rounded-lg font-semibold disabled:opacity-50"
+                  style={{ backgroundColor: "#623FB5" }}
+                >
+                  {emailSending ? "발송 중..." : "이메일 발송"}
+                </button>
+              </div>
+            </>
           )}
         </div>
       )}
