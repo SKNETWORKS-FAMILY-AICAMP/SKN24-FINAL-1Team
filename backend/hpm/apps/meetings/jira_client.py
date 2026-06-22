@@ -1,15 +1,19 @@
 import os
+import re
 import requests
 
 JIRA_STATUS_TO_COLUMN = {
     "To Do":       "todo",
     "할 일":        "todo",
+    "해야 할 일":   "todo",
     "In Progress": "progress",
     "진행 중":      "progress",
     "In Review":   "review",
     "검토":         "review",
+    "검토 중":      "review",
     "Done":        "done",
     "완료":         "done",
+    "해결됨":       "done",
 }
 
 COLUMN_TO_TRANSITION_NAME = {
@@ -23,8 +27,49 @@ COLUMN_TO_STATUS_NAMES = {
     "todo": ["To Do", "해야 할 일"],
     "progress": ["In Progress", "진행 중"],
     "review": ["In Review", "검토 중"],
-    "done": ["Done", "완료"],
+    "done": ["Done", "완료", "해결됨"],
 }
+
+
+def create_jira_project(project_name: str, access_token: str, cloud_id: str) -> dict:
+    """Jira에 새 프로젝트를 생성하고 key와 name을 반환."""
+    # project key: 대문자 알파벳으로만, 최대 10자
+    raw = re.sub(r"[^A-Za-z0-9]", "", project_name).upper()[:10] or "PROJ"
+    project_key = raw if raw else "PROJ"
+
+    url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {
+        "key": project_key,
+        "name": project_name,
+        "projectTypeKey": "software",
+        "projectTemplateKey": "com.pyxis.greenhopper.jira:gh-kanban-template",
+        "assigneeType": "PROJECT_LEAD",
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 400:
+            # key 충돌 가능성 — suffix 추가
+            import random, string
+            suffix = "".join(random.choices(string.ascii_uppercase, k=3))
+            payload["key"] = (project_key[:7] + suffix)[:10]
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return {"success": True, "key": data.get("key"), "name": data.get("name")}
+    except requests.RequestException as e:
+        error_detail = ""
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail = e.response.json()
+            except Exception:
+                error_detail = e.response.text
+        return {"success": False, "error": str(e), "detail": error_detail}
 
 
 def get_jira_config():
