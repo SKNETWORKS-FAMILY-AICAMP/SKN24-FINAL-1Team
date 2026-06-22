@@ -50,6 +50,7 @@ class Migration(migrations.Migration):
                 ('role', models.CharField(default='USER', max_length=20, verbose_name='관리자/사용자')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='계정 생성 일시')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='계정 수정 일시')),
+                ('is_initial_password', models.BooleanField(default=True, verbose_name='최초 비밀번호')),
                 ('jira_account_id', models.CharField(blank=True, db_column='jira_account_Id', max_length=255, null=True, verbose_name='아이디')),
                 ('jira_access_token', models.TextField(blank=True, null=True, verbose_name='Jira 액세스 토큰')),
                 ('jira_refresh_token', models.TextField(blank=True, null=True, verbose_name='Jira 리프레시 토큰')),

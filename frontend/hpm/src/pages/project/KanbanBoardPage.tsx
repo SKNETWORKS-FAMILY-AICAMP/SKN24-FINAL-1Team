@@ -36,6 +36,7 @@ const mapJiraPriority = (priority: string): KanbanPriority => {
   if (normalized.includes("high")) return KANBAN_PRIORITIES[3];
   if (normalized.includes("lowest")) return KANBAN_PRIORITIES[0];
   if (normalized.includes("low")) return KANBAN_PRIORITIES[1];
+
   return KANBAN_PRIORITIES[2];
 };
 
@@ -77,7 +78,7 @@ const jiraBoardToTasks = (board: ProjectJiraBoard, columns: KanbanColumnConfig[]
       category: issue.parent_title || "Epic 없음",
       dueDate: issue.due_date || "",
       startDate: issue.created ? issue.created.slice(0, 10) : "",
-      assignee: issue.assignee,
+      assignee: issue.assignee || "-",
       priority: mapJiraPriority(issue.priority),
       code: issue.issue_key,
       owner: issue.assignee || "-",
@@ -104,6 +105,9 @@ export default function KanbanBoardPage() {
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     getProjectJiraBoard(projectId)
       .then((board) => {
         const nextColumns = toKanbanColumns(board.columns || []);
@@ -114,6 +118,9 @@ export default function KanbanBoardPage() {
         console.error("Jira 칸반 조회 실패:", error);
         setBoardColumns(KANBAN_COLUMNS);
         setTasks([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [projectId]);
 

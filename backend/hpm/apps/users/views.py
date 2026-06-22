@@ -62,7 +62,6 @@ def login(request):
         return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, 
         status=status.HTTP_401_UNAUTHORIZED)
 
-    # 초기 비밀번호 abc123 또는 해시 비교
     raw_match = (password == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD)
     hash_match = (user.password == _hash_pw(password))
 

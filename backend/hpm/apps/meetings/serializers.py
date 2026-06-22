@@ -56,3 +56,12 @@ class RecordUtteranceSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecordUtterance
         fields = "__all__"
+
+
+from .models import MeetingPreparation
+
+class MeetingPreparationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MeetingPreparation
+        fields = "__all__"
+
