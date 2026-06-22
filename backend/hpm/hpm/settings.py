@@ -5,9 +5,11 @@ from datetime import timedelta
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent.parent
 
 # 절대경로 → 상대경로로 변경 (parents[3]는 .env 위치에 맞게 조정)
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(PROJECT_ROOT / ".env")
+load_dotenv(BASE_DIR / ".env", override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-^ai6lg-1&n^afjylo6rs$2s(!5)j(449z=!vfje)7h7xb71!*v")
 
