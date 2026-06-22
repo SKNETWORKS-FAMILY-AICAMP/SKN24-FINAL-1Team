@@ -194,10 +194,7 @@ def project_jira_board(request, project_id):
     if not project.jira_project_key:
         return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        user = Users.objects.get(users_id=user_id)
-    except Users.DoesNotExist:
-        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    user = project.project_owner
 
     access_token = get_valid_access_token(user)
     if not access_token:
@@ -209,6 +206,18 @@ def project_jira_board(request, project_id):
     jira_columns = _get_jira_board_columns(access_token, user.jira_cloud_id, project.jira_project_key)
 
     if request.method == "POST":
+        try:
+            requester = Users.objects.get(users_id=user_id)
+        except Users.DoesNotExist:
+            return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        requester_token = get_valid_access_token(requester)
+        if not requester_token or not requester.jira_cloud_id:
+            return Response({"error": "Jira connection is required to manage board tasks."}, status=status.HTTP_403_FORBIDDEN)
+
+        access_token = requester_token
+        user = requester
+
         title = (request.data.get("title") or "").strip()
         if not title:
             return Response({"error": "title is required."}, status=status.HTTP_400_BAD_REQUEST)

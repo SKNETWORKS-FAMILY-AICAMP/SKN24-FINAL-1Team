@@ -14,6 +14,7 @@ import {
   createProjectJiraIssue,
   getProjectDetail,
   getProjectJiraBoard,
+  getJiraStatus,
   type ProjectMember,
   type ProjectJiraBoard,
   type JiraBoardColumn,
@@ -103,6 +104,7 @@ export default function KanbanBoardPage() {
   const [modal, setModal] = useState<KanbanModalState | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canManageJira, setCanManageJira] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -133,6 +135,12 @@ export default function KanbanBoardPage() {
         setLoading(false);
       });
   }, [projectId]);
+
+  useEffect(() => {
+    getJiraStatus()
+      .then((status) => setCanManageJira(status.connected))
+      .catch(() => setCanManageJira(false));
+  }, []);
 
   useEffect(() => {
     if (!projectId) {
@@ -188,6 +196,8 @@ export default function KanbanBoardPage() {
   );
 
   const openAddModal = (columnId: KanbanColumnId) => {
+    if (!canManageJira) return;
+
     const defaultAssignee = assigneeOptions[0];
     setModal({
       mode: "add",
@@ -201,6 +211,8 @@ export default function KanbanBoardPage() {
   };
 
   const openEditModal = (task: KanbanTask) => {
+    if (!canManageJira) return;
+
     setModal({
       mode: "edit",
       columnId: task.columnId,
@@ -313,6 +325,7 @@ export default function KanbanBoardPage() {
             tasks={tasksByColumn[column.id]}
             onAddTask={openAddModal}
             onEditTask={openEditModal}
+            readOnly={!canManageJira}
           />
         ))}
       </section>
