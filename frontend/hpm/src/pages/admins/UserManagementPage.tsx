@@ -270,8 +270,6 @@ export default function UserManagementPage() {
     setRegisterErrors(INIT_ERRORS);
   };
 
-  const statusColor = (_s: string) => "text-[#0A0A0A]";
-
   // 공통 모달 레이아웃 
   const ConfirmModal = ({
     message, onConfirm, onCancel,

@@ -27,6 +27,8 @@ urlpatterns = [
     path("<int:meeting_id>/tasks/<int:task_id>/", views.task_detail),
     # Jira 등록
     path("<int:meeting_id>/jira/", views.register_jira_tasks),
+    # 회의 후 요약 이메일 발송
+    path("<int:meeting_id>/email/", views.send_summary_email),
     # 안건생성
     path("<int:meeting_id>/agenda/generate/", generate_agenda),
     # speaker_mapping_list

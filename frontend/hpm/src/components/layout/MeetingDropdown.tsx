@@ -39,7 +39,9 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
 
   const isActive = (path: string) => location.pathname.startsWith(path);
   const isMeetingSelected = (meetingId: number) =>
-    location.pathname === `/meetings/${meetingId}` || location.pathname === `/meetings/${meetingId}/minutes`;
+    location.pathname === `/meetings/${meetingId}` ||
+    location.pathname === `/meetings/${meetingId}/minutes` ||
+    location.pathname === `/meetings/${meetingId}/archive`;
 
   const showArrow = meetingOpen || isHovered;
 
@@ -120,7 +122,7 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
               key={m.meeting_id}
               onClick={() => {
                 if (m.status !== "scheduled" && m.status !== "in_progress") {
-                  navigate(`/meetings/${m.meeting_id}/minutes`);
+                  navigate(`/meetings/${m.meeting_id}/archive`);
                 } else {
                   navigate(`/meetings/${m.meeting_id}`);
                 }

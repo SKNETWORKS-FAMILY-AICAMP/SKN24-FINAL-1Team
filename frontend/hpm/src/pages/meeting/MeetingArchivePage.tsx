@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 import {
   getMeetingDetail,
   getTaskList,
+  sendMeetingSummaryEmail,
   getTranscript,
   getAgendaList,
   getPrepMaterial,
@@ -55,7 +56,8 @@ export default function MeetingArchivePage() {
   const [downloading, setDownloading] = useState(false);
 
   // 이메일 발송
-  const [recipients, setRecipients] = useState<{ user_id: number; name: string }[]>([]);
+  const [recipients, setRecipients] = useState<NonNullable<Meeting["participants"]>>([]);
+  const [emailRecipientQuery, setEmailRecipientQuery] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
@@ -68,11 +70,14 @@ export default function MeetingArchivePage() {
       getPrepMaterial(meetingId),
     ])
       .then(([m, t, tr, ag, pr]) => {
-        if (m) { setMeeting(m); if (m.participants?.length) setRecipients(m.participants); }
-        if (t?.length) setTasks(t);
-        if (tr?.length) setTranscript(tr);
-        if (ag?.length) setAgenda(ag);
-        if (pr) setPrep(pr);
+        if (m) {
+          setMeeting(m);
+          setRecipients(m.participants || []);
+        }
+        setTasks(t || []);
+        setTranscript(tr || []);
+        setAgenda(ag || []);
+        setPrep(pr || null);
       })
       .catch(() => {});
   }, [meetingId]);
@@ -90,6 +95,18 @@ export default function MeetingArchivePage() {
 
   const participantNames = meeting.participants?.map(p => p.name).join(", ") || "-";
   const writer = meeting.participants?.[0]?.name || "-";
+  const selectedRecipientIds = new Set(recipients.map(recipient => recipient.user_id));
+  const normalizedRecipientQuery = emailRecipientQuery.trim().toLowerCase();
+  const matchingRecipients = normalizedRecipientQuery
+    ? (meeting.participants || []).filter(participant => {
+        if (selectedRecipientIds.has(participant.user_id)) return false;
+        return [
+          participant.name,
+          participant.email || "",
+          participant.work || "",
+        ].some(value => value.toLowerCase().includes(normalizedRecipientQuery));
+      })
+    : [];
 
   const handlePdfDownload = async () => {
     if (downloading) return;
@@ -237,16 +254,30 @@ export default function MeetingArchivePage() {
     }
   };
 
-  const removeRecipient = (userId: number) => {
-    setRecipients(prev => prev.filter(r => r.user_id !== userId));
-  };
-
-  const handleEmailSend = () => {
+  const handleEmailSend = async () => {
+    if (emailSending) return;
     setEmailSending(true);
-    setTimeout(() => {
+    try {
+      await sendMeetingSummaryEmail(meetingId, recipients.map(recipient => recipient.user_id));
       setEmailSending(false);
       setEmailSent(true);
-    }, 700);
+    } catch (error) {
+      console.error("요약 이메일 발송 실패:", error);
+      setEmailSending(false);
+      alert("요약 이메일 발송에 실패했습니다.");
+    }
+  };
+
+  const removeRecipient = (userId: number) => {
+    setRecipients(prev => prev.filter(recipient => recipient.user_id !== userId));
+  };
+
+  const addRecipient = (participant: NonNullable<Meeting["participants"]>[number]) => {
+    setRecipients(prev => {
+      if (prev.some(recipient => recipient.user_id === participant.user_id)) return prev;
+      return [...prev, participant];
+    });
+    setEmailRecipientQuery("");
   };
 
   return (
@@ -356,8 +387,9 @@ export default function MeetingArchivePage() {
               업무
             </div>
             {/* 헤더 */}
-            <div className="grid text-[12px] font-semibold px-5 py-2.5" style={{ gridTemplateColumns: "1fr 120px 130px 100px", color: "#555", borderBottom: "1px solid #E6E1E6", backgroundColor: "#FAFAFA" }}>
+            <div className="grid text-[12px] font-semibold px-5 py-2.5" style={{ gridTemplateColumns: "1fr 72px 120px 130px 100px", color: "#555", borderBottom: "1px solid #E6E1E6", backgroundColor: "#FAFAFA" }}>
               <span>업무명</span>
+              <span aria-hidden="true" />
               <span className="text-center">담당자</span>
               <span className="text-center">기한</span>
               <span className="text-center">우선순위</span>
@@ -365,17 +397,14 @@ export default function MeetingArchivePage() {
 
             {tasks.map((task, idx) => (
               <div key={task.meeting_task_id} style={{ borderBottom: idx < tasks.length - 1 ? "1px solid #E6E1E6" : "none" }}>
-                <div className="grid items-center px-5 py-3" style={{ gridTemplateColumns: "1fr 120px 130px 100px" }}>
-                  {/* 접기/펼치기 버튼 */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <button
-                      onClick={() => toggleExpand(task.meeting_task_id)}
-                      style={{ color: "#623FB5", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}
-                    >
-                      {expandedIds.has(task.meeting_task_id) ? "접기 ▲" : "펼치기 ▼"}
-                    </button>
-                    <span style={{ fontSize: "13px", color: "#141414" }}>{task.title}</span>
-                  </div>
+                <div className="grid items-center px-5 py-3" style={{ gridTemplateColumns: "1fr 72px 120px 130px 100px" }}>
+                  <span style={{ fontSize: "13px", color: "#141414" }}>{task.title}</span>
+                  <button
+                    onClick={() => toggleExpand(task.meeting_task_id)}
+                    style={{ color: "#623FB5", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", justifySelf: "center" }}
+                  >
+                    {expandedIds.has(task.meeting_task_id) ? "접기 ▲" : "펼치기 ▼"}
+                  </button>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{task.owner}</span>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{task.due_date || "-"}</span>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{PRIORITY_LABEL[task.priority] || task.priority}</span>
@@ -581,18 +610,69 @@ export default function MeetingArchivePage() {
                   {/* 이메일 수신자 */}
                   <div className="rounded-xl border p-4" style={{ borderColor: "#E6E1E6" }}>
                     <p className="text-[13px] font-bold mb-3" style={{ color: "#141414" }}>이메일 수신자</p>
-                    <div className="flex flex-wrap gap-2">
-                      {recipients.map(r => (
-                        <span
-                          key={r.user_id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
-                          style={{ backgroundColor: "#F4F5F8", color: "#141414", border: "1px solid #E6E1E6" }}
-                        >
-                          {r.name}
-                          <button onClick={() => removeRecipient(r.user_id)} style={{ color: "#969696" }}>×</button>
-                        </span>
-                      ))}
+                    <div className="rounded-xl border bg-white p-3" style={{ borderColor: "#E6E1E6" }}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {recipients.map(r => (
+                          <span
+                            key={r.user_id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
+                            style={{ backgroundColor: "#F4F5F8", color: "#141414", border: "1px solid #E6E1E6" }}
+                          >
+                            {r.name}
+                            <button
+                              type="button"
+                              onClick={() => removeRecipient(r.user_id)}
+                              aria-label={`${r.name} 수신자 제거`}
+                              className="text-[14px] leading-none"
+                              style={{ color: "#969696" }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          value={emailRecipientQuery}
+                          onChange={e => setEmailRecipientQuery(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Backspace" && emailRecipientQuery.length === 0 && recipients.length > 0) {
+                              e.preventDefault();
+                              removeRecipient(recipients[recipients.length - 1].user_id);
+                              return;
+                            }
+                            if (e.key === "Enter" && matchingRecipients[0]) {
+                              e.preventDefault();
+                              addRecipient(matchingRecipients[0]);
+                            }
+                          }}
+                          placeholder={recipients.length === 0 ? "이름이나 이메일, 직무를 입력해주세요" : ""}
+                          className="h-8 min-w-[180px] flex-1 border-0 bg-transparent text-[13px] text-[#141414] outline-none placeholder:text-[#969696]"
+                        />
+                      </div>
                     </div>
+                    {normalizedRecipientQuery && (
+                      <div className="mt-2 overflow-hidden rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
+                        {matchingRecipients.length > 0 ? (
+                          matchingRecipients.map(participant => (
+                            <button
+                              key={participant.user_id}
+                              type="button"
+                              onClick={() => addRecipient(participant)}
+                              className="block w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
+                              style={{ borderColor: "#E6E1E6" }}
+                            >
+                              <p className="text-[13px] font-medium" style={{ color: "#141414" }}>
+                                {participant.name}{participant.email ? ` (${participant.email})` : ""}
+                              </p>
+                              {participant.work && (
+                                <p className="mt-0.5 text-[12px]" style={{ color: "#969696" }}>{participant.work}</p>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-4 py-3 text-[12px]" style={{ color: "#969696" }}>검색 결과가 없습니다.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

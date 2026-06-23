@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { getTaskList, registerJiraTasks, type Task } from "../../services/meeting";
 import StepBar from "../../components/meeting/StepBar";
 
@@ -7,66 +8,40 @@ const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
 };
 
-const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
+const PRIORITY_COLOR: Record<string, string> = {
+  Highest: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+  High: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+  Medium: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+  Low: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+  Lowest: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+};
 
-const MOCK_TASKS: Task[] = [
-  {
-    meeting_task_id: 1,
-    title: "사내 클라우드 보호처 신청 절차 및 예산 코드 확인",
-    content: "",
-    owner: "김규호",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-  {
-    meeting_task_id: 2,
-    title: "운영 서버 외부 API 호출 보안 정책 확인",
-    content: "",
-    owner: "김규호",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-  {
-    meeting_task_id: 3,
-    title: "업종 코드 자동 분류 기능 RFP 범위 검토",
-    content: "",
-    owner: "류지우",
-    due_date: "2026-06-05",
-    priority: "Medium",
-    status: 0,
-  },
-  {
-    meeting_task_id: 4,
-    title: "파인튜닝 GPU 서버 확보 방안 검토",
-    content: "",
-    owner: "박수영",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-];
+const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
 
 export default function JiraTaskPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const meetingId = Number(id);
 
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [selected, setSelected] = useState<Set<number>>(
-    new Set(MOCK_TASKS.map(t => t.meeting_task_id))
-  );
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [registered, setRegistered] = useState<Set<number>>(new Set());
+  const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
+  const [showRetryModal, setShowRetryModal] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     getTaskList(meetingId)
       .then(list => {
-        if (list && list.length > 0) {
-          setTasks(list);
-          setSelected(new Set(list.map(t => t.meeting_task_id)));
-        }
+        const nextTasks = list || [];
+        setTasks(nextTasks);
+        setSelected(new Set(nextTasks.map(task => task.meeting_task_id)));
+        setRegistered(new Set());
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [meetingId]);
 
   const toggle = (taskId: number) => {
@@ -77,43 +52,52 @@ export default function JiraTaskPage() {
     });
   };
 
-  const handleRegister = async () => {
+  const runRegister = async () => {
+    if (selected.size === 0) return;
+
     setRegistering(true);
     try {
       const taskIds = [...selected];
-      await registerJiraTasks(meetingId, taskIds);
-    } catch {
-      // 등록 실패해도 다음 페이지로 진행
+      const result = await registerJiraTasks(meetingId, taskIds, user?.users_id);
+      const registeredTaskIds = result.registered.map(item => item.task_id);
+      setRegistered(prev => {
+        const next = new Set(prev);
+        registeredTaskIds.forEach(taskId => next.add(taskId));
+        return next;
+      });
+      setSelected(prev => {
+        const next = new Set(prev);
+        registeredTaskIds.forEach(taskId => next.delete(taskId));
+        return next;
+      });
+
+      if (result.failed.length > 0 || result.registered.length === 0) {
+        setShowRetryModal(true);
+        return;
+      }
+
+      navigate(`/meetings/${meetingId}/email`);
+    } catch (error) {
+      console.error("Jira 등록 실패:", error);
+      setShowRetryModal(true);
     } finally {
       setRegistering(false);
-      navigate(`/meetings/${meetingId}/email`);
     }
   };
 
   return (
     <div className="mx-auto max-w-[960px] p-8">
-      <div className="mb-8 flex items-center gap-3">
-        {stepLabels.map((label, index) => (
-          <div
-            key={label}
-            className={`rounded-full px-4 py-2 text-sm ${
-              index === 1 ? "bg-[#623FB5] text-white" : "bg-[#F4F5F8] text-[#969696]"
-            }`}
-          >
-            {label}
-          </div>
-        ))}
-      </div>
+      <StepBar steps={STEP_LABELS} activeStep={2} />
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-[24px] font-semibold text-[#141414]">Jira 태스크 등록</h1>
         <button
           type="button"
-          disabled={selected.length === 0 || registering}
-          onClick={handleRegister}
+          disabled={selected.size === 0 || registering}
+          onClick={runRegister}
           className="rounded-[8px] bg-[#623FB5] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
         >
-          {registering ? "등록 중..." : `선택 등록 (${selected.length})`}
+          {registering ? "등록 중..." : `선택 등록 (${selected.size})`}
         </button>
       </div>
 
@@ -128,8 +112,8 @@ export default function JiraTaskPage() {
       ) : (
         <div className="flex flex-col gap-3">
           {tasks.map((task) => {
-            const isRegistered = registered.includes(task.meeting_task_id) || task.is_jira_synced;
-            const isSelected = selected.includes(task.meeting_task_id);
+            const isRegistered = registered.has(task.meeting_task_id);
+            const isSelected = selected.has(task.meeting_task_id);
 
             return (
               <button
@@ -143,7 +127,7 @@ export default function JiraTaskPage() {
                     : "border-[#E6E1E6] bg-white hover:border-[#623FB5]"
                 } ${isRegistered ? "cursor-not-allowed opacity-60" : ""}`}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-[#141414]">{task.title}</p>
                     <p className="mt-1 text-xs text-[#969696]">
@@ -151,7 +135,7 @@ export default function JiraTaskPage() {
                     </p>
                   </div>
                   <span
-                    className={`shrink-0 rounded-full px-3 py-1 text-xs ${
+                    className={`flex h-9 shrink-0 items-center rounded-[7px] px-3 text-[13px] font-semibold ${
                       PRIORITY_COLOR[task.priority] || "bg-gray-100 text-gray-500"
                     }`}
                   >
@@ -164,6 +148,39 @@ export default function JiraTaskPage() {
               </button>
             );
           })}
+        </div>
+      )}
+      {showRetryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="w-80 overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="font-medium leading-relaxed text-[#623FB5]">
+                Jira 등록에 실패하였습니다.<br />재시도 하시겠습니까?
+              </p>
+            </div>
+            <div className="flex border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRetryModal(false);
+                  void runRegister();
+                }}
+                className="flex-1 border-r border-gray-200 py-4 text-sm text-gray-700 transition hover:bg-gray-50"
+              >
+                확인
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRetryModal(false);
+                  navigate(`/meetings/${meetingId}/email`);
+                }}
+                className="flex-1 py-4 text-sm text-gray-700 transition hover:bg-gray-50"
+              >
+                취소
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -12,8 +12,17 @@ from rest_framework.response import Response
 
 from apps.notifications.models import Notification
 from apps.users.models import Users
+from apps.users.views import get_valid_access_token
+from apps.meetings.jira_client import create_jira_issue_for_board
 from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance, MeetingPreparation, PreparationDocument
-from .serializers import MeetingAgendaSerializer, MeetingSerializer, MeetingTaskSerializer, RecordUtteranceSerializer, MeetingPreparationSerializer
+from .serializers import (
+    MeetingAgendaSerializer,
+    MeetingSerializer,
+    MeetingTaskSerializer,
+    RecordUtteranceSerializer,
+    MeetingPreparationSerializer,
+    build_meeting_participants,
+)
 
 
 def _minutes_payload(meeting, text):
@@ -65,6 +74,62 @@ def _send_invite_email(user, meeting) :
     except Exception as e:
         print(f"이메일 발송 실패 ({user.email}) : {e}")
 
+def _meeting_email_recipients(meeting):
+    recipients = []
+    seen_user_ids = set()
+
+    if meeting.creator_id and meeting.creator:
+        recipients.append(meeting.creator)
+        seen_user_ids.add(meeting.creator_id)
+
+    meeting_users = MeetingUsers.objects.filter(meeting=meeting).select_related("user")
+    for meeting_user in meeting_users:
+        user = meeting_user.user
+        if user.users_id in seen_user_ids:
+            continue
+        recipients.append(user)
+        seen_user_ids.add(user.users_id)
+
+    return recipients
+
+def _send_summary_email(user, meeting, tasks):
+    task_lines = []
+    for idx, task in enumerate(tasks, start=1):
+        owner = task.meeting_users.user.name if task.meeting_users_id and task.meeting_users else "미배정"
+        due_date = task.due_date.isoformat() if task.due_date else "-"
+        priority = task.priority or "-"
+        task_lines.append(
+            f"{idx}. {task.title} (담당자: {owner}, 기한: {due_date}, 우선순위: {priority})"
+        )
+
+    task_text = "\n".join(task_lines) if task_lines else "등록된 태스크가 없습니다."
+    meeting_document = meeting.meeting_document or "회의록 내용이 없습니다."
+
+    body = (
+        f"{user.name}님,\n\n"
+        f"회의록이 확정되었습니다.\n\n"
+        f"[회의 정보]\n"
+        f"- 회의 제목: {meeting.title}\n"
+        f"- 회의 일시: {timezone.localtime(meeting.meeting_at).strftime('%Y-%m-%d %H:%M') if meeting.meeting_at else '-'}\n"
+        f"- 회의 장소: {meeting.location or '-'}\n\n"
+        f"[회의록]\n"
+        f"{meeting_document}\n\n"
+        f"[부여된 태스크]\n"
+        f"{task_text}\n\n"
+        f"프로젝트에서 더 자세한 내용을 확인하실 수 있습니다.\n"
+        f"감사합니다."
+    )
+
+    client = boto3.client("ses", region_name=settings.AWS_REGION)
+    client.send_email(
+        Source=settings.DEFAULT_FROM_EMAIL,
+        Destination={"ToAddresses": [user.email]},
+        Message={
+            "Subject": {"Data": f"[HPM] {meeting.title} 회의록 및 태스크 공유"},
+            "Body": {"Text": {"Data": body}},
+        },
+    )
+
 def _notify_task_assigned(task):
     if not task.meeting_users_id or not task.meeting_users:
         return
@@ -75,6 +140,32 @@ def _notify_task_assigned(task):
         content=f"[{task.title}] 업무가 배정되었습니다.",
         target_id=task.meeting_task_id,
     )
+
+
+def _resolve_meeting_user(meeting, data):
+    meeting_users_id = data.get("meeting_users_id")
+    if meeting_users_id not in (None, ""):
+        try:
+            return MeetingUsers.objects.get(
+                meeting=meeting,
+                meeting_users_id=meeting_users_id,
+            )
+        except MeetingUsers.DoesNotExist:
+            pass
+
+    user_id = data.get("user_id")
+    if user_id not in (None, ""):
+        try:
+            user = Users.objects.get(pk=user_id)
+            meeting_user, _ = MeetingUsers.objects.get_or_create(
+                meeting=meeting,
+                user=user,
+            )
+            return meeting_user
+        except Users.DoesNotExist:
+            pass
+
+    return None
 
 
 # ── 회의 목록 / 생성 ─────────────────────────────────────────────
@@ -106,17 +197,23 @@ def meeting_list(request):
         creator = creator,
     )
 
-    for participant_id in data.get("participants", []):
+    participant_ids = [creator.users_id, *data.get("participants", [])]
+    seen_participant_ids = set()
+    for participant_id in participant_ids:
+        if participant_id in seen_participant_ids:
+            continue
+        seen_participant_ids.add(participant_id)
         try:
             participant = Users.objects.get(pk=participant_id)
-            MeetingUsers.objects.create(meeting=meeting, user=participant)
-            _create_notification(
-                user=participant,
-                notification_type=Notification.MEETING_INVITED,
-                content=f"[{meeting.title}] 회의에 초대되었습니다.",
-                target_id=meeting.meeting_id,
-            )
-            _send_invite_email(participant, meeting)
+            MeetingUsers.objects.get_or_create(meeting=meeting, user=participant)
+            if participant.users_id != creator.users_id:
+                _create_notification(
+                    user=participant,
+                    notification_type=Notification.MEETING_INVITED,
+                    content=f"[{meeting.title}] 회의에 초대되었습니다.",
+                    target_id=meeting.meeting_id,
+                )
+                _send_invite_email(participant, meeting)
         except Users.DoesNotExist:
             pass
 
@@ -133,8 +230,7 @@ def meeting_detail(request, meeting_id):
 
     if request.method == "GET":
         data = MeetingSerializer(meeting).data
-        participants = MeetingUsers.objects.filter(meeting=meeting).select_related("user")
-        data["participants"] = [{"user_id": mu.user.users_id, "name": mu.user.name} for mu in participants]
+        data["participants"] = build_meeting_participants(meeting)
         data["agenda"] = MeetingAgendaSerializer(MeetingAgendas.objects.filter(meeting=meeting), many=True).data
         data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
         return Response(data)
@@ -441,13 +537,7 @@ def task_list(request, meeting_id):
         return Response(MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data)
 
     data = request.data
-    meeting_users = None
-    meeting_users_id = data.get("meeting_users_id")
-    if meeting_users_id:
-        try:
-            meeting_users = MeetingUsers.objects.get(meeting_users_id=meeting_users_id)
-        except MeetingUsers.DoesNotExist:
-            pass
+    meeting_users = _resolve_meeting_user(meeting, data)
 
     task = MeetingTask.objects.create(
         meeting=meeting,
@@ -462,12 +552,16 @@ def task_list(request, meeting_id):
     return Response(MeetingTaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
 
-@api_view(["PATCH"])
+@api_view(["PATCH", "DELETE"])
 def task_detail(request, meeting_id, task_id):
     try:
         task = MeetingTask.objects.get(meeting_task_id=task_id, meeting_id=meeting_id)
     except MeetingTask.DoesNotExist:
         return Response({"error": "태스크를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        task.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     old_meeting_users_id = task.meeting_users_id
 
@@ -475,13 +569,11 @@ def task_detail(request, meeting_id, task_id):
         if field in request.data:
             setattr(task, field, request.data[field])
 
-    if "meeting_users_id" in request.data:
-        try:
-            task.meeting_users = MeetingUsers.objects.get(
-                meeting_users_id=request.data["meeting_users_id"]
-            )
-        except MeetingUsers.DoesNotExist:
+    if "meeting_users_id" in request.data or "user_id" in request.data:
+        if request.data.get("meeting_users_id") in ("", None) and request.data.get("user_id") in ("", None):
             task.meeting_users = None
+        else:
+            task.meeting_users = _resolve_meeting_user(task.meeting, request.data)
 
     task.save()
     if task.meeting_users_id and task.meeting_users_id != old_meeting_users_id:
@@ -497,8 +589,11 @@ def register_jira_tasks(request, meeting_id):
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
+    if not meeting.project.jira_project_key:
+        return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
     # 요청자 user_id로 Jira 토큰 확인
-    user_id = request.data.get("user_id")
+    user_id = request.data.get("user_id") or request.auth.get("user_id")
     if not user_id:
         return Response({"error": "user_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -507,8 +602,6 @@ def register_jira_tasks(request, meeting_id):
     except Users.DoesNotExist:
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    # users/views.py의 get_valid_access_token 함수 사용
-    from apps.users.views import get_valid_access_token
     access_token = get_valid_access_token(user)
     if not access_token:
         return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -517,8 +610,6 @@ def register_jira_tasks(request, meeting_id):
     if not cloud_id:
         return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 프론트에서 선택한 Jira 프로젝트 키
-    jira_project_key = request.data.get("jira_project_key", "HPM")
     task_ids = request.data.get("task_ids", [])
 
     registered, failed = [], []
@@ -530,45 +621,75 @@ def register_jira_tasks(request, meeting_id):
             failed.append({"task_id": task_id, "reason": "태스크 없음"})
             continue
 
-        try:
-            payload = {"fields": {
-                "project": {"key": jira_project_key},
-                "summary": task.title,
-                "description": {
-                    "type": "doc",
-                    "version": 1,
-                    "content": [{
-                        "type": "paragraph",
-                        "content": [{"type": "text", "text": task.content or task.title}]
-                    }]
-                },
-                "issuetype": {"name": "Task"},
-                "priority": {"name": task.priority or "Medium"},
-                "duedate": str(task.due_date) if task.due_date else None,
-            }}
+        assignee_account_id = None
+        if task.meeting_users_id and task.meeting_users and task.meeting_users.user:
+            assignee_account_id = task.meeting_users.user.jira_account_id
 
-            resp = requests.post(
-                f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json"
-                },
-                timeout=10
+        result = create_jira_issue_for_board(
+            task.title,
+            access_token,
+            cloud_id,
+            meeting.project.jira_project_key,
+            description=task.content or task.title,
+            due_date=str(task.due_date) if task.due_date else None,
+            priority=task.priority or "Medium",
+            assignee_account_id=assignee_account_id,
+        )
+
+        if result.get("success"):
+            registered.append(
+                {"task_id": task_id, "jira_key": result.get("issue_key", "")}
             )
-
-            if resp.status_code in [200, 201]:
-                task.is_jira_synced = True
-                task.save()
-                registered.append({"task_id": task_id, "jira_key": resp.json().get("key", "")})
-            else:
-                failed.append({"task_id": task_id, "reason": resp.text})
-
-        except Exception as e:
-            failed.append({"task_id": task_id, "reason": str(e)})
+        else:
+            failed.append({"task_id": task_id, "reason": result})
 
     return Response({"registered": registered, "failed": failed})
+
+@api_view(["POST"])
+def send_summary_email(request, meeting_id):
+    try:
+        meeting = Meeting.objects.select_related("creator").get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    recipients = _meeting_email_recipients(meeting)
+    recipient_user_ids = request.data.get("recipient_user_ids")
+    if recipient_user_ids is not None:
+        try:
+            selected_user_ids = {int(user_id) for user_id in recipient_user_ids}
+        except (TypeError, ValueError):
+            return Response({"error": "수신자 목록이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+        recipients = [user for user in recipients if user.users_id in selected_user_ids]
+
+    if not recipients:
+        return Response({"error": "이메일을 발송할 참여자가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not settings.DEFAULT_FROM_EMAIL:
+        return Response({"error": "발신 이메일 설정이 없습니다."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    tasks = list(
+        MeetingTask.objects
+        .filter(meeting=meeting)
+        .select_related("meeting_users__user")
+        .order_by("meeting_task_id")
+    )
+    sent, failed = [], []
+
+    for user in recipients:
+        if not user.email:
+            failed.append({"user_id": user.users_id, "name": user.name, "reason": "이메일 없음"})
+            continue
+
+        try:
+            _send_summary_email(user, meeting, tasks)
+            sent.append({"user_id": user.users_id, "name": user.name, "email": user.email})
+        except Exception as exc:
+            failed.append({"user_id": user.users_id, "name": user.name, "email": user.email, "reason": str(exc)})
+
+    if failed:
+        return Response({"sent": sent, "failed": failed}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({"sent": sent})
 
 # ── 회의록 생성 (RunPod 엔드포인트) ─────────────────────────────
 @api_view(["POST"])
