@@ -26,6 +26,7 @@ class Meeting(models.Model):
         choices=MeetingStatus.choices, default=MeetingStatus.SCHEDULED, verbose_name="회의 상태"
     )
     is_meeting_approve = models.BooleanField(default=False, verbose_name="회의록 승인 여부")
+    is_paused = models.BooleanField(default=False, verbose_name="일시 정지 여부")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성 일시")
 
     class Meta:

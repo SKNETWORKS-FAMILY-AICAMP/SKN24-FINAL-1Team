@@ -9,6 +9,9 @@ urlpatterns = [
     path("<int:meeting_id>/", views.meeting_detail),
     # 회의 시작
     path("<int:meeting_id>/start/", views.start_meeting),
+    # 회의 일시중지 / 재개
+    path("<int:meeting_id>/pause/", views.pause_meeting),
+    path("<int:meeting_id>/resume/", views.resume_meeting),
     # 회의 종료 (STT + 회의록 생성)
     path("<int:meeting_id>/end/", views.end_meeting),
     # 회의록 생성 (RunPod 별도 호출)
