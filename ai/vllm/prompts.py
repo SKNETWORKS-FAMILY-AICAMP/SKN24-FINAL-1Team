@@ -99,6 +99,9 @@ OCR 참고 텍스트: {req.ocr_text}
 
 
 def preparation_messages(req: PreparationRequest, selected_documents: dict[str, Any]) -> list[dict[str, str]]:
+    ocr_text = req.ocr_text.strip()
+    if len(ocr_text) > 6000:
+        ocr_text = f"{ocr_text[:6000]}\n...(OCR 텍스트 일부 생략)"
     prompt = f"""
 당신은 프로젝트 문서 분석 및 회의 준비 자료 작성 전문가입니다.
 제공된 근거를 바탕으로 회의 참석자가 바로 읽고 회의에 들어갈 수 있는 '회의 준비 자료'를 작성하십시오.
@@ -106,18 +109,22 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
 [핵심 규칙]
 1. 제공된 자료([프로젝트 히스토리], [내부 문서], [외부 뉴스])에 명시된 내용만 사용합니다. 사실을 추정하거나 지어내지 마십시오.
 2. 문서에서 확인되지 않거나 누락된 정보는 반드시 "확인 필요"로 표기합니다.
-3. 주어진 [회의 주제], [프로젝트 누적 맥락], [안건]과 직접 관련 없는 정보는 제외합니다.
-4. 이전회의록은 지난 결정사항, 미완료 todo, 담당자, 후속 논의가 필요한 사항을 파악하는 데 우선 사용합니다.
-5. 내부 문서는 정책, 절차, 요구사항, 제약조건, 기준을 확인하는 데 우선 사용합니다.
-6. 이전회의록과 내부 문서의 내용이 충돌하면 어느 쪽이 맞는지 단정하지 말고 "확인 필요"로 표시합니다.
-7. 모든 핵심 문장 끝에는 가능한 경우 [출처명] 형태로 출처를 붙입니다. 출처가 없으면 붙이지 않습니다.
-8. 출력은 반드시 유효한 JSON 객체 하나만 반환합니다. 마크다운 본문은 document 필드 안에 JSON 문자열로 작성합니다.
-9. JSON 밖에는 코드블록, 설명 문장, 마크다운을 절대 출력하지 마십시오.
-10. 최상위 key는 반드시 "document", "sections", "selected_documents", "source_map" 네 개만 사용합니다.
+3. 주어진 [회의 주제], [프로젝트 누적 맥락], [OCR 참고 텍스트], [안건]과 직접 관련 없는 정보는 제외합니다.
+4. 프로젝트 누적 맥락은 배경 판단용으로만 사용합니다. 입력 문장을 그대로 복사하지 말고, 이번 회의 준비에 필요한 현재 상태, 결정사항, 미완료 쟁점만 재구성합니다.
+5. 이전회의록은 회의 주제, 안건, 프로젝트 맥락, OCR 참고 텍스트와 직접 관련된 경우에만 사용합니다. 관련 이전회의록이 없으면 "관련 이전 회의록 확인 불가"로 작성합니다.
+6. 내부 문서는 정책, 절차, 요구사항, 제약조건, 기준을 확인하는 데 우선 사용합니다.
+7. OCR 참고 텍스트는 사용자가 방금 업로드한 회의 관련 문서 내용으로 보고, 회의 목적과 안건 보강에 사용합니다.
+8. 외부 뉴스는 항상 참고하여 회의 주제와 연결되는 최신 외부 동향, 시장 상황, 리스크를 반영합니다.
+9. 이전회의록과 내부 문서의 내용이 충돌하면 어느 쪽이 맞는지 단정하지 말고 "확인 필요"로 표시합니다.
+10. 모든 핵심 문장 끝에는 가능한 경우 [출처명] 형태로 출처를 붙입니다. 출처가 없으면 붙이지 않습니다.
+11. 출력은 반드시 유효한 JSON 객체 하나만 반환합니다.
+12. JSON 밖에는 코드블록, 설명 문장, 마크다운을 절대 출력하지 마십시오.
+13. 최상위 key는 반드시 "preparation_id", "meeting_id", "purpose", "project_status", "rule", "effect", "sources" 일곱 개만 사용합니다.
 
 [입력 데이터]
 - 회의 주제: {req.title}
 - 프로젝트 누적 맥락: {req.project_context or "없음"}
+- OCR 참고 텍스트: {ocr_text or "없음"}
 - 참석자: {json.dumps(req.participants, ensure_ascii=False)}
 - 안건: {json.dumps(req.agendas, ensure_ascii=False)}
 - 프로젝트 히스토리: {json.dumps(selected_documents.get("previous_meetings", []), ensure_ascii=False)}
@@ -128,43 +135,16 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
 반드시 아래 JSON 스키마만 반환하십시오.
 
 {{
-  "document": "### 회의 준비 자료\\n\\n#### 1. 회의 주제\\n- {req.title}\\n\\n#### 2. 회의 목적\\n- 이번 회의에서 확정하거나 점검해야 할 목적을 2~3개로 정리\\n\\n#### 3. 지난 회의 맥락\\n- 결정사항, 미완료 todo, 담당자, 후속 논의 필요사항을 구분\\n\\n#### 4. 관련 내부문서 근거\\n- 정책, 절차, 요구사항, 제약조건을 정리\\n\\n#### 5. 이번 회의 논의 포인트\\n- 참석자가 실제로 논의해야 할 질문을 3~5개로 제시\\n\\n#### 6. 리스크 및 확인 필요 사항\\n- 근거가 부족하거나 충돌하는 항목을 표시\\n\\n#### 7. 회의 전 준비사항\\n- 참석자가 미리 확인하거나 준비해야 할 항목\\n\\n#### 8. 참조 문서 목록\\n- 사용한 출처 목록",
-  "sections": [
+  "preparation_id": null,
+  "meeting_id": "{req.meeting_id}",
+  "purpose": "이번 회의에서 확정하거나 점검해야 할 목적을 2~3개로 정리",
+  "project_status": "입력 맥락을 그대로 복사하지 말고 이번 회의 준비에 필요한 현재 진행 상태, 지난 결정사항, 미완료 쟁점을 재구성. 근거가 부족하면 확인 필요",
+  "rule": "관련 내부문서 근거, 정책, 절차, 요구사항, 제약조건, 확인 필요 사항을 정리",
+  "effect": "회의 종료 후 기대 결과와 참석자가 회의 전 준비해야 할 항목을 정리",
+  "sources": [
     {{
-      "title": "회의 주제",
-      "content": "{req.title}",
-      "sources": []
-    }},
-    {{
-      "title": "지난 회의 맥락",
-      "content": "결정사항, 미완료 todo, 담당자, 후속 논의 필요사항 요약",
-      "sources": []
-    }},
-    {{
-      "title": "관련 내부문서 근거",
-      "content": "정책, 절차, 요구사항, 제약조건 요약",
-      "sources": []
-    }},
-    {{
-      "title": "이번 회의 논의 포인트",
-      "content": "회의에서 다룰 질문과 판단 포인트",
-      "sources": []
-    }},
-    {{
-      "title": "리스크 및 확인 필요 사항",
-      "content": "근거 부족, 충돌, 미확정 항목",
-      "sources": []
-    }}
-  ],
-  "selected_documents": {{
-    "previous_meetings": [],
-    "internal_documents": [],
-    "external_news": []
-  }},
-  "source_map": [
-    {{
-      "source": "문서명 또는 source 값",
-      "used_for": "사용 이유"
+      "title": "참고 문서명",
+      "document_id": 0
     }}
   ]
 }}
@@ -175,8 +155,9 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
             "content": "Return exactly one valid JSON object and nothing else. "
             "Do not use markdown outside JSON. "
             "The JSON object must have exactly these top-level keys: "
-            "document, sections, selected_documents, source_map. "
-            "The document field must contain Korean markdown as a JSON string. "
+            "preparation_id, meeting_id, purpose, project_status, rule, effect, sources. "
+            "preparation_id must be null unless it is provided by the input. "
+            "sources must be an array of objects with title and document_id. "
             "Use only the provided evidence. If evidence is missing, write '확인 필요'. "
             "Separate previous meeting context from internal document requirements. "
             "Prefer concrete decisions, todos, owners, dates, policy clauses, constraints, and open questions. "

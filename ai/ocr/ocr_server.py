@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
 import os
 import socket
 import tempfile
+import threading
 import time
 from typing import Any
 from urllib.parse import urlparse
+import uuid
 
 import requests
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -44,6 +47,42 @@ embedding_model_info: dict[str, Any] | None = None
 embedding_model_error: str | None = None
 paddleocr_vl_ready = False
 paddleocr_vl_error: str | None = None
+OCR_JOBS: dict[str, dict[str, Any]] = {}
+OCR_JOBS_LOCK = threading.Lock()
+OCR_JOB_EXECUTOR = ThreadPoolExecutor(max_workers=int(os.getenv("OCR_JOB_WORKERS", "1")))
+
+
+def _now_ts() -> float:
+    return round(time.time(), 3)
+
+
+def _job_snapshot(job_id: str) -> dict[str, Any]:
+    with OCR_JOBS_LOCK:
+        job = OCR_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"OCR job not found: {job_id}")
+        return dict(job)
+
+
+def _update_ocr_job(job_id: str, **updates: Any) -> None:
+    with OCR_JOBS_LOCK:
+        job = OCR_JOBS.get(job_id)
+        if job is None:
+            return
+        job.update(updates)
+        job["updated_at"] = _now_ts()
+
+
+def _serialize_error(exc: Exception) -> str:
+    if isinstance(exc, HTTPException):
+        return str(exc.detail)
+    return str(exc)
+
+
+def _text_response_dict(response: TextResponse) -> dict[str, Any]:
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    return response.dict()
 
 
 def _torch_cuda_available() -> bool:
@@ -76,7 +115,11 @@ def _wait_for_paddleocr_vl_ready(timeout_sec: int | None = None) -> None:
 def _is_pdf(file: UploadFile) -> bool:
     filename = (file.filename or "").lower()
     content_type = (file.content_type or "").lower()
-    return filename.endswith(".pdf") or content_type == "application/pdf"
+    return _is_pdf_info(filename, content_type)
+
+
+def _is_pdf_info(filename: str, content_type: str) -> bool:
+    return filename.lower().endswith(".pdf") or content_type.lower() == "application/pdf"
 
 
 def _extract_paddleocr_text(payload: dict[str, Any]) -> str:
@@ -101,18 +144,16 @@ def _extract_paddleocr_text(payload: dict[str, Any]) -> str:
     return json.dumps(fallback, ensure_ascii=False)
 
 
-async def _ocr_with_paddleocr_vl(file: UploadFile) -> str:
-    file_bytes = await file.read()
+def _ocr_with_paddleocr_vl_bytes(file_bytes: bytes, filename: str, content_type: str) -> str:
     payload = {
         "file": base64.b64encode(file_bytes).decode("ascii"),
-        "fileType": 0 if _is_pdf(file) else 1,
+        "fileType": 0 if _is_pdf_info(filename, content_type) else 1,
         "returnMarkdownImages": PADDLEOCR_VL_RETURN_MARKDOWN_IMAGES,
         "visualize": PADDLEOCR_VL_VISUALIZE,
     }
 
     try:
-        response = await run_in_threadpool(
-            requests.post,
+        response = requests.post(
             f"{PADDLEOCR_VL_URL}/layout-parsing",
             json=payload,
             timeout=PADDLEOCR_VL_TIMEOUT_SEC,
@@ -141,7 +182,16 @@ async def _ocr_with_paddleocr_vl(file: UploadFile) -> str:
     return _extract_paddleocr_text(response_payload)
 
 
-async def _ocr_with_qwen(file: UploadFile) -> str:
+async def _ocr_with_paddleocr_vl(file: UploadFile) -> str:
+    return await run_in_threadpool(
+        _ocr_with_paddleocr_vl_bytes,
+        await file.read(),
+        file.filename or "",
+        file.content_type or "",
+    )
+
+
+def _ocr_with_qwen_bytes(file_bytes: bytes, filename: str) -> str:
     import torch
 
     from model_runtime import cleanup_cuda, load_ocr_model, process_vision_info
@@ -150,9 +200,9 @@ async def _ocr_with_qwen(file: UploadFile) -> str:
     processor = bundle.processor
     model = bundle.model
 
-    suffix = os.path.splitext(file.filename or "")[1] or ".png"
+    suffix = os.path.splitext(filename or "")[1] or ".png"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await file.read())
+        tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
@@ -186,6 +236,58 @@ async def _ocr_with_qwen(file: UploadFile) -> str:
             os.remove(tmp_path)
         except OSError:
             pass
+
+
+async def _ocr_with_qwen(file: UploadFile) -> str:
+    return await run_in_threadpool(_ocr_with_qwen_bytes, await file.read(), file.filename or "")
+
+
+def _run_ocr_bytes(file_bytes: bytes, filename: str, content_type: str) -> TextResponse:
+    started = time.perf_counter()
+
+    GPU_TASK_LOCK.acquire()
+    try:
+        if OCR_BACKEND == "paddleocr_vl":
+            extracted = _ocr_with_paddleocr_vl_bytes(file_bytes, filename, content_type)
+            model_name = "PaddleOCR-VL"
+        elif OCR_BACKEND == "qwen":
+            extracted = _ocr_with_qwen_bytes(file_bytes, filename)
+            model_name = OCR_MODEL_ID
+        else:
+            raise HTTPException(status_code=500, detail=f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
+    finally:
+        GPU_TASK_LOCK.release()
+
+    return TextResponse(
+        result={"text": extracted.strip()},
+        elapsed_sec=round(time.perf_counter() - started, 3),
+        model=model_name,
+    )
+
+
+def _run_ocr_job(job_id: str, file_bytes: bytes, filename: str, content_type: str) -> None:
+    _update_ocr_job(job_id, status="running", step="ocr", started_at=_now_ts())
+    try:
+        response = _run_ocr_bytes(file_bytes, filename, content_type)
+        payload = _text_response_dict(response)
+        _update_ocr_job(
+            job_id,
+            status="succeeded",
+            step="done",
+            result=payload.get("result"),
+            elapsed_sec=payload.get("elapsed_sec"),
+            model=payload.get("model"),
+            error=None,
+            completed_at=_now_ts(),
+        )
+    except Exception as exc:
+        _update_ocr_job(
+            job_id,
+            status="failed",
+            step="failed",
+            error=_serialize_error(exc),
+            completed_at=_now_ts(),
+        )
 
 
 @app.get("/health")
@@ -255,6 +357,39 @@ def preload_models() -> None:
         logger.info("OCR model loaded: %s", OCR_MODEL_ID)
     else:
         raise RuntimeError(f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
+
+
+@app.post("/ocr/jobs", status_code=202)
+async def create_ocr_job(file: UploadFile = File(...)) -> dict[str, Any]:
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail=f"Uploaded file is empty: {file.filename or ''}")
+
+    job_id = uuid.uuid4().hex
+    job = {
+        "job_id": job_id,
+        "type": "ocr",
+        "status": "queued",
+        "step": "queued",
+        "result": None,
+        "elapsed_sec": None,
+        "model": None,
+        "error": None,
+        "filename": file.filename or "",
+        "created_at": _now_ts(),
+        "updated_at": _now_ts(),
+        "started_at": None,
+        "completed_at": None,
+    }
+    with OCR_JOBS_LOCK:
+        OCR_JOBS[job_id] = job
+    OCR_JOB_EXECUTOR.submit(_run_ocr_job, job_id, file_bytes, file.filename or "", file.content_type or "")
+    return _job_snapshot(job_id)
+
+
+@app.get("/ocr/jobs/{job_id}")
+def get_ocr_job(job_id: str) -> dict[str, Any]:
+    return _job_snapshot(job_id)
 
 
 @app.post("/ocr", response_model=TextResponse)

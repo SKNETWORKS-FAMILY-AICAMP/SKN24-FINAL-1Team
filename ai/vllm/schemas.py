@@ -23,11 +23,13 @@ class AgendaRequest(BaseModel):
 
 class PreparationRequest(BaseModel):
     title: str = Field(..., description="Meeting topic or title used to generate preparation material.")
+    preparation_id: str | int | None = None
     meeting_id: str = ""
     project_id: str = ""
     meeting_datetime: str = ""
     location: str = ""
     project_context: str = ""
+    ocr_text: str = ""
     participants: list[dict[str, str]] = Field(default_factory=list)
     agendas: list[str] = Field(default_factory=list)
     max_previous_meetings: int = 5

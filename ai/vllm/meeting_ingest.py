@@ -85,8 +85,7 @@ def base_metadata(req: Any, result: dict[str, Any]) -> dict[str, Any]:
         "viewer_id": str(getattr(req, "meeting_id", "") or ""),
         "title": title,
         "meeting_datetime": meeting_datetime,
-        "location": getattr(req, "location", "") or minutes.get("location") or "미정",
-        "source": source,
+        "source_filename": source,
     }
 
 
