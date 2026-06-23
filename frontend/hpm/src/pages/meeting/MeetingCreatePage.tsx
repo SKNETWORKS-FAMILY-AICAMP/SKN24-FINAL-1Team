@@ -9,6 +9,8 @@ interface UserOption {
   users_id: number;
   name: string;
   email: string;
+  rank_name?: string;
+  dept_name?: string;
 }
 
 export default function MeetingCreatePage() {
@@ -276,7 +278,7 @@ export default function MeetingCreatePage() {
                     key={id}
                     className={`flex items-center gap-1.5 px-3 py-1.5 ${DESIGN.RADIUS_SIZES.md} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.black} font-medium transition`}
                   >
-                    <span>{u.name}</span>
+                    <span>{u.name}{u.rank_name ? ` ${u.rank_name}` : ""}</span>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -314,13 +316,20 @@ export default function MeetingCreatePage() {
                           key={u.users_id}
                           type="button"
                           onClick={() => toggleParticipant(u.users_id)}
-                          className={`w-full text-left px-3 py-2 rounded ${DESIGN.FONT_SIZES.sm} transition ${
+                          className={`w-full text-left px-3 py-2 rounded transition ${
                             isSelected
                               ? `${DESIGN.BACKGROUND_COLORS.purpleHover} font-semibold`
                               : `${DESIGN.BACKGROUND_COLORS.grayLightHover} ${DESIGN.COLORS.black}`
                           }`}
                         >
-                          {u.name} ({u.email})
+                          <div className={`${DESIGN.FONT_SIZES.sm}`}>
+                            {u.name}{u.rank_name ? ` ${u.rank_name}` : ""}({u.email})
+                          </div>
+                          {u.dept_name && (
+                            <div className={`text-[11px] ${DESIGN.COLORS.gray} mt-0.5`}>
+                              {u.dept_name}
+                            </div>
+                          )}
                         </button>
                       );
                     })

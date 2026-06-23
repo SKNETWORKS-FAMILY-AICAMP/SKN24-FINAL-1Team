@@ -23,6 +23,20 @@ def get_project_user_or_response(project_id, user_id):
         return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
 
 
+@api_view(["GET"])
+def upload_config(request):
+    return Response({
+        "max_files": 10,
+        "max_size_mb": 20,
+        "allowed_formats": ["pdf", "docx", "txt"],
+        "messages": {
+            "entry": "최대 파일 10개만 업로드 가능합니다",
+            "size_exceeded": "파일의 용량이 20MB를 초과했습니다.\n다시 한번 확인해주세요",
+            "unsupported_format": "지원하지 않는 파일 형식입니다",
+        },
+    })
+
+
 @api_view(["GET", "POST"])
 def document_list(request, project_id):
     uploader = get_project_user_or_response(project_id, request.auth["user_id"])

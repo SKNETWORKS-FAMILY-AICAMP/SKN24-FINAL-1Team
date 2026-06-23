@@ -133,6 +133,7 @@ export interface UserListItem {
   rank?: number;
   dept_name?: string;
   rank_name?: string;
+  role?: string;
 }
 
 export interface ProjectMember {

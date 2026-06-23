@@ -11,6 +11,22 @@ export interface DocumentUploadResponse {
   errors: DocumentUploadError[];
 }
 
+export interface UploadConfig {
+  max_files: number;
+  max_size_mb: number;
+  allowed_formats: string[];
+  messages: {
+    entry: string;
+    size_exceeded: string;
+    unsupported_format: string;
+  };
+}
+
+export const getUploadConfig = async (): Promise<UploadConfig> => {
+  const res = await api.get("/documents/upload-config/");
+  return res.data;
+};
+
 export const getDocuments = async (projectId: number): Promise<DocumentRecord[]> => {
   const res = await api.get(`/documents/${projectId}/`);
   return res.data;

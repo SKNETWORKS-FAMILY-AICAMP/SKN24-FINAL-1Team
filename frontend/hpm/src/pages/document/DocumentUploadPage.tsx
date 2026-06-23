@@ -1,15 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DocumentUploadPanel from "../../components/document/DocumentUploadPanel";
+import UploadWarningModal from "../../components/document/UploadWarningModal";
 import {
   DOCUMENT_ALLOWED_EXTENSIONS,
   DOCUMENT_MAX_UPLOAD_SIZE,
 } from "../../constants/documentManagement";
 import { useAuth } from "../../context/AuthContext";
-import { uploadDocuments } from "../../services/documents";
+import { getUploadConfig, uploadDocuments } from "../../services/documents";
+import type { UploadConfig } from "../../services/documents";
 import type { UploadedDocument } from "../../types/documentManagement";
 
 const getExtension = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+
+const DEFAULT_MESSAGES = {
+  entry: "최대 파일 10개만 업로드 가능합니다",
+  size_exceeded: "파일의 용량이 20MB를 초과했습니다.\n다시 한번 확인해주세요",
+  unsupported_format: "지원하지 않는 파일 형식입니다",
+};
 
 export default function DocumentUploadPage() {
   const navigate = useNavigate();
@@ -17,31 +25,42 @@ export default function DocumentUploadPage() {
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [uploadMessage, setUploadMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [config, setConfig] = useState<UploadConfig | null>(null);
+  const [modal, setModal] = useState<string | null>(null);
+
+  const messages = config?.messages ?? DEFAULT_MESSAGES;
+
+  useEffect(() => {
+    getUploadConfig()
+      .then((cfg) => {
+        setConfig(cfg);
+        setModal(cfg.messages.entry);
+      })
+      .catch(() => {
+        setModal(DEFAULT_MESSAGES.entry);
+      });
+  }, []);
 
   const addUploadFiles = (files: File[]) => {
-    const validFiles = files.filter(
-      (file) =>
-        DOCUMENT_ALLOWED_EXTENSIONS.has(getExtension(file.name)) &&
-        file.size <= DOCUMENT_MAX_UPLOAD_SIZE,
-    );
-
-    if (validFiles.length !== files.length) {
-      setUploadMessage("PDF, DOCX, TXT 파일만 업로드할 수 있고 파일은 최대 20MB입니다.");
-    } else {
-      setUploadMessage("");
-    }
-
-    if (validFiles.length === 0) {
-      return;
+    for (const file of files) {
+      if (!DOCUMENT_ALLOWED_EXTENSIONS.has(getExtension(file.name))) {
+        setModal(messages.unsupported_format);
+        return;
+      }
+      if (file.size > DOCUMENT_MAX_UPLOAD_SIZE) {
+        setModal(messages.size_exceeded);
+        return;
+      }
     }
 
     setUploadedDocuments((current) => [
       ...current,
-      ...validFiles.map((file, index) => ({
+      ...files.map((file, index) => ({
         id: Date.now() + index,
         file,
       })),
     ]);
+    setUploadMessage("");
   };
 
   const removeUploadedDocument = (documentId: number) => {
@@ -78,6 +97,9 @@ export default function DocumentUploadPage() {
 
   return (
     <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
+      {modal && (
+        <UploadWarningModal message={modal} onClose={() => setModal(null)} />
+      )}
       <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[64px]">
         <DocumentUploadPanel
           uploadMessage={uploadMessage}
