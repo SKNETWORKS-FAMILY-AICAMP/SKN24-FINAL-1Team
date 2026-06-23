@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
   getMeetingDetail,
   getTaskList,
-  sendChatMessage,
+  sendMeetingSummaryEmail,
   getPrepMaterial,
   getAgendaList,
   type MeetingPreparation,
@@ -18,12 +18,11 @@ import {
   SPEAKER_SEGMENTS,
 } from "../../constants/speakerMapping";
 
-type TabKey = "minutes" | "record" | "chatbot" | "material" | "email";
+type TabKey = "minutes" | "record" | "material" | "email";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "minutes",  label: "회의록" },
   { key: "record",   label: "녹음 원문" },
-  { key: "chatbot",  label: "챗봇내역" },
   { key: "material", label: "회의 자료" },
   { key: "email",    label: "이메일 발송" },
 ];
@@ -83,11 +82,6 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 
 
-interface ChatMessage {
-  role: "user" | "bot";
-  text: string;
-}
-
 function getAllUtterances() {
   const items: { time: string; sortKey: string; speakerName: string; content: string[] }[] = [];
   for (const segment of SPEAKER_SEGMENTS) {
@@ -111,16 +105,9 @@ export default function MeetingArchivePage() {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set([1, 2]));
   const [downloading, setDownloading] = useState(false);
 
-  // 챗봇
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: "bot", text: "안녕하세요! 회의 내용에 대해 무엇이든 질문해 주세요." },
-  ]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
   // 이메일 발송
   const [recipients, setRecipients] = useState(DUMMY_MEETING.participants ?? []);
+  const [emailRecipientQuery, setEmailRecipientQuery] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
@@ -139,16 +126,12 @@ export default function MeetingArchivePage() {
           setMeeting(m);
           if (m.participants?.length) setRecipients(m.participants);
         }
-        if (t?.length) setTasks(t);
+        setTasks(t || []);
         if (p) setPrep(p);
         if (a?.length) setAgenda(a);
       })
       .catch(() => {});
   }, [meetingId]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
 
   const toggleExpand = (taskId: number) => {
     setExpandedIds(prev => {
@@ -163,6 +146,18 @@ export default function MeetingArchivePage() {
 
   const participantNames = meeting.participants?.map(p => p.name).join(", ") || "-";
   const writer = meeting.participants?.[0]?.name || "-";
+  const selectedRecipientIds = new Set(recipients.map(recipient => recipient.user_id));
+  const normalizedRecipientQuery = emailRecipientQuery.trim().toLowerCase();
+  const matchingRecipients = normalizedRecipientQuery
+    ? (meeting.participants || []).filter(participant => {
+        if (selectedRecipientIds.has(participant.user_id)) return false;
+        return [
+          participant.name,
+          participant.email || "",
+          participant.work || "",
+        ].some(value => value.toLowerCase().includes(normalizedRecipientQuery));
+      })
+    : [];
 
   const handlePdfDownload = async () => {
     if (downloading) return;
@@ -310,32 +305,30 @@ export default function MeetingArchivePage() {
     }
   };
 
-  const handleChatSend = async () => {
-    const text = chatInput.trim();
-    if (!text || chatLoading) return;
-    setChatInput("");
-    setChatMessages(prev => [...prev, { role: "user", text }]);
-    setChatLoading(true);
+  const handleEmailSend = async () => {
+    if (emailSending) return;
+    setEmailSending(true);
     try {
-      const res = await sendChatMessage(meetingId, text);
-      setChatMessages(prev => [...prev, { role: "bot", text: res.answer }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: "bot", text: "답변을 가져오는 데 실패했습니다." }]);
-    } finally {
-      setChatLoading(false);
+      await sendMeetingSummaryEmail(meetingId, recipients.map(recipient => recipient.user_id));
+      setEmailSending(false);
+      setEmailSent(true);
+    } catch (error) {
+      console.error("요약 이메일 발송 실패:", error);
+      setEmailSending(false);
+      alert("요약 이메일 발송에 실패했습니다.");
     }
   };
 
   const removeRecipient = (userId: number) => {
-    setRecipients(prev => prev.filter(r => r.user_id !== userId));
+    setRecipients(prev => prev.filter(recipient => recipient.user_id !== userId));
   };
 
-  const handleEmailSend = () => {
-    setEmailSending(true);
-    setTimeout(() => {
-      setEmailSending(false);
-      setEmailSent(true);
-    }, 700);
+  const addRecipient = (participant: NonNullable<Meeting["participants"]>[number]) => {
+    setRecipients(prev => {
+      if (prev.some(recipient => recipient.user_id === participant.user_id)) return prev;
+      return [...prev, participant];
+    });
+    setEmailRecipientQuery("");
   };
 
   const transcript = getAllUtterances();
@@ -508,62 +501,6 @@ export default function MeetingArchivePage() {
         </div>
       )}
 
-      {/* 챗봇 내역 탭 */}
-      {tab === "chatbot" && (
-        <div className="rounded-xl border flex flex-col" style={{ borderColor: "#E6E1E6", height: "520px" }}>
-          <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
-            챗봇 내역
-          </div>
-
-          {/* 메시지 영역 */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className="max-w-[70%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed"
-                  style={
-                    msg.role === "user"
-                      ? { backgroundColor: "#623FB5", color: "#fff" }
-                      : { backgroundColor: "#F4F5F8", color: "#141414" }
-                  }
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl px-4 py-2.5 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#969696" }}>
-                  답변 생성 중...
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* 입력창 */}
-          <div className="px-4 py-3 border-t flex gap-2" style={{ borderColor: "#E6E1E6" }}>
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleChatSend()}
-              placeholder="회의 내용에 대해 질문하세요..."
-              className="flex-1 border rounded-lg px-4 py-2 text-[13px] outline-none"
-              style={{ borderColor: "#E6E1E6" }}
-            />
-            <button
-              onClick={handleChatSend}
-              disabled={chatLoading || !chatInput.trim()}
-              className="px-4 py-2 text-[13px] text-white rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: "#623FB5" }}
-            >
-              전송
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* 회의 자료 탭 */}
       {tab === "material" && (
         <div>
@@ -718,18 +655,69 @@ export default function MeetingArchivePage() {
                   {/* 이메일 수신자 */}
                   <div className="rounded-xl border p-4" style={{ borderColor: "#E6E1E6" }}>
                     <p className="text-[13px] font-bold mb-3" style={{ color: "#141414" }}>이메일 수신자</p>
-                    <div className="flex flex-wrap gap-2">
-                      {recipients.map(r => (
-                        <span
-                          key={r.user_id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
-                          style={{ backgroundColor: "#F4F5F8", color: "#141414", border: "1px solid #E6E1E6" }}
-                        >
-                          {r.name}
-                          <button onClick={() => removeRecipient(r.user_id)} style={{ color: "#969696" }}>×</button>
-                        </span>
-                      ))}
+                    <div className="rounded-xl border bg-white p-3" style={{ borderColor: "#E6E1E6" }}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {recipients.map(r => (
+                          <span
+                            key={r.user_id}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px]"
+                            style={{ backgroundColor: "#F4F5F8", color: "#141414", border: "1px solid #E6E1E6" }}
+                          >
+                            {r.name}
+                            <button
+                              type="button"
+                              onClick={() => removeRecipient(r.user_id)}
+                              aria-label={`${r.name} 수신자 제거`}
+                              className="text-[14px] leading-none"
+                              style={{ color: "#969696" }}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          value={emailRecipientQuery}
+                          onChange={e => setEmailRecipientQuery(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Backspace" && emailRecipientQuery.length === 0 && recipients.length > 0) {
+                              e.preventDefault();
+                              removeRecipient(recipients[recipients.length - 1].user_id);
+                              return;
+                            }
+                            if (e.key === "Enter" && matchingRecipients[0]) {
+                              e.preventDefault();
+                              addRecipient(matchingRecipients[0]);
+                            }
+                          }}
+                          placeholder={recipients.length === 0 ? "이름이나 이메일, 직무를 입력해주세요" : ""}
+                          className="h-8 min-w-[180px] flex-1 border-0 bg-transparent text-[13px] text-[#141414] outline-none placeholder:text-[#969696]"
+                        />
+                      </div>
                     </div>
+                    {normalizedRecipientQuery && (
+                      <div className="mt-2 overflow-hidden rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
+                        {matchingRecipients.length > 0 ? (
+                          matchingRecipients.map(participant => (
+                            <button
+                              key={participant.user_id}
+                              type="button"
+                              onClick={() => addRecipient(participant)}
+                              className="block w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
+                              style={{ borderColor: "#E6E1E6" }}
+                            >
+                              <p className="text-[13px] font-medium" style={{ color: "#141414" }}>
+                                {participant.name}{participant.email ? ` (${participant.email})` : ""}
+                              </p>
+                              {participant.work && (
+                                <p className="mt-0.5 text-[12px]" style={{ color: "#969696" }}>{participant.work}</p>
+                              )}
+                            </button>
+                          ))
+                        ) : (
+                          <p className="px-4 py-3 text-[12px]" style={{ color: "#969696" }}>검색 결과가 없습니다.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

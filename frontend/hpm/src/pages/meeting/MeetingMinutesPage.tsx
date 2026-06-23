@@ -315,7 +315,7 @@ export default function MeetingMinutesPage() {
           <textarea
             value={meeting.meeting_document || ""}
             onChange={e => setMeeting(m => m ? { ...m, meeting_document: e.target.value } : m)}
-            className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed min-h-[120px] resize-y outline-none focus:border-[#623FB5]"
+            className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed min-h-[320px] resize-y outline-none focus:border-[#623FB5]"
             placeholder="회의 내용이 없습니다."
           />
         </div>

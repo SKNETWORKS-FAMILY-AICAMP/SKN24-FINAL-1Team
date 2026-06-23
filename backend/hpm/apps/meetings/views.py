@@ -74,6 +74,62 @@ def _send_invite_email(user, meeting) :
     except Exception as e:
         print(f"이메일 발송 실패 ({user.email}) : {e}")
 
+def _meeting_email_recipients(meeting):
+    recipients = []
+    seen_user_ids = set()
+
+    if meeting.creator_id and meeting.creator:
+        recipients.append(meeting.creator)
+        seen_user_ids.add(meeting.creator_id)
+
+    meeting_users = MeetingUsers.objects.filter(meeting=meeting).select_related("user")
+    for meeting_user in meeting_users:
+        user = meeting_user.user
+        if user.users_id in seen_user_ids:
+            continue
+        recipients.append(user)
+        seen_user_ids.add(user.users_id)
+
+    return recipients
+
+def _send_summary_email(user, meeting, tasks):
+    task_lines = []
+    for idx, task in enumerate(tasks, start=1):
+        owner = task.meeting_users.user.name if task.meeting_users_id and task.meeting_users else "미배정"
+        due_date = task.due_date.isoformat() if task.due_date else "-"
+        priority = task.priority or "-"
+        task_lines.append(
+            f"{idx}. {task.title} (담당자: {owner}, 기한: {due_date}, 우선순위: {priority})"
+        )
+
+    task_text = "\n".join(task_lines) if task_lines else "등록된 태스크가 없습니다."
+    meeting_document = meeting.meeting_document or "회의록 내용이 없습니다."
+
+    body = (
+        f"{user.name}님,\n\n"
+        f"회의록이 확정되었습니다.\n\n"
+        f"[회의 정보]\n"
+        f"- 회의 제목: {meeting.title}\n"
+        f"- 회의 일시: {timezone.localtime(meeting.meeting_at).strftime('%Y-%m-%d %H:%M') if meeting.meeting_at else '-'}\n"
+        f"- 회의 장소: {meeting.location or '-'}\n\n"
+        f"[회의록]\n"
+        f"{meeting_document}\n\n"
+        f"[부여된 태스크]\n"
+        f"{task_text}\n\n"
+        f"프로젝트에서 더 자세한 내용을 확인하실 수 있습니다.\n"
+        f"감사합니다."
+    )
+
+    client = boto3.client("ses", region_name=settings.AWS_REGION)
+    client.send_email(
+        Source=settings.DEFAULT_FROM_EMAIL,
+        Destination={"ToAddresses": [user.email]},
+        Message={
+            "Subject": {"Data": f"[HPM] {meeting.title} 회의록 및 태스크 공유"},
+            "Body": {"Text": {"Data": body}},
+        },
+    )
+
 def _notify_task_assigned(task):
     if not task.meeting_users_id or not task.meeting_users:
         return
@@ -588,6 +644,52 @@ def register_jira_tasks(request, meeting_id):
             failed.append({"task_id": task_id, "reason": result})
 
     return Response({"registered": registered, "failed": failed})
+
+@api_view(["POST"])
+def send_summary_email(request, meeting_id):
+    try:
+        meeting = Meeting.objects.select_related("creator").get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    recipients = _meeting_email_recipients(meeting)
+    recipient_user_ids = request.data.get("recipient_user_ids")
+    if recipient_user_ids is not None:
+        try:
+            selected_user_ids = {int(user_id) for user_id in recipient_user_ids}
+        except (TypeError, ValueError):
+            return Response({"error": "수신자 목록이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+        recipients = [user for user in recipients if user.users_id in selected_user_ids]
+
+    if not recipients:
+        return Response({"error": "이메일을 발송할 참여자가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not settings.DEFAULT_FROM_EMAIL:
+        return Response({"error": "발신 이메일 설정이 없습니다."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    tasks = list(
+        MeetingTask.objects
+        .filter(meeting=meeting)
+        .select_related("meeting_users__user")
+        .order_by("meeting_task_id")
+    )
+    sent, failed = [], []
+
+    for user in recipients:
+        if not user.email:
+            failed.append({"user_id": user.users_id, "name": user.name, "reason": "이메일 없음"})
+            continue
+
+        try:
+            _send_summary_email(user, meeting, tasks)
+            sent.append({"user_id": user.users_id, "name": user.name, "email": user.email})
+        except Exception as exc:
+            failed.append({"user_id": user.users_id, "name": user.name, "email": user.email, "reason": str(exc)})
+
+    if failed:
+        return Response({"sent": sent, "failed": failed}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({"sent": sent})
 
 # ── 회의록 생성 (RunPod 엔드포인트) ─────────────────────────────
 @api_view(["POST"])

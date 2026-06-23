@@ -1,159 +1,228 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getTaskList, type Task } from "../../services/meeting";
+import {
+  getMeetingDetail,
+  getTaskList,
+  sendMeetingSummaryEmail,
+  type Meeting,
+  type Task,
+} from "../../services/meeting";
 import StepBar from "../../components/meeting/StepBar";
 
 const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
 
-const MOCK_TASKS: Task[] = [
-  {
-    meeting_task_id: 1,
-    title: "사내 클라우드 보호처 신청 절차 및 예산 코드 확인",
-    content: "",
-    owner: "김규호",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-  {
-    meeting_task_id: 2,
-    title: "운영 서버 외부 API 호출 보안 정책 확인",
-    content: "",
-    owner: "김규호",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-  {
-    meeting_task_id: 3,
-    title: "업종 코드 자동 분류 기능 RFP 범위 검토",
-    content: "",
-    owner: "류지우",
-    due_date: "2026-06-05",
-    priority: "Medium",
-    status: 0,
-  },
-  {
-    meeting_task_id: 4,
-    title: "파인튜닝 GPU 서버 확보 방안 검토",
-    content: "",
-    owner: "박수영",
-    due_date: "2026-06-05",
-    priority: "High",
-    status: 0,
-  },
-];
+const PRIORITY_LABEL: Record<string, string> = {
+  Highest: "매우 높음",
+  High: "높음",
+  Medium: "중간",
+  Low: "낮음",
+  Lowest: "매우 낮음",
+};
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.replace("T", " ").slice(0, 16);
+
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 
 export default function MeetingEmailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const meetingId = Number(id);
 
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [selected, setSelected] = useState<Set<number>>(
-    new Set(MOCK_TASKS.map(t => t.meeting_task_id))
-  );
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
-    getTaskList(meetingId)
-      .then(list => {
-        if (list && list.length > 0) {
-          setTasks(list);
-          setSelected(new Set(list.map(t => t.meeting_task_id)));
-        }
+    setLoading(true);
+    Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
+      .then(([meetingDetail, taskList]) => {
+        setMeeting(meetingDetail);
+        setTasks(taskList || []);
       })
-      .catch(console.error);
+      .catch(error => {
+        console.error("요약 메일 화면 로드 실패:", error);
+        setMeeting(null);
+      })
+      .finally(() => setLoading(false));
   }, [meetingId]);
 
-  const toggle = (taskId: number) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
-      return next;
-    });
+  const recipients = meeting?.participants || [];
+  const participantNames = recipients.map(participant => participant.name).join(", ") || "-";
+
+  const handleSend = async () => {
+    if (sending || recipients.length === 0) return;
+
+    setSending(true);
+    try {
+      await sendMeetingSummaryEmail(meetingId);
+      setSent(true);
+    } catch (error) {
+      console.error("요약 이메일 발송 실패:", error);
+      alert("요약 이메일 발송에 실패했습니다.");
+    } finally {
+      setSending(false);
+    }
   };
 
-  const handleSend = () => {
-    setSending(true);
-    setTimeout(() => {
-      navigate("/meetings");
-    }, 700);
-  };
+  if (loading) {
+    return <div className="p-8 text-gray-400">메일 발송 정보를 불러오는 중...</div>;
+  }
+
+  if (!meeting) {
+    return <div className="p-8 text-gray-400">회의를 찾을 수 없습니다.</div>;
+  }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="mx-auto max-w-6xl p-8">
       <StepBar steps={STEP_LABELS} activeStep={3} />
 
-      <h2 className="text-xl font-bold text-gray-900 mb-1">요약 메일 발송</h2>
-      <p className="text-sm text-gray-400 mb-8">체크된 태스크 담당자에게 맞춤 메일이 발송됩니다.</p>
+      <div className="mb-6">
+        <h1 className="text-[24px] font-semibold text-[#141414]">요약 메일 발송</h1>
+        <p className="mt-1 text-[13px] text-[#969696]">회의 참여자 전체에게 회의록과 태스크 요약을 발송합니다.</p>
+      </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <div className="flex flex-col gap-3">
-          {tasks.map(task => {
-            const isSelected = selected.has(task.meeting_task_id);
-            return (
-              <button
-                key={task.meeting_task_id}
-                onClick={() => toggle(task.meeting_task_id)}
-                className={`w-full text-left px-5 py-4 rounded-xl border transition-colors
-                  ${isSelected
-                    ? "bg-[#F4F1FF] border-[#623FB5]"
-                    : "bg-white border-gray-200 hover:bg-gray-50"}`}
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold mb-0.5 ${isSelected ? "text-[#141414]" : "text-gray-900"}`}>
-                      {task.owner || "미배정"}
-                    </p>
-                    <p className={`text-xs ${isSelected ? "text-[#623FB5]" : "text-gray-500"}`}>
-                      담당 태스크: {task.title}{task.due_date ? ` (${task.due_date})` : ""}
-                    </p>
+      {sent ? (
+        <div className="rounded-xl border border-[#E6E1E6] bg-white px-8 py-14 text-center">
+          <p className="text-[15px] font-semibold text-[#623FB5]">메일이 참여자 전체에게 발송되었습니다.</p>
+          <div className="mt-6 flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(`/meetings/${meetingId}/archive`)}
+              className="rounded-lg bg-[#623FB5] px-5 py-2 text-sm font-semibold text-white"
+            >
+              회의 후 상세보기
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/meetings")}
+              className="rounded-lg border border-[#E6E1E6] px-5 py-2 text-sm font-medium text-[#555] hover:bg-[#F4F5F8]"
+            >
+              회의 목록
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-5">
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="rounded-xl border border-[#E6E1E6] bg-white p-5">
+                <p className="mb-1 text-[12px] text-[#969696]">회의 제목</p>
+                <p className="text-[14px] font-medium text-[#141414]">{meeting.title}</p>
+              </div>
+
+              <div className="rounded-xl border border-[#E6E1E6] bg-white">
+                <p className="px-5 pb-2 pt-4 text-[13px] font-bold text-[#141414]">회의 정보</p>
+                <div className="flex flex-col gap-2 px-5 pb-4 text-[13px]">
+                  <div className="flex gap-3">
+                    <span className="min-w-[70px] text-[#969696]">회의 일시</span>
+                    <span className="text-[#141414]">{formatDate(meeting.meeting_at)}</span>
                   </div>
-                  <div
-                    className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center border-2 transition-colors
-                      ${isSelected
-                        ? "bg-[#623FB5] border-[#623FB5] text-white"
-                        : "border-gray-300 bg-white"}`}
-                  >
-                    {isSelected && (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+                  <div className="flex gap-3">
+                    <span className="min-w-[70px] text-[#969696]">회의 참석자</span>
+                    <span className="text-[#141414]">{participantNames}</span>
                   </div>
                 </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+              </div>
 
-      <div className="flex justify-end gap-3 mb-6">
-        <button
-          onClick={() => navigate(`/meetings/${meetingId}/jira`)}
-          className="px-5 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-        >
-          이전
-        </button>
-        <button
-          onClick={handleSend}
-          disabled={sending}
-          className="px-5 py-2 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
-          style={{ backgroundColor: "#623FB5" }}
-        >
-          {sending ? "발송 중..." : "메일 발송"}
-        </button>
-      </div>
+              <div className="rounded-xl border border-[#E6E1E6] bg-white">
+                <p className="px-5 pb-2 pt-4 text-[13px] font-bold text-[#141414]">부여된 태스크</p>
+                <table className="w-full border-collapse text-[12px]">
+                  <thead>
+                    <tr className="border-y border-[#E6E1E6] bg-[#F4F5F8]">
+                      <th className="px-4 py-2.5 text-left font-medium text-[#555]">태스크</th>
+                      <th className="w-[80px] whitespace-nowrap px-4 py-2.5 text-left font-medium text-[#555]">담당자</th>
+                      <th className="w-[100px] whitespace-nowrap px-4 py-2.5 text-left font-medium text-[#555]">기한</th>
+                      <th className="w-[82px] whitespace-nowrap px-4 py-2.5 text-left font-medium text-[#555]">우선순위</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasks.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-[#969696]">등록된 태스크가 없습니다.</td>
+                      </tr>
+                    ) : tasks.map((task, idx) => (
+                      <tr key={task.meeting_task_id} className={idx < tasks.length - 1 ? "border-b border-[#E6E1E6]" : ""}>
+                        <td className="px-4 py-3 text-[#141414]">{task.title}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-[#555]">{task.owner || "미배정"}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-[#555]">{task.due_date || "-"}</td>
+                        <td className="whitespace-nowrap px-4 py-3">
+                          <span className="rounded-full bg-[#F2F0FF] px-2 py-0.5 text-[11px] text-[#623FB5]">
+                            {PRIORITY_LABEL[task.priority] || task.priority || "중간"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-      <div className="text-center">
-        <button
-          onClick={() => navigate("/meetings")}
-          className="text-sm text-gray-400 underline hover:text-gray-600"
-        >
-          메일 발송을 건너뛰겠습니까? 메일 발송 없이 회의가 마무리 됩니다.
-        </button>
-      </div>
+              <div className="rounded-xl border border-[#E6E1E6] bg-white p-4">
+                <p className="mb-3 text-[13px] font-bold text-[#141414]">이메일 수신자</p>
+                <div className="flex flex-wrap gap-2">
+                  {recipients.map(recipient => (
+                    <span
+                      key={recipient.user_id}
+                      className="rounded-lg border border-[#E6E1E6] bg-[#F4F5F8] px-3 py-1.5 text-[12px] text-[#141414]"
+                    >
+                      {recipient.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="w-[440px] shrink-0">
+              <p className="mb-3 text-[14px] font-bold text-[#141414]">이메일 미리보기</p>
+              <div className="rounded-xl border border-[#E6E1E6] bg-white px-6 py-5 text-[13px] leading-relaxed text-[#333]">
+                <p className="mb-4">안녕하세요, OOO.</p>
+                <p className="mb-4">회의록이 확정되었습니다. 아래 태스크가 부여되었으니 기한 내에 처리해 주세요.</p>
+                <p className="mb-1 font-bold">[회의 정보]</p>
+                <p>• 회의 제목: {meeting.title}</p>
+                <p className="mb-4">• 회의 일시: {formatDate(meeting.meeting_at)}</p>
+                <p className="mb-1 font-bold">[부여된 태스크]</p>
+                {tasks.length === 0 ? (
+                  <p>등록된 태스크가 없습니다.</p>
+                ) : tasks.map((task, index) => (
+                  <p key={task.meeting_task_id}>
+                    {index + 1}. {task.title} (담당자: {task.owner || "미배정"}, 기한: {task.due_date || "-"}, 우선순위: {PRIORITY_LABEL[task.priority] || task.priority || "중간"})
+                  </p>
+                ))}
+                <p className="mt-4">프로젝트에서 더 자세한 내용을 확인하실 수 있습니다.</p>
+                <p>감사합니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 flex justify-end">
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending || recipients.length === 0}
+              className="rounded-lg bg-[#623FB5] px-8 py-3 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
+            >
+              {sending ? "발송 중..." : "이메일 발송"}
+            </button>
+          </div>
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => navigate(`/meetings/${meetingId}/archive`)}
+              className="text-sm text-[#969696] underline hover:text-[#555]"
+            >
+              메일 발송을 건너뛰겠습니까? 메일 발송 없이 회의가 마무리 됩니다.
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

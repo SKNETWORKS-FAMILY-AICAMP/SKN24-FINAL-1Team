@@ -73,7 +73,7 @@ export interface Meeting {
   is_meeting: boolean;
   is_meeting_approve?: boolean;
   project: number;
-  participants?: { meeting_users_id?: number | null; user_id: number; name: string }[];
+  participants?: { meeting_users_id?: number | null; user_id: number; name: string; email?: string; work?: string }[];
   agenda?: AgendaItem[];
   tasks?: Task[];
   creator?: number;
@@ -258,6 +258,17 @@ export const registerJiraTasks = async (
   userId?: number,
 ): Promise<{ registered: { task_id: number; jira_key: string }[]; failed: unknown[] }> => {
   const res = await api.post(`/meetings/${meetingId}/jira/`, { task_ids: taskIds, user_id: userId });
+  return res.data;
+};
+
+export const sendMeetingSummaryEmail = async (
+  meetingId: number,
+  recipientUserIds?: number[],
+): Promise<{ sent: { user_id: number; email: string; name: string }[] }> => {
+  const res = await api.post(
+    `/meetings/${meetingId}/email/`,
+    recipientUserIds ? { recipient_user_ids: recipientUserIds } : {},
+  );
   return res.data;
 };
 

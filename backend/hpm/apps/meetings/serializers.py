@@ -15,6 +15,8 @@ def build_meeting_participants(meeting):
             "meeting_users_id": creator_meeting_user.meeting_users_id if creator_meeting_user else None,
             "user_id": meeting.creator.users_id,
             "name": meeting.creator.name,
+            "email": meeting.creator.email,
+            "work": meeting.creator.work,
         })
         seen_user_ids.add(meeting.creator.users_id)
 
@@ -27,6 +29,8 @@ def build_meeting_participants(meeting):
             "meeting_users_id": meeting_user.meeting_users_id,
             "user_id": user.users_id,
             "name": user.name,
+            "email": user.email,
+            "work": user.work,
         })
         seen_user_ids.add(user.users_id)
 
