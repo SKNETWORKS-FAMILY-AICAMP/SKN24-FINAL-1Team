@@ -340,7 +340,7 @@ export default function MeetingListPage() {
         <button
           onClick={() => {
             if (row.status !== "scheduled" && row.status !== "in_progress") {
-              navigate(`/meetings/${row.meeting_id}/minutes`);
+              navigate(`/meetings/${row.meeting_id}/archive`);
             } else {
               navigate(`/meetings/${row.meeting_id}`);
             }

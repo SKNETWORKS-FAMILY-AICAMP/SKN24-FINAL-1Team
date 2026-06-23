@@ -4,7 +4,6 @@ from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, 
 
 class MeetingSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
-    minutes_status = serializers.SerializerMethodField()
     is_meeting = serializers.SerializerMethodField()
     elapsed_seconds = serializers.SerializerMethodField()
     creator_name = serializers.SerializerMethodField()
@@ -16,17 +15,10 @@ class MeetingSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         return {
-            Meeting.MeetingStatus.SCHEDULED: "scheduled",
+            Meeting.MeetingStatus.SCHEDULED:   "scheduled",
             Meeting.MeetingStatus.IN_PROGRESS: "in_progress",
-            Meeting.MeetingStatus.FINISHED: "finished",
+            Meeting.MeetingStatus.FINISHED:    "finished",
         }.get(obj.meeting_status, "scheduled")
-
-    def get_minutes_status(self, obj):
-        if obj.is_meeting_approve:
-            return "approved"
-        if obj.meeting_document:
-            return "draft"
-        return None
 
     def get_is_meeting(self, obj):
         return obj.meeting_status == Meeting.MeetingStatus.IN_PROGRESS
@@ -61,9 +53,16 @@ class MeetingAgendaSerializer(serializers.ModelSerializer):
 
 
 class MeetingTaskSerializer(serializers.ModelSerializer):
+    owner = serializers.SerializerMethodField()
+
     class Meta:
         model = MeetingTask
         fields = "__all__"
+
+    def get_owner(self, obj):
+        if obj.meeting_users and obj.meeting_users.user:
+            return obj.meeting_users.user.name
+        return ""
 
 
 class MeetingUsersSerializer(serializers.ModelSerializer):

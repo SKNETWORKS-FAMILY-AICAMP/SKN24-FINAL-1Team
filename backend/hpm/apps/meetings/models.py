@@ -4,9 +4,9 @@ from apps.users.models import Users
 
 class Meeting(models.Model):
     class MeetingStatus(models.IntegerChoices):
-            SCHEDULED = 0, "회의 전"
-            IN_PROGRESS = 1, "회의 진행 중"
-            FINISHED = 2, "회의 후"
+        SCHEDULED   = 0, "회의 전"
+        IN_PROGRESS = 1, "회의 진행 중"
+        FINISHED    = 2, "회의 후"
 
     meeting_id = models.AutoField(primary_key=True, verbose_name="회의 식별 번호")
     project = models.ForeignKey(
@@ -17,12 +17,12 @@ class Meeting(models.Model):
         related_name="created_meetings", null=True, verbose_name="회의 생성자"
     )
 
-    title         = models.CharField(max_length=90, verbose_name="회의 주제")
-    location      = models.CharField(max_length=150, blank=True, verbose_name="회의 장소")
-    meeting_at    = models.DateTimeField(verbose_name="회의 일시")
+    title            = models.CharField(max_length=90, verbose_name="회의 주제")
+    location         = models.CharField(max_length=150, blank=True, verbose_name="회의 장소")
+    meeting_at       = models.DateTimeField(verbose_name="회의 일시")
     meeting_document = models.TextField(null=True, blank=True, verbose_name="회의록")
-    during_time = models.CharField(max_length=20, null=True, blank=True, verbose_name="회의 진행 시간")
-    meeting_status = models.IntegerField(
+    during_time      = models.CharField(max_length=20, null=True, blank=True, verbose_name="회의 진행 시간")
+    meeting_status   = models.IntegerField(
         choices=MeetingStatus.choices, default=MeetingStatus.SCHEDULED, verbose_name="회의 상태"
     )
     is_meeting_approve = models.BooleanField(default=False, verbose_name="회의록 승인 여부")

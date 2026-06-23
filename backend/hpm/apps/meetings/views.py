@@ -139,12 +139,12 @@ def meeting_detail(request, meeting_id):
         data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
         return Response(data)
 
+
     if request.method == "DELETE":
         meeting.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    # special_note 제거 (모델에 없음) → title, location만 수정 가능
-    for field in ["title", "location"]:
+    for field in ["title", "location", "meeting_document"]:
         if field in request.data:
             setattr(meeting, field, request.data[field])
     meeting.save()
@@ -417,7 +417,7 @@ def complete_minutes_review(request, meeting_id):
             Notification.MINUTES_APPROVED,
             f"[{meeting.title}] 회의록이 확정되었습니다.",
         )
-    return Response({"message": "검토 완료되었습니다.", "minutes_status": "approved"})
+    return Response({"message": "검토 완료되었습니다."})
 
 def _notify_meeting_users(meeting, notification_type, content):
     for mu in MeetingUsers.objects.filter(meeting=meeting).select_related("user"):

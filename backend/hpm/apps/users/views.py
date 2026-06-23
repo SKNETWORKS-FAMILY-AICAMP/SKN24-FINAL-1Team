@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
-from .models import Users
+from .models import Users, Dept, Rank
 from .serializers import UserSerializer
 
 import os
@@ -23,6 +23,7 @@ from rest_framework.decorators import permission_classes
 from django.conf import settings
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
+
 
 from apps.meetings.jira_client import (
     get_jira_issues,
@@ -613,3 +614,111 @@ def jira_issue_types(request):
         for item in res.json().get("issueTypes", [])
     ]
     return Response(issue_types)
+
+
+
+#----관리자 전용 사용자 관리 ----
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def admin_user_list(request):
+    if request.method == "POST":
+        emp_no    = request.data.get("emp_no", "").strip()
+        name      = request.data.get("name", "").strip()
+        email     = request.data.get("email", "").strip()
+        dept_name = request.data.get("dept_name", "").strip()
+        rank_name = request.data.get("rank_name", "").strip()
+        work      = request.data.get("work", "").strip()
+
+        if not all([emp_no, name, email, dept_name, rank_name, work]):
+            return Response({"error": "모든 필수 항목을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+        if Users.objects.filter(emp_no=emp_no).exists():
+            return Response({"error": "이미 존재하는 사원번호입니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if Users.objects.filter(email=email).exists():
+            return Response({"error": "이미 존재하는 이메일입니다."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        dept, _ = Dept.objects.get_or_create(dept_name=dept_name)
+        rank, _ = Rank.objects.get_or_create(rank_name=rank_name)
+
+        user = Users.objects.create(
+            emp_no=emp_no, name=name, email=email,
+            dept=dept, rank=rank, work=work,
+            password=settings.DEFAULT_USER_PASSWORD,
+            status=0, account_status=0,
+        )
+
+        return Response({
+            "users_id": user.users_id, "emp_no": user.emp_no,
+            "name": user.name, "email": user.email,
+            "dept_name": dept.dept_name, "rank_name": rank.rank_name,
+            "work": user.work, "status": user.status,
+        }, status=status.HTTP_201_CREATED)
+    users = Users.objects.select_related("dept", "rank").all().order_by("-created_at")
+    return Response([
+        {
+            "users_id": u.users_id, "emp_no": u.emp_no,
+            "email": u.email, "name": u.name, "work": u.work,
+            "dept_name": u.dept.dept_name, "rank_name": u.rank.rank_name,
+            "status": u.status,
+        }
+        for u in users
+    ])
+
+
+@api_view(["GET", "PATCH", "DELETE"])
+@permission_classes([IsAuthenticated])
+def admin_user_detail(request, users_id):
+    try:
+        user = Users.objects.select_related("dept", "rank").get(users_id=users_id)
+    except Users.DoesNotExist:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == "DELETE":
+        user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    if request.method == "GET":
+        return Response({
+            "users_id": user.users_id, "emp_no": user.emp_no,
+            "email": user.email, "name": user.name, "work": user.work,
+            "dept_name": user.dept.dept_name, "rank_name": user.rank.rank_name,
+            "status": user.status,
+        })
+
+    for field in ["name", "email", "work", "emp_no"]:
+        if field in request.data:
+            setattr(user, field, request.data[field])
+
+    if "dept_name" in request.data:
+        dept, _ = Dept.objects.get_or_create(dept_name = request.data["dept_name"])
+        user.dept = dept
+
+    if "rank_name" in request.data:
+        rank, _ = Rank.objects.get_or_create(rank_name=request.data["rank_name"])
+        user.rank = rank
+
+    if "status" in request.data:
+        user.status = request.data["status"]
+
+    if request.data.get("reset_password"):
+        user.password = settings.DEFAULT_USER_PASSWORD
+        user.account_status = 0
+
+    user.save()
+    return Response({
+        "users_id": user.users_id, "emp_no": user.emp_no,
+        "email": user.email, "name": user.name, "work": user.work,
+        "dept_name": user.dept.dept_name, "rank_name": user.rank.rank_name,
+        "status": user.status,
+    })
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dept_list(request):
+    depts = Dept.objects.all().order_by("dept_id")
+    return Response([{"dept_id": d.dept_id, "dept_name": d.dept_name} for d in depts])
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def rank_list(request):
+    ranks = Rank.objects.all().order_by("rank_id")
+    return Response([{"rank_id": r.rank_id, "rank_name": r.rank_name} for r in ranks])
