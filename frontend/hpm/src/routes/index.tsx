@@ -14,6 +14,7 @@ import MeetingCompletePage from "../pages/meeting/MeetingCompletePage";
 import MeetingInviteEmailPage from "../pages/meeting/MeetingInviteEmailPage";
 import MeetingDetailPage from "../pages/meeting/MeetingDetailPage";
 import MeetingMinutesPage from "../pages/meeting/MeetingMinutesPage";
+import MeetingArchivePage from "../pages/meeting/MeetingArchivePage";
 import SpeakerMappingPage from "../pages/meeting/SpeakerMappingPage";
 import JiraTaskPage from "../pages/meeting/JiraTaskPage";
 import MeetingEmailPage from "../pages/meeting/MeetingEmailPage";
@@ -22,6 +23,8 @@ import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 import UserManagementPage from "../pages/admins/UserManagementPage";
+
+
 
 function DocumentRoutes() {
   return <Outlet />;
@@ -47,6 +50,7 @@ const router = createBrowserRouter([
       { path: "/meetings/:id", element: <MeetingDetailPage /> },
       { path: "/meetings/:id/speaker-mapping", element: <SpeakerMappingPage /> },
       { path: "/meetings/:id/minutes", element: <MeetingMinutesPage /> },
+      { path: "/meetings/:id/archive", element: <MeetingArchivePage /> },
       { path: "/meetings/:id/jira", element: <JiraTaskPage /> },
       { path: "/meetings/:id/email", element: <MeetingEmailPage /> },
       { path: "/meetings/:id/jira-register", element: <MeetingJiraRegisterPage /> },
@@ -62,6 +66,7 @@ const router = createBrowserRouter([
       { path: "/admin/users", element: <UserManagementPage /> },
     ],
   },
+  { path: "/admin/users", element: <UserManagementPage /> },
 ]);
 
 export default router;
