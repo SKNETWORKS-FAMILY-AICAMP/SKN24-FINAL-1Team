@@ -30,4 +30,4 @@ for i in $(seq 1 120); do
 done
 
 echo "Starting OCR wrapper on 0.0.0.0:8501..."
-exec uvicorn ocr_server:app --host 0.0.0.0 --port 8501
+exec uvicorn ocr_server:app --host 0.0.0.0 --port 8501 --reload

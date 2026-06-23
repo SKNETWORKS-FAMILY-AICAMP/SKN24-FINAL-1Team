@@ -38,7 +38,7 @@ const EMPTY_MEETING: Meeting = {
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
-  High: "높음", Medium: "중간", Low: "낮음", Lowest: "최하",
+  Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
 };
 
 export default function MeetingArchivePage() {
@@ -490,14 +490,26 @@ export default function MeetingArchivePage() {
               { label: "프로젝트 현재 상태", value: prep?.project_status },
               { label: "관련 규정 및 제약사항", value: prep?.rule },
               { label: "회의 종료 후 기대 결과", value: prep?.effect },
-            ].map(section => (
+            ].map(section => section.value ? (
               <div key={section.label}>
                 <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
                 <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
                   {section.value || <span style={{ color: "#969696" }}>내용이 없습니다.</span>}
                 </div>
               </div>
-            ))}
+            ) : null)}
+
+            <div>
+              <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>참고 자료</p>
+              <div className="border rounded-xl px-5 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
+                {prep?.sources?.map((src, i) => (
+                  <p key={i} className="text-[13px]">
+                    <span style={{ color: "#141414" }}>- {src.title} </span>
+                    <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</a>
+                  </p>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -131,7 +131,6 @@ export default function UserManagementPage() {
     .catch(console.error)
     .finally(() => setIsLoading(false));
 }, []);
-  
 
   // ── 필터 적용 목록 ────────────────────────────────────────────────
   const filteredUsers = users.filter((u) => {
@@ -394,6 +393,10 @@ export default function UserManagementPage() {
               </button>
             </div>
           </div>
+          {/* 로딩 */}
+          {isLoading && (
+            <p className="text-center py-4 text-[#969696]">불러오는 중...</p>
+          )}
 
           {/* 테이블 */}
           <div className="flex-1 overflow-auto">

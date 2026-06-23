@@ -417,3 +417,9 @@ export const generatePrepMaterial = async (meetingId: number): Promise<MeetingPr
   const res = await api.post(`/meetings/${meetingId}/prep/generate/`);
   return res.data;
 };
+
+
+export const getUserProjects = async (userId: number) => {
+  const res = await api.get(`/projects/user/${userId}/`);
+  return res.data;
+};
