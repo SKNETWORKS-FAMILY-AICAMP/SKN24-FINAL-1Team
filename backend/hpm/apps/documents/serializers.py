@@ -48,11 +48,17 @@ class DocumentSerializer(serializers.ModelSerializer):
         if not obj.path:
             return ""
 
-        try:
-            relative_path = os.path.relpath(obj.path, settings.MEDIA_ROOT)
-        except ValueError:
-            return ""
+        normalized_path = obj.path.replace('\\', '/')
+        if 'media/' in normalized_path:
+            relative_path = normalized_path.split('media/', 1)[1]
+        else:
+            try:
+                relative_path = os.path.relpath(obj.path, settings.MEDIA_ROOT)
+            except ValueError:
+                relative_path = os.path.basename(obj.path)
 
         media_path = f"{settings.MEDIA_URL}{relative_path.replace(os.sep, '/')}"
+        if media_path.startswith('//'):
+            media_path = media_path[1:]
         request = self.context.get("request")
         return request.build_absolute_uri(media_path) if request else media_path

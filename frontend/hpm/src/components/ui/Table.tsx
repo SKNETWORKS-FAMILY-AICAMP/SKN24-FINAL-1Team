@@ -65,24 +65,15 @@ export default function Table<T>({
         {/* 테이블 헤더 */}
         <thead>
           <tr className={`${DESIGN.BACKGROUND_COLORS.grayLight} border-b border-b-[#E6E1E6]`}>
-            {columns.map((col) => {
-              const alignClass =
-                col.align === "center"
-                  ? "text-center"
-                  : col.align === "right"
-                  ? "text-end"
-                  : "text-start";
-
-              return (
-                <th
-                  key={col.key}
-                  style={{ width: col.width }}
-                  className={`py-4 px-6 ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray} font-semibold ${alignClass} whitespace-nowrap`}
-                >
-                  {col.header}
-                </th>
-              );
-            })}
+            {columns.map((col) => (
+              <th
+                key={col.key}
+                style={{ width: col.width, textAlign: col.align }}
+                className={`py-4 px-6 ${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.gray} font-medium whitespace-nowrap`}
+              >
+                {col.header}
+              </th>
+            ))}
           </tr>
         </thead>
 
@@ -116,23 +107,15 @@ export default function Table<T>({
                   onRowClick ? "cursor-pointer" : ""
                 } ${DESIGN.BACKGROUND_COLORS.grayLightHover}`}
               >
-                {columns.map((col) => {
-                  const alignClass =
-                    col.align === "center"
-                      ? "text-center"
-                      : col.align === "right"
-                      ? "text-end"
-                      : "text-start";
-
-                  return (
-                    <td
-                      key={col.key}
-                      className={`py-4 px-6 ${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} align-middle ${alignClass} break-words`}
-                    >
-                      {col.render ? col.render(row, rowIndex) : (row as any)[col.key]}
-                    </td>
-                  );
-                })}
+                {columns.map((col) => (
+                  <td
+                    key={col.key}
+                    style={{ textAlign: col.align }}
+                    className={`py-4 px-6 ${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} align-middle break-words`}
+                  >
+                    {col.render ? col.render(row, rowIndex) : (row as any)[col.key]}
+                  </td>
+                ))}
               </tr>
             ))
           )}

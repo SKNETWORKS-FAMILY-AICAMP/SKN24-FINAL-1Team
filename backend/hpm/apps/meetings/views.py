@@ -5,6 +5,7 @@ from datetime import datetime
 import boto3
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -122,8 +123,8 @@ def meeting_list(request):
     return Response(MeetingSerializer(meeting).data, status=status.HTTP_201_CREATED)
 
 
-# ── 회의 상세 / 수정 ─────────────────────────────────────────────
-@api_view(["GET", "PATCH"])
+# ── 회의 상세 / 수정 / 삭제 ─────────────────────────────────────────────
+@api_view(["GET", "PATCH", "DELETE"])
 def meeting_detail(request, meeting_id):
     try:
         meeting = Meeting.objects.get(meeting_id=meeting_id)
@@ -137,6 +138,10 @@ def meeting_detail(request, meeting_id):
         data["agenda"] = MeetingAgendaSerializer(MeetingAgendas.objects.filter(meeting=meeting), many=True).data
         data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
         return Response(data)
+
+    if request.method == "DELETE":
+        meeting.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     # special_note 제거 (모델에 없음) → title, location만 수정 가능
     for field in ["title", "location"]:
@@ -192,11 +197,62 @@ def start_meeting(request, meeting_id):
         return Response({"error": "이미 진행 중인 회의입니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     meeting.meeting_status = Meeting.MeetingStatus.IN_PROGRESS
-    meeting.save(update_fields=["meeting_status"])
+    meeting.meeting_at = timezone.now()
+    meeting.during_time = "0"
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "meeting_at", "during_time", "is_paused"])
 
     # OneToOneField라서 get_or_create 사용
     Record.objects.get_or_create(meeting=meeting)
+
+    # 회의 참여자들에게 시작 알림 생성 (생성자 제외)
+    meeting_users = MeetingUsers.objects.filter(meeting=meeting)
+    for mu in meeting_users:
+        if mu.user_id != request.auth["user_id"]:
+            _create_notification(
+                user=mu.user,
+                notification_type="meeting_started",
+                content=f"'{meeting.title}' 회의가 시작되었습니다.",
+                target_id=meeting.meeting_id
+            )
+
     return Response({"message": "회의가 시작되었습니다.", "meeting_id": meeting_id})
+
+
+@api_view(["POST"])
+def pause_meeting(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not meeting.is_paused:
+        meeting.is_paused = True
+        if meeting.meeting_at:
+            delta = timezone.now() - meeting.meeting_at
+            try:
+                curr_sec = int(meeting.during_time or "0")
+            except ValueError:
+                curr_sec = 0
+            meeting.during_time = str(curr_sec + int(delta.total_seconds()))
+        meeting.save(update_fields=["is_paused", "during_time"])
+
+    return Response({"message": "회의가 일시 중지되었습니다.", "meeting_id": meeting_id, "is_paused": True})
+
+
+@api_view(["POST"])
+def resume_meeting(request, meeting_id):
+    try:
+        meeting = Meeting.objects.get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if meeting.is_paused:
+        meeting.is_paused = False
+        meeting.meeting_at = timezone.now()
+        meeting.save(update_fields=["is_paused", "meeting_at"])
+
+    return Response({"message": "회의가 재개되었습니다.", "meeting_id": meeting_id, "is_paused": False})
 
 
 @api_view(["POST"])
@@ -208,7 +264,16 @@ def end_meeting(request, meeting_id):
 
     meeting.meeting_status = Meeting.MeetingStatus.FINISHED
     meeting.is_meeting_approve = False
-    meeting.save(update_fields=["meeting_status", "is_meeting_approve"])
+    
+    if not meeting.is_paused and meeting.meeting_at:
+        delta = timezone.now() - meeting.meeting_at
+        try:
+            curr_sec = int(meeting.during_time or "0")
+        except ValueError:
+            curr_sec = 0
+        meeting.during_time = str(curr_sec + int(delta.total_seconds()))
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "is_meeting_approve", "during_time", "is_paused"])
 
     minutes_data = {"content": "", "todo_list": []}
     audio_file = request.FILES.get("audio")
@@ -571,7 +636,7 @@ def generate_agenda(request, meeting_id):
 
     base_url = settings.RUNPOD_BASE_URL
     try:
-        payload = {"title": meeting.title, "ocr_text": ocr_text}
+        payload = {"title": meeting.title, "ocr_text": ocr_text, "context": meeting.project.context or ""}
         agenda_res = requests.post(f"{base_url}/generate-agendas", json=payload, timeout=300)
         agenda_res.raise_for_status()
         agenda_data = agenda_res.json()
@@ -674,7 +739,7 @@ def prep_material_detail(request, meeting_id):
                 "rule": "",
                 "effect": ""
             })
-        serializer = MeetingPreparationSerializer(prep)
+        serializer = MeetingPreparationSerializer(prep, context={"request": request})
         return Response(serializer.data)
 
     data = request.data
@@ -696,7 +761,7 @@ def prep_material_detail(request, meeting_id):
     meeting.meeting_document = _compile_prep_markdown(prep)
     meeting.save(update_fields=["meeting_document"])
 
-    serializer = MeetingPreparationSerializer(prep)
+    serializer = MeetingPreparationSerializer(prep, context={"request": request})
     return Response(serializer.data)
 
 
@@ -754,17 +819,16 @@ def generate_prep_material(request, meeting_id):
 
     PreparationDocument.objects.filter(preparation=prep).delete()
     for source in result_data.get("sources", []):
-        viewer = source.get("viewer", {})
-        if viewer.get("type") == "document" and viewer.get("id"):
-            try:
-                doc_id = int(viewer.get("id"))
+        try:
+            doc_id = source.get("document_id")
+            if doc_id is not None:
                 PreparationDocument.objects.create(
                     preparation=prep,
-                    document_id=doc_id
+                    document_id=int(doc_id)
                 )
-            except (ValueError, TypeError):
-                pass
+        except (ValueError, TypeError):
+            pass
 
-    serializer = MeetingPreparationSerializer(prep)
+    serializer = MeetingPreparationSerializer(prep, context={"request": request})
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 

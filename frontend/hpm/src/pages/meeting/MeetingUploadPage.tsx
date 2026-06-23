@@ -1,17 +1,25 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { generateAgendaWithOcr } from "../../services/meeting";
+import { generateAgendaWithOcr, generatePrepMaterial } from "../../services/meeting";
+import { uploadDocuments } from "../../services/documents";
 
-const MAX_TOTAL_MB = 10;
+const MAX_TOTAL_MB = 5;
 const ACCEPTED = ".jpg,.jpeg,.png,.pdf";
+
+const formatSize = (bytes: number) => {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)}mb`;
+  }
+  return `${(bytes / 1024).toFixed(0)}kb`;
+};
 
 export default function MeetingUploadPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false, showPrepMaterial = false } =
-    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean }) ?? {};
+  const { showAgenda = false, showPrepMaterial = false, type = "agenda", projectId } =
+    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; type?: "agenda" | "prep"; projectId?: number }) ?? {};
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -20,18 +28,33 @@ export default function MeetingUploadPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [showErrorModal, setShowErrorModal] = useState(false);
 
-  const totalMb = files.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024);
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+  const totalMb = totalBytes / (1024 * 1024);
 
   const addFiles = (incoming: FileList | null) => {
-    if (!incoming) return;
-    const valid = Array.from(incoming).filter((f) => {
-      const ext = f.name.split(".").pop()?.toLowerCase() ?? "";
-      return ["jpg", "jpeg", "png", "pdf"].includes(ext) && f.size <= 10 * 1024 * 1024;
-    });
-    setFiles((prev) => {
-      const names = new Set(prev.map((f) => f.name));
-      return [...prev, ...valid.filter((f) => !names.has(f.name))];
-    });
+    if (!incoming || incoming.length === 0) return;
+
+    if (files.length > 0 || incoming.length > 1) {
+      setErrorMessage("파일은 최대 1개만 업로드할 수 있습니다.");
+      setShowErrorModal(true);
+      return;
+    }
+
+    const file = incoming[0];
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!["jpg", "jpeg", "png", "pdf"].includes(ext)) {
+      setErrorMessage("지원되지 않는 파일 형식입니다. (JPG, JPEG, PNG, PDF만 가능)");
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (file.size > MAX_TOTAL_MB * 1024 * 1024) {
+      setErrorMessage(`파일 크기는 최대 ${MAX_TOTAL_MB}MB까지 업로드 가능합니다.`);
+      setShowErrorModal(true);
+      return;
+    }
+
+    setFiles([file]);
   };
 
   const removeFile = (name: string) => setFiles((prev) => prev.filter((f) => f.name !== name));
@@ -44,21 +67,52 @@ export default function MeetingUploadPage() {
 
   const handleNext = async () => {
     if (uploading) return;
-    if (files.length > 0) {
-      setUploading(true);
-      try {
-        await generateAgendaWithOcr(meetingId, files[0]);
-      } catch (e) {
-        const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "업로드 중 오류가 발생했습니다.";
-        setErrorMessage(msg);
-        setShowErrorModal(true);
-        setUploading(false);
-        return;
-      } finally {
-        setUploading(false);
+    setUploading(true);
+    try {
+      if (files.length > 0) {
+        if (type === "prep") {
+          if (!projectId) {
+            throw new Error("프로젝트 ID가 없습니다.");
+          }
+          await uploadDocuments(projectId, [files[0]]);
+          await generatePrepMaterial(meetingId);
+        } else {
+          await generateAgendaWithOcr(meetingId, files[0]);
+        }
+      } else if (type === "prep") {
+        await generatePrepMaterial(meetingId);
       }
+    } catch (e) {
+      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "업로드 중 오류가 발생했습니다.";
+      setErrorMessage(msg);
+      setShowErrorModal(true);
+      setUploading(false);
+      return;
+    } finally {
+      setUploading(false);
     }
-    navigate(`/meetings/${meetingId}/agenda`, {
+
+    navigate(`/meetings/${meetingId}`, {
+      state: { showAgenda, showPrepMaterial },
+    });
+  };
+
+  const handleSkip = async () => {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      if (type === "prep") {
+        await generatePrepMaterial(meetingId);
+      } else {
+        await generateAgendaWithOcr(meetingId, null);
+      }
+    } catch (e) {
+      console.error("동작 처리 실패:", e);
+    } finally {
+      setUploading(false);
+    }
+
+    navigate(`/meetings/${meetingId}`, {
       state: { showAgenda, showPrepMaterial },
     });
   };
@@ -107,7 +161,6 @@ export default function MeetingUploadPage() {
               ref={inputRef}
               type="file"
               accept={ACCEPTED}
-              multiple
               className="hidden"
               onChange={(e) => addFiles(e.target.files)}
             />
@@ -124,7 +177,7 @@ export default function MeetingUploadPage() {
               파일을 드래그하거나 클릭하여 업로드
             </p>
             <p className="text-[12px] text-[#141414] mb-5">
-              JPG · JPEG · PNG · PDF 파일당 최대 10MB
+              JPG · JPEG · PNG · PDF 최대 5MB (1개만 업로드 가능)
             </p>
             <button
               type="button"
@@ -151,7 +204,7 @@ export default function MeetingUploadPage() {
                       {f.name}
                     </span>
                     <span className="text-[12px] text-[#969696] flex-shrink-0">
-                      {(f.size / (1024 * 1024)).toFixed(1)}mb
+                      {formatSize(f.size)}
                     </span>
                   </div>
                   <button
@@ -177,8 +230,8 @@ export default function MeetingUploadPage() {
           </div>
           <div className="flex justify-between text-[12px] text-[#969696]">
             <span>0mb</span>
-            <span>{totalMb.toFixed(1)}mb</span>
-            <span>10mb</span>
+            <span>{formatSize(totalBytes)}</span>
+            <span>{MAX_TOTAL_MB}mb</span>
           </div>
         </div>
 
@@ -197,10 +250,11 @@ export default function MeetingUploadPage() {
       {/* 건너뛰기 */}
       <div className="flex justify-center mt-4">
         <button
-          onClick={() => navigate(`/meetings/${meetingId}/agenda`, { state: { showAgenda, showPrepMaterial } })}
-          className="text-[12px] text-[#623FB5] hover:underline"
+          onClick={handleSkip}
+          disabled={uploading}
+          className="text-[12px] text-[#623FB5] hover:underline disabled:opacity-60"
         >
-          자료 업로드를 건너뛰시겠습니까?
+          {uploading ? (type === "prep" ? "준비 자료 생성 중..." : "안건 생성 중...") : "자료 업로드를 건너뛰시겠습니까?"}
         </button>
       </div>
     </div>

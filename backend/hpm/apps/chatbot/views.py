@@ -39,23 +39,40 @@ def chat(request, meeting_id):
     # RAG 서버 호출
     rag_url = getattr(settings, "RAG_SERVER_URL", "http://127.0.0.1:8088/chat")
     try:
+        payload = {
+            "question": question,
+            "context": "",
+            "history": context,
+            "sources": [],
+            "project_id": str(meeting.project_id),
+            "meeting_id": str(meeting_id),
+            "source_scope": "project",
+            "source_types": [],
+            "max_previous_meetings": 5,
+            "min_relevance_score": None
+        }
         resp = requests.post(
             rag_url,
-            json={"question": question, "history": context, "meeting_id": meeting_id},
+            json=payload,
             timeout=30,
         )
         resp.raise_for_status()
-        answer = resp.json().get("answer", "답변을 불러오지 못했습니다.")
-        source = resp.json().get("source", "")
+        resp_json = resp.json()
+        result = resp_json.get("result", {})
+        answer = result.get("answer", "답변을 불러오지 못했습니다.")
+        citations = result.get("citations", [])
     except Exception as e:
         answer = f"챗봇 요청 중 오류가 발생했습니다: {str(e)}"
-        source = ""
+        citations = []
 
     # 대화 저장
     ChatHistory.objects.create(chat=chatbot, type=1, content=question)   # 1=질문
     ChatHistory.objects.create(chat=chatbot, type=2, content=answer)      # 2=답변
 
-    return Response({"answer": answer, "source": source})
+    return Response({
+        "answer": answer,
+        "sources": citations
+    })
 
 
 @api_view(["GET"])
