@@ -26,25 +26,14 @@ from config import (
     PADDLEOCR_VL_TIMEOUT_SEC,
     PADDLEOCR_VL_URL,
     PADDLEOCR_VL_VISUALIZE,
-    PRELOAD_EMBEDDING_MODEL,
     PRELOAD_OCR_MODEL,
-    QDRANT_COLLECTION,
-    QDRANT_COLLECTION_PREFIX,
-    QDRANT_COLLECTION_PROJECT_MODE,
-    qdrant_collection_for_project,
 )
 from schemas import TextResponse
 from runtime_locks import GPU_TASK_LOCK
 
-from internal_docs.routes import router as internal_docs_router
-from internal_docs.service import preload_embedding_model
-
 
 logger = logging.getLogger("uvicorn.error")
 app = FastAPI(title="HPM OCR Server", version="1.0.0")
-app.include_router(internal_docs_router)
-embedding_model_info: dict[str, Any] | None = None
-embedding_model_error: str | None = None
 paddleocr_vl_ready = False
 paddleocr_vl_error: str | None = None
 OCR_JOBS: dict[str, dict[str, Any]] = {}
@@ -300,17 +289,8 @@ def health() -> dict[str, Any]:
         "paddleocr_vl_url": PADDLEOCR_VL_URL if OCR_BACKEND == "paddleocr_vl" else None,
         "load_in_4bit": LOAD_IN_4BIT,
         "preload_ocr_model": PRELOAD_OCR_MODEL,
-        "preload_embedding_model": PRELOAD_EMBEDDING_MODEL,
-        "embedding_model_loaded_on_startup": embedding_model_info is not None,
-        "embedding_model_info": embedding_model_info,
-        "embedding_model_error": embedding_model_error,
         "paddleocr_vl_ready": paddleocr_vl_ready,
         "paddleocr_vl_error": paddleocr_vl_error,
-        "qdrant_collection": QDRANT_COLLECTION,
-        "project_collection_mode": QDRANT_COLLECTION_PROJECT_MODE,
-        "project_collection_prefix": QDRANT_COLLECTION_PREFIX,
-        "project_collection_example": qdrant_collection_for_project("example"),
-        "internal_docs_ingest": True,
         "gpu_task_locked": GPU_TASK_LOCK.locked(),
         "torch_cuda": _torch_cuda_available(),
     }
@@ -318,27 +298,7 @@ def health() -> dict[str, Any]:
 
 @app.on_event("startup")
 def preload_models() -> None:
-    global embedding_model_error, embedding_model_info, paddleocr_vl_error, paddleocr_vl_ready
-
-    if PRELOAD_EMBEDDING_MODEL:
-        started = time.perf_counter()
-        logger.info("Loading embedding model for internal-docs ingest")
-        try:
-            embedding_model_info = preload_embedding_model()
-            embedding_model_error = None
-        except Exception as exc:
-            embedding_model_error = str(exc)
-            logger.exception("Embedding model preload failed")
-            raise
-        logger.info(
-            "Embedding model loaded: model=%s device=%s dimensions=%s elapsed_sec=%.3f",
-            embedding_model_info.get("model"),
-            embedding_model_info.get("device"),
-            embedding_model_info.get("dimensions"),
-            time.perf_counter() - started,
-        )
-    else:
-        logger.info("Embedding model preload disabled; first /internal-docs/ingest request will load it")
+    global paddleocr_vl_error, paddleocr_vl_ready
 
     if OCR_BACKEND == "paddleocr_vl":
         try:
@@ -394,23 +354,13 @@ def get_ocr_job(job_id: str) -> dict[str, Any]:
 
 @app.post("/ocr", response_model=TextResponse)
 async def ocr(file: UploadFile = File(...)) -> TextResponse:
-    started = time.perf_counter()
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail=f"Uploaded file is empty: {file.filename or ''}")
 
-    await run_in_threadpool(GPU_TASK_LOCK.acquire)
-    try:
-        if OCR_BACKEND == "paddleocr_vl":
-            extracted = await _ocr_with_paddleocr_vl(file)
-            model_name = "PaddleOCR-VL"
-        elif OCR_BACKEND == "qwen":
-            extracted = await _ocr_with_qwen(file)
-            model_name = OCR_MODEL_ID
-        else:
-            raise HTTPException(status_code=500, detail=f"Unsupported OCR_BACKEND: {OCR_BACKEND}")
-    finally:
-        GPU_TASK_LOCK.release()
-
-    return TextResponse(
-        result={"text": extracted.strip()},
-        elapsed_sec=round(time.perf_counter() - started, 3),
-        model=model_name,
+    return await run_in_threadpool(
+        _run_ocr_bytes,
+        file_bytes,
+        file.filename or "",
+        file.content_type or "",
     )

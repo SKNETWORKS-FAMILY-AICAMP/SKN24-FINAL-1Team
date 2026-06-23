@@ -130,6 +130,22 @@ def run_parser(input_dir: Path, output_dir: Path, require_cuda: bool = True) -> 
                 skipped += 1
             else:
                 failed += 1
+
+        total_blocks = parser_module.rebuild_all_blocks(dirs["json"])
+        if pdfs and total_blocks == 0:
+            failed_reasons = [
+                {
+                    "file": record.get("source_filename"),
+                    "status": record.get("status"),
+                    "reason": record.get("reason"),
+                }
+                for record in records[:5]
+            ]
+            raise RuntimeError(
+                "MinerU parser produced no blocks: "
+                f"pdf_count={len(pdfs)} success={success} failed={failed} "
+                f"reasons={json.dumps(failed_reasons, ensure_ascii=False)}"
+            )
     except Exception as exc:
         raise RuntimeError(f"MinerU parser failed: {exc}") from exc
 
@@ -141,6 +157,8 @@ def run_parser(input_dir: Path, output_dir: Path, require_cuda: bool = True) -> 
         "success": success,
         "skipped": skipped,
         "failed": failed,
+        "blocks": total_blocks,
+        "all_blocks_path": str(dirs["json"] / "all_blocks.jsonl"),
         "records": records,
     }
 

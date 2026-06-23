@@ -7,8 +7,6 @@ from typing import Any
 import torch
 
 from config import (
-    EMBEDDING_BATCH_SIZE,
-    EMBEDDING_MODEL_ID,
     LOAD_IN_4BIT,
     OCR_MODEL_ID,
     TORCH_DTYPE,
@@ -26,16 +24,7 @@ class OcrBundle:
     processor: Any
 
 
-@dataclass
-class EmbeddingBundle:
-    tokenizer: Any
-    model: Any
-    device: str
-    dimensions: int
-
-
 ocr_bundle: OcrBundle | None = None
-embedding_bundle: EmbeddingBundle | None = None
 
 
 def dtype_arg() -> str | torch.dtype:
@@ -78,52 +67,3 @@ def load_ocr_model() -> OcrBundle:
     )
     ocr_bundle = OcrBundle(model=model, processor=processor)
     return ocr_bundle
-
-
-def embed_texts_with_model(texts: list[str], tokenizer: Any, model: Any, device: str) -> list[list[float]]:
-    vectors = []
-    for start in range(0, len(texts), EMBEDDING_BATCH_SIZE):
-        batch = texts[start : start + EMBEDDING_BATCH_SIZE]
-        encoded = tokenizer(
-            batch,
-            padding=True,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt",
-        )
-        encoded = {key: value.to(device) for key, value in encoded.items()}
-        with torch.inference_mode():
-            output = model(**encoded)
-        token_embeddings = output.last_hidden_state
-        mask = encoded["attention_mask"].unsqueeze(-1).expand(token_embeddings.size()).float()
-        pooled = (token_embeddings * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
-        pooled = torch.nn.functional.normalize(pooled, p=2, dim=1)
-        vectors.extend(pooled.cpu().tolist())
-    return vectors
-
-
-def load_embedding_model() -> EmbeddingBundle:
-    global embedding_bundle
-    if embedding_bundle is not None:
-        return embedding_bundle
-
-    from transformers import AutoModel, AutoTokenizer
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    tokenizer = AutoTokenizer.from_pretrained(EMBEDDING_MODEL_ID)
-    model = AutoModel.from_pretrained(EMBEDDING_MODEL_ID).to(device)
-    model.eval()
-
-    sample = embed_texts_with_model(["dimension probe"], tokenizer, model, device)
-    embedding_bundle = EmbeddingBundle(
-        tokenizer=tokenizer,
-        model=model,
-        device=device,
-        dimensions=len(sample[0]),
-    )
-    return embedding_bundle
-
-
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    bundle = load_embedding_model()
-    return embed_texts_with_model(texts, bundle.tokenizer, bundle.model, bundle.device)

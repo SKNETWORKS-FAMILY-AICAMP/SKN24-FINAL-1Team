@@ -157,7 +157,7 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
             "The JSON object must have exactly these top-level keys: "
             "preparation_id, meeting_id, purpose, project_status, rule, effect, sources. "
             "preparation_id must be null unless it is provided by the input. "
-            "sources must be an array of objects with title and document_id. "
+            "sources must be an array of objects with title and document_id; document_id may be null when the source has no backend document id. "
             "Use only the provided evidence. If evidence is missing, write '확인 필요'. "
             "Separate previous meeting context from internal document requirements. "
             "Prefer concrete decisions, todos, owners, dates, policy clauses, constraints, and open questions. "

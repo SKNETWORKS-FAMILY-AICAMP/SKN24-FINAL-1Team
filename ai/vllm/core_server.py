@@ -193,20 +193,43 @@ def _source_document_id(source: dict[str, Any]) -> int | None:
 
 def preparation_response_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
     compacted: list[dict[str, Any]] = []
-    seen: set[int] = set()
+    seen: set[tuple[str, str, str]] = set()
     for source in sources:
         if not isinstance(source, dict):
             continue
         document_id = _source_document_id(source)
-        if document_id is None or document_id in seen:
-            continue
-        seen.add(document_id)
-        compacted.append(
-            {
-                "title": _clean_text(source.get("label") or source.get("title") or source.get("source") or f"document_{document_id}"),
-                "document_id": document_id,
-            }
+        metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+        viewer = source.get("viewer") if isinstance(source.get("viewer"), dict) else {}
+        chunk_id = _clean_text(source.get("chunk_id") or metadata.get("chunk_id"))
+        title = _clean_text(
+            source.get("label")
+            or source.get("title")
+            or source.get("source")
+            or metadata.get("title")
+            or metadata.get("source_filename")
+            or metadata.get("file_name")
+            or (f"document_{document_id}" if document_id is not None else "unknown")
         )
+        category = _clean_text(source.get("category") or metadata.get("category") or viewer.get("type"))
+        key = (str(document_id or ""), chunk_id, title)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        item: dict[str, Any] = {
+            "title": title,
+            "document_id": document_id,
+        }
+        if chunk_id:
+            item["chunk_id"] = chunk_id
+        if category:
+            item["category"] = category
+        page = viewer.get("page") or metadata.get("page") or metadata.get("page_number") or metadata.get("page_no") or metadata.get("page_idx")
+        if page is not None:
+            item["page"] = page
+        if viewer:
+            item["viewer"] = viewer
+        compacted.append(item)
     return compacted
 
 
@@ -404,23 +427,90 @@ def strip_answer_source_section(answer: str) -> str:
     return text
 
 
+def _strip_chat_source_section(answer: str) -> str:
+    text = strip_answer_source_section(answer)
+    for marker in ["\n출처:", "\n출처："]:
+        index = text.find(marker)
+        if index >= 0:
+            return text[:index].rstrip()
+    return text
+
+
+def _used_context_ids(value: Any) -> list[int]:
+    if not isinstance(value, list):
+        return []
+    ids: list[int] = []
+    for item in value:
+        try:
+            number = int(str(item).strip())
+        except (TypeError, ValueError):
+            continue
+        if number > 0 and number not in ids:
+            ids.append(number)
+    return ids
+
+
+def _answer_has_no_evidence(answer: str) -> bool:
+    text = str(answer or "").strip().lower()
+    if not text:
+        return True
+    return any(
+        keyword in text
+        for keyword in [
+            "제공된 자료에서 확인할 수 없습니다",
+            "확인할 수 없습니다",
+            "자료에서 확인되지",
+            "근거가 부족",
+            "근거 없음",
+        ]
+    )
+
+
+def _sources_for_used_context_ids(sources: list[str], used_ids: list[int]) -> list[str]:
+    numbered_sources: dict[int, str] = {}
+    for index, source in enumerate(sources, 1):
+        text = str(source).strip()
+        if not text:
+            continue
+        match = re.match(r"^\[(\d+)\]\s*(.+)$", text)
+        if match:
+            numbered_sources[int(match.group(1))] = text
+        else:
+            numbered_sources[index] = f"[{index}] {text}"
+
+    selected: list[str] = []
+    for used_id in used_ids:
+        source = numbered_sources.get(used_id)
+        if source and source not in selected:
+            selected.append(source)
+    return selected
+
+
 def normalize_chat_sources(result: Any, sources: list[str], *, rag_used: bool) -> Any:
     if not isinstance(result, dict):
         return result
 
     normalized_sources = [str(source).strip() for source in sources if str(source).strip()]
-    citations = result.get("citations")
     if not rag_used or not normalized_sources:
         result["citations"] = []
         if isinstance(result.get("answer"), str):
-            result["answer"] = strip_answer_source_section(result["answer"])
+            result["answer"] = _strip_chat_source_section(result["answer"])
         return result
 
-    if isinstance(citations, list):
-        allowed = set(normalized_sources)
-        result["citations"] = [str(source).strip() for source in citations if str(source).strip() in allowed]
-    else:
+    answer = str(result.get("answer") or "")
+    used_ids = _used_context_ids(result.get("used_context_ids"))
+    confidence = str(result.get("confidence") or "").strip().lower()
+    if not used_ids or confidence == "low" or _answer_has_no_evidence(answer):
         result["citations"] = []
+        if isinstance(result.get("answer"), str):
+            result["answer"] = _strip_chat_source_section(result["answer"])
+        return result
+
+    selected_sources = _sources_for_used_context_ids(normalized_sources, used_ids)
+    result["citations"] = selected_sources
+    if selected_sources:
+        answer_without_sources = _strip_chat_source_section(answer)
+        result["answer"] = f"{answer_without_sources}\n\n출처:\n" + "\n".join(selected_sources)
     return result
 
 
