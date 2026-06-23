@@ -187,6 +187,11 @@ export const endMeeting = async (meetingId: number, audio?: File): Promise<{ min
   return res.data;
 };
 
+export const generateMinutes = async (meetingId: number): Promise<{ content: string; todo_list: Task[] }> => {
+  const res = await api.post(`/meetings/${meetingId}/minutes/`);
+  return res.data;
+};
+
 export const pauseMeeting = async (meetingId: number): Promise<void> => {
   await api.post(`/meetings/${meetingId}/pause/`);
 };
@@ -424,6 +429,8 @@ export const createProject = async (data: { name: string; description: string })
 };
 
 // ── OCR서버 -> 텍스트 추출 -> ocr텍스트 + 회의 제목 -> 안건 생성 ─────────────────────────────────────────────────────
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const generateAgendaWithOcr = async (
   meetingId: number,
   file: File | null
@@ -433,11 +440,53 @@ export const generateAgendaWithOcr = async (
 
   const res = await api.post(`/meetings/${meetingId}/agenda/generate/`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
-    timeout: 300000,
+    timeout: 30000,
   });
-  return res.data;
-};
 
+  if (res.data.status === "completed") {
+    return res.data;
+  }
+
+  if (res.data.status === "processing" && res.data.job_id) {
+    const jobId = res.data.job_id;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    while (attempts < maxAttempts) {
+      await delay(3000);
+
+      try {
+        const statusRes = await api.get(`/meetings/${meetingId}/agenda/status/`, {
+          params: { job_id: jobId },
+          timeout: 120000,
+        });
+
+        if (statusRes.data.status === "completed") {
+          return statusRes.data;
+        }
+
+        if (statusRes.data.status === "processing") {
+          attempts++;
+          console.log(`[${attempts}/${maxAttempts}] 안건 생성 대기 중...`);
+          continue;
+        }
+
+        throw new Error(statusRes.data.error || "안건 생성 중 알 수 없는 응답 상태입니다.");
+      } catch (error: any) {
+        console.error("상태 확인 중 에러 발생:", error);
+        const errMsg = error.response?.data?.error;
+        if (errMsg) {
+          throw new Error(errMsg);
+        }
+        attempts++;
+      }
+    }
+
+    throw new Error("작업 시간이 초과되었습니다.");
+  }
+
+  throw new Error("알 수 없는 서버 응답입니다.");
+};
 // ── 회의 준비 자료 ─────────────────────────────────────────────────────
 export interface MeetingPreparation {
   preration_id?: number;
@@ -466,9 +515,61 @@ export const savePrepMaterial = async (
   return res.data;
 };
 
-export const generatePrepMaterial = async (meetingId: number): Promise<MeetingPreparation> => {
-  const res = await api.post(`/meetings/${meetingId}/prep/generate/`);
-  return res.data;
+export const generatePrepMaterial = async (
+  meetingId: number,
+  file: File | null = null
+): Promise<MeetingPreparation> => {
+  const formData = new FormData();
+  if (file) formData.append("file", file);
+
+  const res = await api.post(`/meetings/${meetingId}/prep/generate/`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 30000,
+  });
+
+  if (res.data.status === "completed") {
+    return res.data.prep;
+  }
+
+  if (res.data.status === "processing" && res.data.job_id) {
+    const jobId = res.data.job_id;
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    while (attempts < maxAttempts) {
+      await delay(3000);
+
+      try {
+        const statusRes = await api.get(`/meetings/${meetingId}/prep/status/`, {
+          params: { job_id: jobId },
+          timeout: 120000,
+        });
+
+        if (statusRes.data.status === "completed") {
+          return statusRes.data.prep;
+        }
+
+        if (statusRes.data.status === "processing") {
+          attempts++;
+          console.log(`[${attempts}/${maxAttempts}] 준비 자료 생성 대기 중...`);
+          continue;
+        }
+
+        throw new Error(statusRes.data.error || "준비 자료 생성 중 알 수 없는 응답 상태입니다.");
+      } catch (error: any) {
+        console.error("준비 자료 상태 확인 중 에러 발생:", error);
+        const errMsg = error.response?.data?.error;
+        if (errMsg) {
+          throw new Error(errMsg);
+        }
+        attempts++;
+      }
+    }
+
+    throw new Error("작업 시간이 초과되었습니다.");
+  }
+
+  throw new Error("알 수 없는 서버 응답입니다.");
 };
 
 

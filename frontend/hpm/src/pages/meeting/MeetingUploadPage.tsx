@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { generateAgendaWithOcr, generatePrepMaterial } from "../../services/meeting";
-import { uploadDocuments } from "../../services/documents";
 
 const MAX_TOTAL_MB = 5;
 const ACCEPTED = ".jpg,.jpeg,.png,.pdf";
@@ -71,16 +70,12 @@ export default function MeetingUploadPage() {
     try {
       if (files.length > 0) {
         if (type === "prep") {
-          if (!projectId) {
-            throw new Error("프로젝트 ID가 없습니다.");
-          }
-          await uploadDocuments(projectId, [files[0]]);
-          await generatePrepMaterial(meetingId);
+          await generatePrepMaterial(meetingId, files[0]);
         } else {
           await generateAgendaWithOcr(meetingId, files[0]);
         }
       } else if (type === "prep") {
-        await generatePrepMaterial(meetingId);
+        await generatePrepMaterial(meetingId, null);
       }
     } catch (e) {
       const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "업로드 중 오류가 발생했습니다.";
@@ -102,7 +97,7 @@ export default function MeetingUploadPage() {
     setUploading(true);
     try {
       if (type === "prep") {
-        await generatePrepMaterial(meetingId);
+        await generatePrepMaterial(meetingId, null);
       } else {
         await generateAgendaWithOcr(meetingId, null);
       }
