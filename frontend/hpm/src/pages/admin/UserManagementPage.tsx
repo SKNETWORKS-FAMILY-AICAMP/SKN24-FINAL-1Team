@@ -5,6 +5,7 @@ import resetIcon from "../../assets/reset.png";
 import { useAuth } from "../../context/AuthContext";
 import Dropdown from "../../components/ui/Dropdown";
 import Checkbox from "../../components/ui/Checkbox";
+import { getUsers, getUserProjects } from "../../services/users";
 
 interface AdminUser {
   users_id: number;
@@ -44,23 +45,9 @@ interface RegisterErrors {
   work: string;
 }
 
-const INIT_USERS: AdminUser[] = [
-  { users_id: 1,  emp_no: "2026-DEV-1", name: "황인규", email: "hwangs@company.com",  dept: "개발팀",   rank: "대리", work: "백엔드 개발",     status: "재직" },
-  { users_id: 2,  emp_no: "2026-DEV-2", name: "김민준", email: "kimm@company.com",    dept: "개발팀",   rank: "과장", work: "백엔드개발",      status: "재직" },
-  { users_id: 3,  emp_no: "2026-DEV-3", name: "류지우", email: "ryuj@company.com",    dept: "개발팀",   rank: "사원", work: "풀스택 개발",     status: "휴직" },
-  { users_id: 4,  emp_no: "2026-DEV-4", name: "박수영", email: "parks@company.com",   dept: "개발팀",   rank: "사원", work: "프로젝트관리",    status: "재직" },
-  { users_id: 5,  emp_no: "2026-DEV-5", name: "이수진", email: "lees@company.com",    dept: "개발팀",   rank: "차장", work: "프로젝트엔드개발", status: "휴직" },
-  { users_id: 6,  emp_no: "2026-DEV-6", name: "송지은", email: "songje@company.com",  dept: "개발팀",   rank: "과장", work: "백엔드개발",      status: "재직" },
-  { users_id: 7,  emp_no: "2026-DEV-7", name: "배준혁", email: "baejh@company.com",   dept: "개발팀",   rank: "대리", work: "모바일 개발",     status: "재직" },
-  { users_id: 8,  emp_no: "2026-INF-1", name: "전지현", email: "jeonjh@company.com",  dept: "인프라팀", rank: "과장", work: "DevOps",         status: "휴직" },
-  { users_id: 9,  emp_no: "2026-QA-1",  name: "노송우", email: "rohsw@company.com",   dept: "QA팀",    rank: "사원", work: "QA",             status: "퇴사" },
-  { users_id: 10, emp_no: "2026-DAT-1", name: "신예원", email: "shinyw@company.com",  dept: "데이터팀", rank: "과장", work: "ML 엔지니어링",   status: "재직" },
-];
+const DEPT_OPTIONS = ["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"];
+const RANK_OPTIONS = ["대표이사", "이사", "부장", "차장", "과장", "대리", "주임", "사원"];
 
-const DUMMY_PROJECTS: UserProject[] = [
-  { id: 1, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
-  { id: 2, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
-];
 
 const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
 const NAME_PATTERN = /^[가-힣a-zA-Z]{1,30}$/;
@@ -84,11 +71,18 @@ export default function UserManagementPage() {
   }, [user, navigate]);
 
   // ── 사용자 목록 (CRUD 반영) ──────────────────────────────────────
-  const [users, setUsers] = useState<AdminUser[]>(INIT_USERS);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+
+  useEffect(() => {
+    getUsers().then((data) => {
+      setUsers(data as unknown as AdminUser[]);
+    }).catch(() => {});
+  }, []);
 
   // ── 선택 상태 ───────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userProjects, setUserProjects] = useState<UserProject[]>([]);
 
   // ── 필터 ────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -153,6 +147,7 @@ export default function UserManagementPage() {
       emp_no: u.emp_no, name: u.name, email: u.email,
       dept: u.dept, rank: u.rank, work: u.work, status: u.status,
     });
+    getUserProjects(u.users_id).then(setUserProjects).catch(() => setUserProjects([]));
   };
 
   // ── 삭제 ────────────────────────────────────────────────────────
@@ -326,9 +321,9 @@ export default function UserManagementPage() {
           {/* 필터 + 버튼 */}
           <div className="flex items-center gap-3 mb-5">
             <span className="text-[15px] text-[#0A0A0A]">부서</span>
-            <Dropdown options={["전체", "개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={deptFilter} onChange={setDeptFilter} dropdownClassName="w-32" />
+            <Dropdown options={["전체", ...DEPT_OPTIONS]} value={deptFilter} onChange={setDeptFilter} dropdownClassName="w-32" />
             <span className="text-[15px] text-[#0A0A0A]">직급</span>
-            <Dropdown options={["전체", "인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석"]} value={rankFilter} onChange={setRankFilter} dropdownClassName="w-32" />
+            <Dropdown options={["전체", ...RANK_OPTIONS]} value={rankFilter} onChange={setRankFilter} dropdownClassName="w-32" />
             <span className="text-[15px] text-[#0A0A0A]">상태</span>
             <Dropdown options={["전체", "재직", "휴직", "퇴사"]} value={statusFilter} onChange={setStatusFilter} dropdownClassName="w-32" />
             <div className="flex gap-2 ml-auto">
@@ -492,11 +487,11 @@ export default function UserManagementPage() {
               <div className="flex gap-[33px]">
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">부서</label>
-                  <Dropdown options={["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={editForm.dept} onChange={(v) => setEditForm({ ...editForm, dept: v })} />
+                  <Dropdown options={DEPT_OPTIONS} value={editForm.dept} onChange={(v) => setEditForm({ ...editForm, dept: v })} />
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">직급</label>
-                  <Dropdown options={["인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석", "이사", "대표이사"]} value={editForm.rank} onChange={(v) => setEditForm({ ...editForm, rank: v })} />
+                  <Dropdown options={RANK_OPTIONS} value={editForm.rank} onChange={(v) => setEditForm({ ...editForm, rank: v })} />
                 </div>
               </div>
               <div className="flex gap-[33px] mt-[32px]">
@@ -527,7 +522,7 @@ export default function UserManagementPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {DUMMY_PROJECTS.map((project) => (
+                      {userProjects.map((project) => (
                         <tr key={project.id} className="border-t border-[#E5E5E5]">
                           <td className="px-3 py-2 text-[#969696]">{project.id}</td>
                           <td className="px-3 py-2">{project.project_name}</td>

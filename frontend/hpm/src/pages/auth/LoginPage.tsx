@@ -44,6 +44,8 @@ const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
 
     if (res.data.account_status === 0) {
       navigate("/change-password");
+    } else if (res.data.role === "ADMIN") {
+      navigate("/admin/users");
     } else {
       navigate("/projects");
     }

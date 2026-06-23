@@ -17,6 +17,16 @@ export const getMe = async (): Promise<User> => {
   return response.data;
 };
 
+export const getUsers = async (): Promise<User[]> => {
+  const response = await api.get<User[]>("/users/");
+  return response.data;
+};
+
+export const getUserProjects = async (userId: number) => {
+  const response = await api.get(`/users/${userId}/projects/`);
+  return response.data;
+};
+
 export const getUserDetail = async (userId: number): Promise<User> => {
   const response = await api.get<User>(`/users/${userId}/`);
   return response.data;

@@ -304,7 +304,7 @@ def speaker_mapping_list(request, meeting_id):
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
-        mappings = RecordUtterance.objects.filter(meeting=meeting)
+        mappings = RecordUtterance.objects.filter(record__meeting=meeting).order_by("time")
         return Response(RecordUtteranceSerializer(mappings, many=True).data)
 
     # POST - 매핑 저장 (기존 매핑 삭제 후 새로 저장)

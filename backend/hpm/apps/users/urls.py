@@ -7,5 +7,6 @@ urlpatterns = [
     path('me/', views.get_me, name='get_me'),
     path("", views.user_list),
     path("<int:users_id>/", views.user_detail),
+    path("<int:users_id>/projects/", views.user_projects),
     path("token/refresh/", TokenRefreshView.as_view()),
 ]
