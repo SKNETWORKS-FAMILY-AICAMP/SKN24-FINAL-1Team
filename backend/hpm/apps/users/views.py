@@ -135,6 +135,7 @@ def login(request):
         "email": user.email,
         "name": user.name,
         "account_status": user.account_status,
+        "role": user.role,
     })
 
     response.set_cookie(
@@ -173,19 +174,38 @@ def get_me(request):
 @permission_classes([IsAuthenticated])
 def user_list(request):
     """전체 사용자 목록 (관리자용)"""
-    users = Users.objects.select_related("dept", "rank").all().order_by("-created_at")
+    users = Users.objects.select_related("dept", "rank").exclude(role="ADMIN").order_by("-created_at")
     return Response([
         {
             "users_id": user.users_id,
+            "emp_no": user.emp_no,
             "email": user.email,
             "name": user.name,
             "work": user.work,
-            "dept": user.dept_id,
-            "rank": user.rank_id,
-            "dept_name": user.dept.dept_name,
-            "rank_name": user.rank.rank_name,
+            "dept": user.dept.dept_name,
+            "rank": user.rank.rank_name,
+            "status": user.status,
         }
         for user in users
+    ])
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def user_projects(request, users_id):
+    from apps.projects.models import Project, ProjectUsers
+    owned = Project.objects.filter(project_owner_id=users_id)
+    joined = Project.objects.filter(projectusers__user_id=users_id)
+    projects = (owned | joined).distinct().select_related("project_owner").order_by("-created_at")
+    return Response([
+        {
+            "id": p.project_id,
+            "project_name": p.project_name,
+            "created_at": p.created_at.strftime("%Y.%m.%d"),
+            "created_by": p.project_owner.name,
+            "participants": str(ProjectUsers.objects.filter(project=p).count()) + "명",
+        }
+        for p in projects
     ])
 
 

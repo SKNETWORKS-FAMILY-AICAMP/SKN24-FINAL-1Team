@@ -213,6 +213,19 @@ export const rejectMinutes = async (meetingId: number): Promise<void> => {
   await api.post(`/meetings/${meetingId}/minutes/reject/`);
 };
 
+// ── 녹음 원문 ────────────────────────────────────────────────────────
+export interface TranscriptItem {
+  utterance_id: number;
+  speaker: string;
+  time: string;
+  content: string;
+}
+
+export const getTranscript = async (meetingId: number): Promise<TranscriptItem[]> => {
+  const res = await api.get(`/meetings/${meetingId}/speaker-mapping/`);
+  return res.data;
+};
+
 // ── 태스크 ────────────────────────────────────────────────────────
 export const getTaskList = async (meetingId: number): Promise<Task[]> => {
   const res = await api.get(`/meetings/${meetingId}/tasks/`);

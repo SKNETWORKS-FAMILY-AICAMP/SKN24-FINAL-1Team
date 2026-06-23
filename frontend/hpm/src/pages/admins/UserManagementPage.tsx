@@ -6,9 +6,8 @@ import Dropdown from "../../components/ui/Dropdown";
 import Checkbox from "../../components/ui/Checkbox";
 import {
   fetchAdminUsers, createAdminUser, deleteAdminUser,
-  updateAdminUser, resetAdminUserPassword,
+  updateAdminUser, resetAdminUserPassword, getUserProjects,
 } from "../../services/users";
-import { getUserProjects } from "../../services/meeting";
 
 interface AdminUser {
   users_id: number;
@@ -48,8 +47,11 @@ interface RegisterErrors {
   work: string;
 }
 
+const DEPT_OPTIONS = ["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"];
+const RANK_OPTIONS = ["대표이사", "이사", "부장", "차장", "과장", "대리", "주임", "사원"];
 const STATUS_LABELS: Record<number, string> = { 0: "재직", 1: "휴직", 2: "퇴사" };
 const STATUS_VALUES: Record<string, number> = { "재직": 0, "휴직": 1, "퇴사": 2 };
+
 
 const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
 const NAME_PATTERN = /^[가-힣a-zA-Z]{1,30}$/;
@@ -130,22 +132,6 @@ export default function UserManagementPage() {
     .finally(() => setIsLoading(false));
 }, []);
 
-useEffect(() => {
-  if (!selectedUser) return;
-  getUserProjects(selectedUser.users_id)
-    .then((data: any[]) => {
-      setUserProjects(data.map((p: any) => ({
-        id: p.project_id,
-        project_name: p.project_name,
-        created_at: p.startDate ?? "",
-        created_by: p.members?.[0] ?? "",
-        participants: p.members?.join(", ") ?? "",
-      })));
-    })
-    .catch(() => setUserProjects([]));
-}, [selectedUser]);
-  
-
   // ── 필터 적용 목록 ────────────────────────────────────────────────
   const filteredUsers = users.filter((u) => {
     const matchSearch = !search ||
@@ -168,13 +154,14 @@ useEffect(() => {
 
   // ── 상세보기 선택 ─────────────────────────────────────────────────
   const handleSelectUser = (u: AdminUser) => {
-  setSelectedUser(u);
-  setEditForm({
-    emp_no: u.emp_no, name: u.name, email: u.email,
-    dept: u.dept, rank: u.rank, work: u.work,
-    status: STATUS_LABELS[u.status] as "재직" | "휴직" | "퇴사",
-  });
-};
+    setSelectedUser(u);
+    setEditForm({
+      emp_no: u.emp_no, name: u.name, email: u.email,
+      dept: u.dept, rank: u.rank, work: u.work,
+      status: STATUS_LABELS[u.status] as "재직" | "휴직" | "퇴사",
+    });
+    getUserProjects(u.users_id).then(setUserProjects).catch(() => setUserProjects([]));
+  };
 
   // ── 삭제 ────────────────────────────────────────────────────────
   const handleDelete = async () => {
@@ -382,9 +369,9 @@ useEffect(() => {
           {/* 필터 + 버튼 */}
           <div className="flex items-center gap-3 mb-5">
             <span className="text-[15px] text-[#0A0A0A]">부서</span>
-            <Dropdown options={["전체", "개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={deptFilter} onChange={setDeptFilter} dropdownClassName="w-32" />
+            <Dropdown options={["전체", ...DEPT_OPTIONS]} value={deptFilter} onChange={setDeptFilter} dropdownClassName="w-32" />
             <span className="text-[15px] text-[#0A0A0A]">직급</span>
-            <Dropdown options={["전체", "인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석"]} value={rankFilter} onChange={setRankFilter} dropdownClassName="w-32" />
+            <Dropdown options={["전체", ...RANK_OPTIONS]} value={rankFilter} onChange={setRankFilter} dropdownClassName="w-32" />
             <span className="text-[15px] text-[#0A0A0A]">상태</span>
             <Dropdown options={["전체", "재직", "휴직", "퇴사"]} value={statusFilter} onChange={setStatusFilter} dropdownClassName="w-32" />
             <div className="flex gap-2 ml-auto">
@@ -554,11 +541,11 @@ useEffect(() => {
               <div className="flex gap-[33px]">
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">부서</label>
-                  <Dropdown options={["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"]} value={editForm.dept} onChange={(v) => setEditForm({ ...editForm, dept: v })} />
+                  <Dropdown options={DEPT_OPTIONS} value={editForm.dept} onChange={(v) => setEditForm({ ...editForm, dept: v })} />
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">직급</label>
-                  <Dropdown options={["인턴", "사원", "대리", "과장", "차장", "부장", "팀장", "수석", "이사", "대표이사"]} value={editForm.rank} onChange={(v) => setEditForm({ ...editForm, rank: v })} />
+                  <Dropdown options={RANK_OPTIONS} value={editForm.rank} onChange={(v) => setEditForm({ ...editForm, rank: v })} />
                 </div>
               </div>
               <div className="flex gap-[33px] mt-[32px]">

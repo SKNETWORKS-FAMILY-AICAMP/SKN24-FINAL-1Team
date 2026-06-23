@@ -1,154 +1,81 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import {
   getMeetingDetail,
   getTaskList,
-  sendChatMessage,
-  getPrepMaterial,
+  getTranscript,
   getAgendaList,
-  type MeetingPreparation,
-  type AgendaItem,  
+  getPrepMaterial,
   type Meeting,
   type Task,
+  type TranscriptItem,
+  type AgendaItem,
+  type MeetingPreparation,
 } from "../../services/meeting";
-import {
-  SPEAKER_PARTICIPANTS,
-  SPEAKER_SEGMENTS,
-} from "../../constants/speakerMapping";
 
-type TabKey = "minutes" | "record" | "chatbot" | "material" | "email";
+type TabKey = "minutes" | "record" | "material" | "email";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "minutes",  label: "회의록" },
   { key: "record",   label: "녹음 원문" },
-  { key: "chatbot",  label: "챗봇내역" },
   { key: "material", label: "회의 자료" },
   { key: "email",    label: "이메일 발송" },
 ];
 
-const DUMMY_MEETING: Meeting = {
+const EMPTY_MEETING: Meeting = {
   meeting_id: 0,
-  title: "AI 매칭 엔진 스프린트 리뷰",
-  location: "대륭 17자 18층",
-  meeting_at: "2025-05-29T09:00:00",
+  title: "",
+  location: "",
+  meeting_at: "",
   status: "finished",
-  minutes_status: "approved",
-  meeting_document: `AI 매칭 엔진 고도화 및 포털 관련 회의
-1. AI 매칭 엔진 고도화 현황
-  - 기존 키워드 매칭에서 임베딩 기반 시맨틱 매칭으로 전환 중.
-  - 프로토타입 결과: Top 5 적합 공급기업 포항을 기준 대비 약 23% 개선.
-  - 결정 사항: 우선 1차(LLM 리라이팅) 방식으로 진행, 파인튜닝은 2차로 추진.
-2. 보안 및 인프라 검토
-  - 운영 서버에서 외부 API(LLM) 호출 시 보안 정책 준수 여부 파악 필요.
-3. 포털 프론트엔드 개편 및 기타 안건
-  - 수요기업 온보딩 플로우 내 업종 코드 자동 분류 기능 추가 요청 접수.`,
-  is_meeting: true,
-  project: 1,
-  participants: [
-    { user_id: 1, name: "규김호" },
-    { user_id: 2, name: "김원지" },
-    { user_id: 3, name: "류지우" },
-    { user_id: 4, name: "수박영" },
-    { user_id: 5, name: "인규황" },
-  ],
+  minutes_status: null,
+  meeting_document: null,
+  is_meeting: false,
+  project: 0,
+  participants: [],
 };
-
-const DUMMY_TASKS: Task[] = [
-  {
-    meeting_task_id: 1,
-    title: "사내 클라우드 보호처 신청 절차 및 예산 코드",
-    content: "파인튜닝용 GPU 서버 확보를 위해 사내 클라우드 보호처 신청 절차와 관련된 코드 적정성을 확인하여 보고",
-    owner: "류지우",
-    due_date: "2025-10-20",
-    priority: "High",
-    status: 0,
-  },
-  {
-    meeting_task_id: 2,
-    title: "사내 클라우드 보호처 신청 절차 및 예산 코드",
-    content: "파인튜닝용 GPU 서버 확보를 위해 사내 클라우드 보호처 신청 절차와 관련된 예산 코드 적정성을 확인하여 보고",
-    owner: "류지우",
-    due_date: "2025-10-20",
-    priority: "High",
-    status: 0,
-  },
-];
 
 const PRIORITY_LABEL: Record<string, string> = {
-  High: "높음", Medium: "중간", Low: "낮음", Lowest: "최하",
+  Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
 };
-
-
-
-
-interface ChatMessage {
-  role: "user" | "bot";
-  text: string;
-}
-
-function getAllUtterances() {
-  const items: { time: string; sortKey: string; speakerName: string; content: string[] }[] = [];
-  for (const segment of SPEAKER_SEGMENTS) {
-    const participant = SPEAKER_PARTICIPANTS.find(p => p.id === segment.mappedParticipantId);
-    const speakerName = participant ? `${participant.name} (${participant.position})` : segment.label;
-    for (const utt of segment.utterances) {
-      items.push({ time: utt.time, sortKey: utt.time, speakerName, content: utt.content });
-    }
-  }
-  items.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-  return items;
-}
 
 export default function MeetingArchivePage() {
   const { id } = useParams();
   const meetingId = Number(id);
 
   const [tab, setTab] = useState<TabKey>("minutes");
-  const [meeting, setMeeting] = useState<Meeting>(DUMMY_MEETING);
-  const [tasks, setTasks] = useState<Task[]>(DUMMY_TASKS);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set([1, 2]));
+  const [meeting, setMeeting] = useState<Meeting>(EMPTY_MEETING);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+  const [prep, setPrep] = useState<MeetingPreparation | null>(null);
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [downloading, setDownloading] = useState(false);
 
-  // 챗봇
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
-    { role: "bot", text: "안녕하세요! 회의 내용에 대해 무엇이든 질문해 주세요." },
-  ]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
   // 이메일 발송
-  const [recipients, setRecipients] = useState(DUMMY_MEETING.participants ?? []);
+  const [recipients, setRecipients] = useState<{ user_id: number; name: string }[]>([]);
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
-  const [prep, setPrep] = useState<MeetingPreparation | null>(null);
-  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
-
   useEffect(() => {
     Promise.all([
-      getMeetingDetail(meetingId), 
+      getMeetingDetail(meetingId),
       getTaskList(meetingId),
-      getPrepMaterial(meetingId),
+      getTranscript(meetingId),
       getAgendaList(meetingId),
+      getPrepMaterial(meetingId),
     ])
-      .then(([m, t, p, a]) => {
-        if (m?.title) {
-          setMeeting(m);
-          if (m.participants?.length) setRecipients(m.participants);
-        }
+      .then(([m, t, tr, ag, pr]) => {
+        if (m) { setMeeting(m); if (m.participants?.length) setRecipients(m.participants); }
         if (t?.length) setTasks(t);
-        if (p) setPrep(p);
-        if (a?.length) setAgenda(a);
+        if (tr?.length) setTranscript(tr);
+        if (ag?.length) setAgenda(ag);
+        if (pr) setPrep(pr);
       })
       .catch(() => {});
   }, [meetingId]);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
 
   const toggleExpand = (taskId: number) => {
     setExpandedIds(prev => {
@@ -310,22 +237,6 @@ export default function MeetingArchivePage() {
     }
   };
 
-  const handleChatSend = async () => {
-    const text = chatInput.trim();
-    if (!text || chatLoading) return;
-    setChatInput("");
-    setChatMessages(prev => [...prev, { role: "user", text }]);
-    setChatLoading(true);
-    try {
-      const res = await sendChatMessage(meetingId, text);
-      setChatMessages(prev => [...prev, { role: "bot", text: res.answer }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: "bot", text: "답변을 가져오는 데 실패했습니다." }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
   const removeRecipient = (userId: number) => {
     setRecipients(prev => prev.filter(r => r.user_id !== userId));
   };
@@ -337,8 +248,6 @@ export default function MeetingArchivePage() {
       setEmailSent(true);
     }, 700);
   };
-
-  const transcript = getAllUtterances();
 
   return (
     <div className="max-w-6xl mx-auto w-full py-10 px-6">
@@ -491,77 +400,25 @@ export default function MeetingArchivePage() {
             녹음 원문
           </div>
           <div className="px-6 py-5 flex flex-col gap-4">
-            {transcript.map((item, idx) => (
-              <div key={idx} className="flex gap-3">
-                <span className="text-[12px] font-medium whitespace-nowrap mt-0.5" style={{ color: "#969696", minWidth: "52px" }}>
-                  {item.time}
-                </span>
-                <div className="flex-1">
-                  <span className="text-[12px] font-semibold" style={{ color: "#623FB5" }}>
-                    {item.speakerName}
+            {transcript.length === 0 ? (
+              <p className="text-center text-[13px] py-10" style={{ color: "#969696" }}>녹음 원문이 없습니다.</p>
+            ) : (
+              transcript.map((item) => (
+                <div key={item.utterance_id} className="flex gap-3">
+                  <span className="text-[12px] font-medium whitespace-nowrap mt-0.5" style={{ color: "#969696", minWidth: "52px" }}>
+                    {item.time}
                   </span>
-                  <div className="mt-1 rounded-lg px-4 py-3 text-[13px] leading-relaxed" style={{ backgroundColor: "#F9F9FB", color: "#333" }}>
-                    {item.content.join(" ")}
+                  <div className="flex-1">
+                    <span className="text-[12px] font-semibold" style={{ color: "#623FB5" }}>
+                      {item.speaker}
+                    </span>
+                    <div className="mt-1 rounded-lg px-4 py-3 text-[13px] leading-relaxed" style={{ backgroundColor: "#F9F9FB", color: "#333" }}>
+                      {item.content}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 챗봇 내역 탭 */}
-      {tab === "chatbot" && (
-        <div className="rounded-xl border flex flex-col" style={{ borderColor: "#E6E1E6", height: "520px" }}>
-          <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
-            챗봇 내역
-          </div>
-
-          {/* 메시지 영역 */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-3">
-            {chatMessages.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div
-                  className="max-w-[70%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed"
-                  style={
-                    msg.role === "user"
-                      ? { backgroundColor: "#623FB5", color: "#fff" }
-                      : { backgroundColor: "#F4F5F8", color: "#141414" }
-                  }
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="flex justify-start">
-                <div className="rounded-2xl px-4 py-2.5 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#969696" }}>
-                  답변 생성 중...
-                </div>
-              </div>
+              ))
             )}
-            <div ref={chatEndRef} />
-          </div>
-
-          {/* 입력창 */}
-          <div className="px-4 py-3 border-t flex gap-2" style={{ borderColor: "#E6E1E6" }}>
-            <input
-              type="text"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleChatSend()}
-              placeholder="회의 내용에 대해 질문하세요..."
-              className="flex-1 border rounded-lg px-4 py-2 text-[13px] outline-none"
-              style={{ borderColor: "#E6E1E6" }}
-            />
-            <button
-              onClick={handleChatSend}
-              disabled={chatLoading || !chatInput.trim()}
-              className="px-4 py-2 text-[13px] text-white rounded-lg disabled:opacity-50"
-              style={{ backgroundColor: "#623FB5" }}
-            >
-              전송
-            </button>
           </div>
         </div>
       )}
@@ -584,17 +441,17 @@ export default function MeetingArchivePage() {
                 agendaEl.innerHTML = `<b>기초안건</b><br/>${agenda.map((a,i) => `${i+1}. ${a.content}`).join("<br/>")}`;
                 wrapper.appendChild(agendaEl);
                 [
-                { label: "회의 목적", value: prep?.purpose },
-                { label: "프로젝트 현재 상태", value: prep?.project_status },
-                { label: "관련 규정 및 제약사항", value: prep?.rule },
-                { label: "회의 종료 후 기대 결과", value: prep?.effect },
-              ].forEach(s => {
-                if (!s.value) return;
-                const sec = document.createElement("div");
-                sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
-                sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
-                wrapper.appendChild(sec);
-              });
+                  { label: "회의 목적", value: prep?.purpose },
+                  { label: "프로젝트 현재 상태", value: prep?.project_status },
+                  { label: "관련 규정 및 제약사항", value: prep?.rule },
+                  { label: "회의 종료 후 기대 결과", value: prep?.effect },
+                ].forEach(s => {
+                  if (!s.value) return;
+                  const sec = document.createElement("div");
+                  sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
+                  sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
+                  wrapper.appendChild(sec);
+                });
                 document.body.appendChild(wrapper);
                 const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
                 document.body.removeChild(wrapper);
@@ -616,24 +473,28 @@ export default function MeetingArchivePage() {
           <div className="mb-5">
             <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>기초 안건</p>
             <div className="rounded-xl px-5 py-4 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#141414" }}>
-              {agenda.map((a, i) => (
-                <p key={a.agenda_id ?? i} className="leading-relaxed">{i + 1}. {a.content}</p>
-              ))}
+              {agenda.length === 0 ? (
+                <p style={{ color: "#969696" }}>안건이 없습니다.</p>
+              ) : (
+                agenda.map((a, i) => (
+                  <p key={a.agenda_id ?? i} className="leading-relaxed">{i + 1}. {a.content}</p>
+                ))
+              )}
             </div>
           </div>
 
           {/* 준비자료 섹션들 */}
           <div className="space-y-5">
             {[
-              { label: "회의 목적",           value: prep?.purpose },
-              { label: "프로젝트 현재 상태",  value: prep?.project_status },
+              { label: "회의 목적", value: prep?.purpose },
+              { label: "프로젝트 현재 상태", value: prep?.project_status },
               { label: "관련 규정 및 제약사항", value: prep?.rule },
               { label: "회의 종료 후 기대 결과", value: prep?.effect },
             ].map(section => section.value ? (
               <div key={section.label}>
                 <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
                 <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
-                  {section.value}
+                  {section.value || <span style={{ color: "#969696" }}>내용이 없습니다.</span>}
                 </div>
               </div>
             ) : null)}
