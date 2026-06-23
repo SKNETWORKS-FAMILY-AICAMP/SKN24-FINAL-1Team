@@ -230,6 +230,9 @@ export const rejectMinutes = async (meetingId: number): Promise<void> => {
 // ── 녹음 원문 ────────────────────────────────────────────────────────
 export interface TranscriptItem {
   utterance_id: number;
+  meeting_users?: number | null;
+  meeting_user_name?: string;
+  user_id?: number | null;
   speaker: string;
   time: string;
   content: string;
@@ -237,6 +240,14 @@ export interface TranscriptItem {
 
 export const getTranscript = async (meetingId: number): Promise<TranscriptItem[]> => {
   const res = await api.get(`/meetings/${meetingId}/speaker-mapping/`);
+  return res.data;
+};
+
+export const saveSpeakerMappings = async (
+  meetingId: number,
+  mappings: { utterance_id: number; meeting_users_id: number | null }[],
+): Promise<TranscriptItem[]> => {
+  const res = await api.post(`/meetings/${meetingId}/speaker-mapping/`, { mappings });
   return res.data;
 };
 

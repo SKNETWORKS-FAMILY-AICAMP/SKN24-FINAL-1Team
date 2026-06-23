@@ -1,27 +1,25 @@
 import type { SpeakerParticipant, SpeakerUtterance } from "../../types/speakerMapping";
 
 interface SpeakerMappingCardProps {
-  defaultParticipantId: string;
   participants: SpeakerParticipant[];
   utterance: SpeakerUtterance;
   onMappingChange: (utteranceId: string, participantId: string) => void;
 }
 
 const participantLabel = (participant?: SpeakerParticipant) => {
-  if (!participant) {
+  if (!participant || participant.id === "") {
     return "선택 안 함";
   }
 
-  return `${participant.name} (${participant.position})`;
+  return participant.position ? `${participant.name} (${participant.position})` : participant.name;
 };
 
 export default function SpeakerMappingCard({
-  defaultParticipantId,
   participants,
   utterance,
   onMappingChange,
 }: SpeakerMappingCardProps) {
-  const changed = utterance.mappedParticipantId !== defaultParticipantId;
+  const changed = Boolean(utterance.isOverride);
 
   return (
     <div className="grid grid-cols-[90px_1fr_54px_230px] items-start gap-0">

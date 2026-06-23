@@ -42,6 +42,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
 };
 
+const EMPTY_MATERIAL_TEXT = "자료가 존재하지 않습니다";
+
 export default function MeetingArchivePage() {
   const { id } = useParams();
   const meetingId = Number(id);
@@ -95,6 +97,14 @@ export default function MeetingArchivePage() {
 
   const participantNames = meeting.participants?.map(p => p.name).join(", ") || "-";
   const writer = meeting.participants?.[0]?.name || "-";
+  const hasMeetingMaterial = Boolean(
+    agenda.length > 0 ||
+    prep?.purpose ||
+    prep?.project_status ||
+    prep?.rule ||
+    prep?.effect ||
+    prep?.sources?.length,
+  );
   const selectedRecipientIds = new Set(recipients.map(recipient => recipient.user_id));
   const normalizedRecipientQuery = emailRecipientQuery.trim().toLowerCase();
   const matchingRecipients = normalizedRecipientQuery
@@ -439,7 +449,7 @@ export default function MeetingArchivePage() {
                   </span>
                   <div className="flex-1">
                     <span className="text-[12px] font-semibold" style={{ color: "#623FB5" }}>
-                      {item.speaker}
+                      {item.meeting_user_name || item.speaker}
                     </span>
                     <div className="mt-1 rounded-lg px-4 py-3 text-[13px] leading-relaxed" style={{ backgroundColor: "#F9F9FB", color: "#333" }}>
                       {item.content}
@@ -459,6 +469,8 @@ export default function MeetingArchivePage() {
             <p className="text-[13px]" style={{ color: "#969696" }}>회의의 준비 자료입니다.</p>
             <button
               onClick={async () => {
+                if (!hasMeetingMaterial) return;
+
                 const wrapper = document.createElement("div");
                 wrapper.style.cssText = `position:absolute;top:-9999px;left:-9999px;width:700px;background:#fff;padding:48px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;box-sizing:border-box;color:#111;`;
                 const titleEl = document.createElement("div");
@@ -467,7 +479,7 @@ export default function MeetingArchivePage() {
                 wrapper.appendChild(titleEl);
                 const agendaEl = document.createElement("div");
                 agendaEl.style.cssText = `margin-bottom:20px;font-size:13px;line-height:1.9;`;
-                agendaEl.innerHTML = `<b>기초안건</b><br/>${agenda.map((a,i) => `${i+1}. ${a.content}`).join("<br/>")}`;
+                agendaEl.innerHTML = `<b>기초안건</b><br/>${agenda.length ? agenda.map((a,i) => `${i+1}. ${a.content}`).join("<br/>") : EMPTY_MATERIAL_TEXT}`;
                 wrapper.appendChild(agendaEl);
                 [
                   { label: "회의 목적", value: prep?.purpose },
@@ -475,10 +487,9 @@ export default function MeetingArchivePage() {
                   { label: "관련 규정 및 제약사항", value: prep?.rule },
                   { label: "회의 종료 후 기대 결과", value: prep?.effect },
                 ].forEach(s => {
-                  if (!s.value) return;
                   const sec = document.createElement("div");
                   sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
-                  sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
+                  sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value || EMPTY_MATERIAL_TEXT}</span>`;
                   wrapper.appendChild(sec);
                 });
                 document.body.appendChild(wrapper);
@@ -491,8 +502,9 @@ export default function MeetingArchivePage() {
                 pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
                 pdf.save("회의_준비_자료.pdf");
               }}
-              className="px-5 py-2 text-[13px] text-white rounded-lg"
-              style={{ backgroundColor: "#623FB5" }}
+              disabled={!hasMeetingMaterial}
+              className="px-5 py-2 text-[13px] text-white rounded-lg disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: hasMeetingMaterial ? "#623FB5" : "#969696" }}
             >
               PDF 다운로드
             </button>
@@ -501,9 +513,9 @@ export default function MeetingArchivePage() {
           {/* 기초안건 */}
           <div className="mb-5">
             <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>기초 안건</p>
-            <div className="rounded-xl px-5 py-4 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#141414" }}>
+            <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
               {agenda.length === 0 ? (
-                <p style={{ color: "#969696" }}>안건이 없습니다.</p>
+                <p style={{ color: "#969696" }}>{EMPTY_MATERIAL_TEXT}</p>
               ) : (
                 agenda.map((a, i) => (
                   <p key={a.agenda_id ?? i} className="leading-relaxed">{i + 1}. {a.content}</p>
@@ -519,24 +531,32 @@ export default function MeetingArchivePage() {
               { label: "프로젝트 현재 상태", value: prep?.project_status },
               { label: "관련 규정 및 제약사항", value: prep?.rule },
               { label: "회의 종료 후 기대 결과", value: prep?.effect },
-            ].map(section => section.value ? (
+            ].map(section => (
               <div key={section.label}>
                 <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
                 <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
-                  {section.value || <span style={{ color: "#969696" }}>내용이 없습니다.</span>}
+                  {section.value ? (
+                    section.value
+                  ) : (
+                    <span style={{ color: "#969696" }}>{EMPTY_MATERIAL_TEXT}</span>
+                  )}
                 </div>
               </div>
-            ) : null)}
+            ))}
 
             <div>
               <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>참고 자료</p>
               <div className="border rounded-xl px-5 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
-                {prep?.sources?.map((src, i) => (
-                  <p key={i} className="text-[13px]">
-                    <span style={{ color: "#141414" }}>- {src.title} </span>
-                    <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</a>
-                  </p>
-                ))}
+                {prep?.sources?.length ? (
+                  prep.sources.map((src, i) => (
+                    <p key={i} className="text-[13px]">
+                      <span style={{ color: "#141414" }}>- {src.title} </span>
+                      <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</a>
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-[13px]" style={{ color: "#969696" }}>{EMPTY_MATERIAL_TEXT}</p>
+                )}
               </div>
             </div>
           </div>

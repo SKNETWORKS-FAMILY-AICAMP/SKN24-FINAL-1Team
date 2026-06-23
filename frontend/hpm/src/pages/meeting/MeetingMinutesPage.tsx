@@ -19,7 +19,7 @@ const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
 };
 
-const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
+const STEP_LABELS = ["발화자 매핑", "회의록 검토 & 태스크 수정", "Jira 태스크 등록"];
 
 const formatMeetingDateTime = (value?: string | null) => {
   if (!value) return "-";
@@ -228,7 +228,7 @@ export default function MeetingMinutesPage() {
   return (
     <div className="p-8 max-w-5xl mx-auto">
 
-      <StepBar steps={STEP_LABELS} activeStep={1} />
+      <StepBar steps={STEP_LABELS} activeStep={2} />
 
       {/* 상태 배너 */}
       {minutesStatus === "reviewing" && (

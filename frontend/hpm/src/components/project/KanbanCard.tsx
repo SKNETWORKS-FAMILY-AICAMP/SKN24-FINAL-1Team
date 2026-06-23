@@ -51,7 +51,7 @@ export default function KanbanCard({
       >
         <div className="absolute left-[18px] top-[18px] flex w-[170px] flex-col items-start gap-[18px]">
           <div className="flex w-full flex-col items-start gap-[10px]">
-            <p className="m-0 w-[170px] text-[15px] font-normal leading-[1.2] text-[#141414]">
+            <p className="m-0 w-[270px] text-[15px] font-normal leading-[1.2] text-[#141414]">
               {task.title}
             </p>
             <span className="flex h-[22px] items-center justify-center rounded-[20px] bg-[#DCD0FE] px-[8px] py-px text-[11px] font-normal leading-[1.2] text-[#623FB5]">

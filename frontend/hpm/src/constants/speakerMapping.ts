@@ -5,9 +5,9 @@ import type {
 } from "../types/speakerMapping";
 
 export const SPEAKER_MAPPING_STEPS: SpeakerMappingStep[] = [
-  { id: "speaker-mapping", label: "회의 발화자 매핑", status: "active" },
-  { id: "minutes-task", label: "회의록 & 태스크 수정", status: "pending" },
-  { id: "minutes-create", label: "회의록 생성", status: "pending" },
+  { id: "speaker-mapping", label: "발화자 매핑", status: "active" },
+  { id: "minutes-task", label: "회의록 검토 & 태스크 수정", status: "pending" },
+  { id: "jira-task", label: "Jira 태스크 등록", status: "pending" },
 ];
 
 export const SPEAKER_PARTICIPANTS: SpeakerParticipant[] = [

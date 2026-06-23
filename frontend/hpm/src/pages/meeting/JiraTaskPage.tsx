@@ -16,7 +16,7 @@ const PRIORITY_COLOR: Record<string, string> = {
   Lowest: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
 };
 
-const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
+const STEP_LABELS = ["발화자 매핑", "회의록 검토 & 태스크 수정", "Jira 태스크 등록"];
 
 export default function JiraTaskPage() {
   const { id } = useParams();
@@ -76,7 +76,7 @@ export default function JiraTaskPage() {
         return;
       }
 
-      navigate(`/meetings/${meetingId}/email`);
+      navigate(`/meetings/${meetingId}/archive`);
     } catch (error) {
       console.error("Jira 등록 실패:", error);
       setShowRetryModal(true);
@@ -87,7 +87,7 @@ export default function JiraTaskPage() {
 
   return (
     <div className="mx-auto max-w-[960px] p-8">
-      <StepBar steps={STEP_LABELS} activeStep={2} />
+      <StepBar steps={STEP_LABELS} activeStep={3} />
 
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-[24px] font-semibold text-[#141414]">Jira 태스크 등록</h1>
@@ -150,6 +150,15 @@ export default function JiraTaskPage() {
           })}
         </div>
       )}
+      <div className="mt-6 text-center">
+        <button
+          type="button"
+          onClick={() => navigate(`/meetings/${meetingId}/archive`)}
+          className="text-sm text-[#969696] underline hover:text-[#555]"
+        >
+          Jira 태스크 등록을 건너뛰시겠습니까? 이후 자동 등록은 불가합니다.
+        </button>
+      </div>
       {showRetryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="w-80 overflow-hidden rounded-2xl bg-white shadow-xl">
@@ -173,7 +182,7 @@ export default function JiraTaskPage() {
                 type="button"
                 onClick={() => {
                   setShowRetryModal(false);
-                  navigate(`/meetings/${meetingId}/email`);
+                  navigate(`/meetings/${meetingId}/archive`);
                 }}
                 className="flex-1 py-4 text-sm text-gray-700 transition hover:bg-gray-50"
               >

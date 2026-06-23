@@ -146,7 +146,7 @@ export default function MeetingDetailPage() {
           if (statusChanged || pauseChanged) {
             setMeeting(data);
             if (data.status === "finished") {
-              navigate(`/meetings/${meetingId}/minutes`, { replace: true });
+              navigate(`/meetings/${meetingId}/speaker-mapping`, { replace: true });
             }
           }
 
@@ -305,11 +305,11 @@ export default function MeetingDetailPage() {
       }
 
       await endMeeting(meetingId, audioFile);
-      navigate(`/meetings/${meetingId}/minutes`);
+      navigate(`/meetings/${meetingId}/speaker-mapping`);
     } catch (err) {
       console.error("회의 종료 에러:", err);
-      alert("회의가 종료되었습니다. (회의록 상세화면으로 이동합니다.)");
-      navigate(`/meetings/${meetingId}/minutes`);
+      alert("회의가 종료되었습니다. (발화자 매핑 화면으로 이동합니다.)");
+      navigate(`/meetings/${meetingId}/speaker-mapping`);
     } finally {
       setEndLoading(false);
     }
