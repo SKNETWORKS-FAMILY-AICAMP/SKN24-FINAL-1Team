@@ -7,6 +7,7 @@ from apps.users.views import (
     jira_board, jira_board_issue_status, jira_board_issue_detail,
     jira_set_project_key, jira_workspaces, jira_select_workspace,
     jira_board_issue_create, jira_issue_types,
+    admin_user_list, admin_user_detail, dept_list, rank_list,
 )
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -37,6 +38,11 @@ urlpatterns = [
     path("api/jira/select-workspace/", jira_select_workspace),
     path("api/jira/board/issue/", jira_board_issue_create),
     path("api/jira/issue-types/", jira_issue_types),
+
+    path("api/admin/users/", admin_user_list),
+    path("api/admin/users/<int:users_id>/", admin_user_detail),
+    path("api/admin/depts/", dept_list),
+    path("api/admin/ranks/", rank_list),
 
     path("api/jira/board/issue/<str:issue_key>/", jira_board_issue_detail),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

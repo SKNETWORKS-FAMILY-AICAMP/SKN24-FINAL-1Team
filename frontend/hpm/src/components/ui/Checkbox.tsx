@@ -1,3 +1,4 @@
+
 import { type ComponentPropsWithoutRef } from "react";
 
 interface CheckboxProps extends ComponentPropsWithoutRef<"input"> {
@@ -21,5 +22,6 @@ export default function Checkbox({
         <span className="text-[15px] text-[#0A0A0A]">{label}</span>
       )}
     </label>
+
   );
 }

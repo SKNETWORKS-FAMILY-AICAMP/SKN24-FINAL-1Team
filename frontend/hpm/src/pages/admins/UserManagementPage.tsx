@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import logo from "../../assets/logo.png";
-import resetIcon from "../../assets/reset.png";
+import logo from "../../assets/login/logo.png";
 import { useAuth } from "../../context/AuthContext";
 import Dropdown from "../../components/ui/Dropdown";
 import Checkbox from "../../components/ui/Checkbox";
-import { getUsers, getUserProjects } from "../../services/users";
+import {
+  fetchAdminUsers, createAdminUser, deleteAdminUser,
+  updateAdminUser, resetAdminUserPassword, getUserProjects,
+} from "../../services/users";
 
 interface AdminUser {
   users_id: number;
@@ -15,7 +17,7 @@ interface AdminUser {
   dept: string;
   rank: string;
   work: string;
-  status: "재직" | "휴직" | "퇴사";
+  status: number;
 }
 
 interface UserProject {
@@ -47,6 +49,8 @@ interface RegisterErrors {
 
 const DEPT_OPTIONS = ["개발팀", "인프라팀", "보안팀", "QA팀", "데이터팀"];
 const RANK_OPTIONS = ["대표이사", "이사", "부장", "차장", "과장", "대리", "주임", "사원"];
+const STATUS_LABELS: Record<number, string> = { 0: "재직", 1: "휴직", 2: "퇴사" };
+const STATUS_VALUES: Record<string, number> = { "재직": 0, "휴직": 1, "퇴사": 2 };
 
 
 const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
@@ -64,20 +68,9 @@ export default function UserManagementPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (user && user.role !== "ADMIN") {
-      navigate("/login", { replace: true });
-    }
-  }, [user, navigate]);
-
   // ── 사용자 목록 (CRUD 반영) ──────────────────────────────────────
   const [users, setUsers] = useState<AdminUser[]>([]);
-
-  useEffect(() => {
-    getUsers().then((data) => {
-      setUsers(data as unknown as AdminUser[]);
-    }).catch(() => {});
-  }, []);
+  const [isLoading, setIsLoading] = useState(true);
 
   // ── 선택 상태 ───────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -94,7 +87,7 @@ export default function UserManagementPage() {
   const [editForm, setEditForm] = useState({
     emp_no: "", name: "", email: "",
     dept: "", rank: "", work: "",
-    status: "재직" as AdminUser["status"],
+    status: "재직" as "재직" | "휴직" | "퇴사",
   });
 
   // ── 모달 표시 여부 ────────────────────────────────────────────────
@@ -120,6 +113,26 @@ export default function UserManagementPage() {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
+  useEffect(() => {
+  setIsLoading(true);
+  fetchAdminUsers()
+    .then((data: any[]) => {
+      setUsers(data.map((u) => ({
+        users_id: u.users_id,
+        emp_no: u.emp_no,
+        name: u.name,
+        email: u.email,
+        dept: u.dept_name,
+        rank: u.rank_name,
+        work: u.work,
+        status: u.status,
+      })));
+    })
+    .catch(console.error)
+    .finally(() => setIsLoading(false));
+}, []);
+  
+
   // ── 필터 적용 목록 ────────────────────────────────────────────────
   const filteredUsers = users.filter((u) => {
     const matchSearch = !search ||
@@ -128,7 +141,7 @@ export default function UserManagementPage() {
       u.email.includes(search);
     const matchDept   = deptFilter   === "전체" || u.dept   === deptFilter;
     const matchRank   = rankFilter   === "전체" || u.rank   === rankFilter;
-    const matchStatus = statusFilter === "전체" || u.status === statusFilter;
+    const matchStatus = statusFilter === "전체" || u.status === STATUS_VALUES[statusFilter];
     return matchSearch && matchDept && matchRank && matchStatus;
   });
 
@@ -145,27 +158,52 @@ export default function UserManagementPage() {
     setSelectedUser(u);
     setEditForm({
       emp_no: u.emp_no, name: u.name, email: u.email,
-      dept: u.dept, rank: u.rank, work: u.work, status: u.status,
+      dept: u.dept, rank: u.rank, work: u.work,
+      status: STATUS_LABELS[u.status] as "재직" | "휴직" | "퇴사",
     });
     getUserProjects(u.users_id).then(setUserProjects).catch(() => setUserProjects([]));
   };
 
   // ── 삭제 ────────────────────────────────────────────────────────
-  const handleDelete = () => {
+  const handleDelete = async () => {
+  try {
+    await Promise.all(selectedIds.map((id) => deleteAdminUser(id)));
     setUsers((prev) => prev.filter((u) => !selectedIds.includes(u.users_id)));
     if (selectedUser && selectedIds.includes(selectedUser.users_id)) setSelectedUser(null);
     setSelectedIds([]);
+  } catch {
+    alert("삭제에 실패했습니다.");
+  } finally {
     setShowDeleteModal(false);
-  };
+  }
+};
 
   // ── 저장 ────────────────────────────────────────────────────────
-  const handleSave = () => {
-    if (!selectedUser) return;
+  const handleSave = async () => {
+  if (!selectedUser) return;
+  try {
+    await updateAdminUser(selectedUser.users_id, {
+      name: editForm.name,
+      email: editForm.email,
+      emp_no: editForm.emp_no,
+      work: editForm.work,
+      dept_name: editForm.dept,
+      rank_name: editForm.rank,
+      status: STATUS_VALUES[editForm.status],
+    });
     setUsers((prev) =>
-      prev.map((u) => u.users_id === selectedUser.users_id ? { ...u, ...editForm } : u)
+      prev.map((u) =>
+        u.users_id === selectedUser.users_id
+          ? { ...u, ...editForm, status: STATUS_VALUES[editForm.status] }
+          : u
+      )
     );
+  } catch {
+    alert("저장에 실패했습니다.");
+  } finally {
     setShowSaveModal(false);
-  };
+  }
+};
 
   // ── 등록 유효성 검사 ──────────────────────────────────────────────
   const validateRegister = (): boolean => {
@@ -198,23 +236,34 @@ export default function UserManagementPage() {
     return valid;
   };
 
-  const handleRegisterSubmit = () => {
-    if (!validateRegister()) return;
-    const newId = users.length > 0 ? Math.max(...users.map((u) => u.users_id)) + 1 : 1;
-    setUsers((prev) => [{
-      users_id: newId,
+  const handleRegisterSubmit = async () => {
+  if (!validateRegister()) return;
+  try {
+    const created = await createAdminUser({
       emp_no: registerForm.emp_no,
       name: registerForm.name,
       email: `${registerForm.emailPrefix}@company.com`,
-      dept: registerForm.dept,
-      rank: registerForm.rank,
+      dept_name: registerForm.dept,
+      rank_name: registerForm.rank,
       work: registerForm.work,
-      status: registerForm.status,
+    });
+    setUsers((prev) => [{
+      users_id: created.users_id,
+      emp_no: created.emp_no,
+      name: created.name,
+      email: created.email,
+      dept: created.dept_name,
+      rank: created.rank_name,
+      work: created.work,
+      status: created.status,
     }, ...prev]);
     setRegisterForm(INIT_REGISTER);
     setRegisterErrors(INIT_ERRORS);
     setShowRegisterModal(false);
-  };
+  } catch (e: any) {
+    alert(e?.response?.data?.error ?? "등록에 실패했습니다.");
+  }
+};
 
   const closeRegisterModal = () => {
     setShowRegisterModal(false);
@@ -391,7 +440,7 @@ export default function UserManagementPage() {
                       <td className="p-3">{u.dept}</td>
                       <td className="p-3">{u.rank}</td>
                       <td className="p-3">{u.work}</td>
-                      <td className={`p-3 ${statusColor(u.status)}`}>{u.status}</td>
+                      <td className="p-3">{STATUS_LABELS[u.status] ?? "재직"}</td>
                       <td className="p-3">
                         <button
                           onClick={() => handleSelectUser(u)}
@@ -454,7 +503,9 @@ export default function UserManagementPage() {
                     onClick={() => setShowResetPwModal(true)}
                     className="flex items-center gap-1 px-3 py-2 bg-[#623FB5] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
                   >
-                    <img src={resetIcon} alt="reset" className="w-3 h-3 object-contain" />
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
                     비밀번호 초기화
                   </button>
                 </div>
@@ -502,7 +553,7 @@ export default function UserManagementPage() {
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">재직 상태</label>
-                  <Dropdown options={["재직", "휴직", "퇴사"]} value={editForm.status} onChange={(v) => setEditForm({ ...editForm, status: v as AdminUser["status"] })} />
+                  <Dropdown options={["재직", "휴직", "퇴사"]} value={editForm.status} onChange={(v) => setEditForm({ ...editForm, status: v as "재직" | "휴직" | "퇴사" })} />
                 </div>
               </div>
 
@@ -683,7 +734,16 @@ export default function UserManagementPage() {
       {showResetPwModal && (
         <ConfirmModal
           message={<>비밀번호를 abc123으로 초기화하시겠습니까?<br />확인 클릭 시 해당 사용자의<br />비밀번호가 abc123으로 변경됩니다.</>}
-          onConfirm={() => setShowResetPwModal(false)}
+          onConfirm={async () => {
+            if (selectedUser) {
+              try {
+                await resetAdminUserPassword(selectedUser.users_id);
+              } catch {
+                alert("비밀번호 초기화에 실패했습니다.");
+              }
+            }
+            setShowResetPwModal(false);
+          }}
           onCancel={() => setShowResetPwModal(false)}
         />
       )}
