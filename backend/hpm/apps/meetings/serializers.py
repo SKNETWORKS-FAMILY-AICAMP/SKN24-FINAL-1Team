@@ -110,9 +110,22 @@ class RecordSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class RecordUtteranceSerializer(serializers.ModelSerializer):
+    meeting_user_name = serializers.SerializerMethodField()
+    user_id = serializers.SerializerMethodField()
+
     class Meta:
         model = RecordUtterance
         fields = "__all__"
+
+    def get_meeting_user_name(self, obj):
+        if obj.meeting_users and obj.meeting_users.user:
+            return obj.meeting_users.user.name
+        return ""
+
+    def get_user_id(self, obj):
+        if obj.meeting_users and obj.meeting_users.user:
+            return obj.meeting_users.user.users_id
+        return None
 
 
 from .models import MeetingPreparation

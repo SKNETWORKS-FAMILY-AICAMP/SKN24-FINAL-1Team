@@ -17,6 +17,7 @@ export interface SpeakerUtterance {
   time: string;
   content: string[];
   mappedParticipantId: string;
+  isOverride?: boolean;
 }
 
 export interface SpeakerSegment {
@@ -24,5 +25,6 @@ export interface SpeakerSegment {
   label: string;
   utteranceCount: number;
   mappedParticipantId: string;
+  hasAppliedAll?: boolean;
   utterances: SpeakerUtterance[];
 }

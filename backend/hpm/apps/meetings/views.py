@@ -168,6 +168,77 @@ def _resolve_meeting_user(meeting, data):
     return None
 
 
+def _format_stt_time(value):
+    try:
+        seconds = int(float(value))
+    except (TypeError, ValueError):
+        return str(value or "")
+
+    return f"[{seconds // 60:02d}:{seconds % 60:02d}]"
+
+
+def _stt_utterance_items(result, full_text):
+    if not isinstance(result, dict):
+        result = {}
+
+    items = (
+        result.get("utterances")
+        or result.get("segments")
+        or result.get("speaker_segments")
+        or result.get("diarization")
+        or []
+    )
+    if isinstance(items, dict):
+        items = items.get("items") or items.get("segments") or []
+
+    normalized = []
+    if isinstance(items, list):
+        for index, item in enumerate(items):
+            if not isinstance(item, dict):
+                continue
+
+            content = item.get("content") or item.get("text") or item.get("transcript") or ""
+            content = str(content).strip()
+            if not content:
+                continue
+
+            speaker = (
+                item.get("speaker")
+                or item.get("speaker_label")
+                or item.get("label")
+                or f"SPEAKER_{index + 1:02d}"
+            )
+            time_value = item.get("time") or item.get("start") or item.get("start_time") or ""
+            normalized.append({
+                "speaker": str(speaker),
+                "time": str(time_value) if str(time_value).startswith("[") else _format_stt_time(time_value),
+                "content": content,
+            })
+
+    if normalized:
+        return normalized
+
+    text = str(full_text or "").strip()
+    if not text:
+        return []
+
+    return [{"speaker": "SPEAKER_01", "time": "[00:00]", "content": text}]
+
+
+def _replace_record_utterances(record, result, full_text):
+    RecordUtterance.objects.filter(record=record).delete()
+    utterances = _stt_utterance_items(result, full_text)
+    return [
+        RecordUtterance.objects.create(
+            record=record,
+            speaker=item["speaker"],
+            time=item["time"],
+            content=item["content"],
+        )
+        for item in utterances
+    ]
+
+
 # ── 회의 목록 / 생성 ─────────────────────────────────────────────
 @api_view(["GET", "POST"])
 def meeting_list(request):
@@ -394,6 +465,7 @@ def end_meeting(request, meeting_id):
             record, _ = Record.objects.get_or_create(meeting=meeting)
             record.record_row_text = full_text
             record.save()
+            _replace_record_utterances(record, result, full_text)
 
             txt_dir = os.path.join(settings.MEDIA_ROOT, "texts", str(meeting_id))
             os.makedirs(txt_dir, exist_ok=True)
@@ -408,7 +480,7 @@ def end_meeting(request, meeting_id):
             minutes_resp.raise_for_status()
             minutes_data = _minutes_result(minutes_resp.json())
 
-            meeting.meeting_document = minutes_data.get("content", "")
+            meeting.meeting_document = minutes_data.get("content") or minutes_data.get("cotent", "")
             meeting.save()
             _create_tasks_from_todo(meeting, minutes_data.get("todo_list", []))
 
@@ -438,9 +510,10 @@ def _create_tasks_from_todo(meeting, todo_list):
         meeting_users = None
         if owner_label:
             mapping = RecordUtterance.objects.filter(
-                meeting=meeting,
-                speaker_label=owner_label
-            ).first()
+                record__meeting=meeting,
+                speaker=owner_label,
+                meeting_users__isnull=False,
+            ).select_related("meeting_users").first()
             if mapping:
                 meeting_users = mapping.meeting_users
 
@@ -466,29 +539,60 @@ def speaker_mapping_list(request, meeting_id):
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "GET":
-        mappings = RecordUtterance.objects.filter(record__meeting=meeting).order_by("time")
+        mappings = (
+            RecordUtterance.objects
+            .filter(record__meeting=meeting)
+            .select_related("meeting_users__user")
+            .order_by("time", "utterance_id")
+        )
         return Response(RecordUtteranceSerializer(mappings, many=True).data)
 
-    # POST - 매핑 저장 (기존 매핑 삭제 후 새로 저장)
-    # 요청 형식: [{"speaker_label": "SPEAKER_01", "meeting_users_id": 3}, ...]
+    # POST - 기존 발화 row의 담당자만 갱신
+    # 요청 형식: {"mappings": [{"utterance_id": 1, "meeting_users_id": 3}, ...]}
     items = request.data.get("mappings", [])
-    RecordUtterance.objects.filter(meeting=meeting).delete()
-    created = []
+    if not isinstance(items, list):
+        return Response({"error": "mappings는 배열이어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
     for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        utterance_id = item.get("utterance_id")
+        if not utterance_id:
+            continue
+
+        try:
+            utterance = RecordUtterance.objects.get(
+                utterance_id=utterance_id,
+                record__meeting=meeting,
+            )
+        except RecordUtterance.DoesNotExist:
+            continue
+
+        meeting_users_id = item.get("meeting_users_id")
+        if meeting_users_id in (None, ""):
+            utterance.meeting_users = None
+            utterance.save(update_fields=["meeting_users"])
+            continue
+
         try:
             meeting_user = MeetingUsers.objects.get(
-                meeting_users_id=item.get("meeting_users_id")
-            )
-            mapping = RecordUtterance.objects.create(
                 meeting=meeting,
-                speaker_label=item.get("speaker_label", ""),
-                meeting_users=meeting_user,
+                meeting_users_id=meeting_users_id,
             )
-            created.append(mapping)
         except MeetingUsers.DoesNotExist:
-            pass
+            continue
 
-    return Response(RecordUtteranceSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
+        utterance.meeting_users = meeting_user
+        utterance.save(update_fields=["meeting_users"])
+
+    mappings = (
+        RecordUtterance.objects
+        .filter(record__meeting=meeting)
+        .select_related("meeting_users__user")
+        .order_by("time", "utterance_id")
+    )
+    return Response(RecordUtteranceSerializer(mappings, many=True).data)
 
 
 # ── 회의록 승인 플로우 ───────────────────────────────────────────
@@ -715,13 +819,21 @@ def generate_minutes(request, meeting_id):
             timeout=300,
         )
         response.raise_for_status()
+        print(response.json())
         data = _minutes_result(response.json())
     except requests.RequestException as e:
         return Response({"error": f"RunPod 연결 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
-    meeting.meeting_document = data.get("content", "")
+    meeting.meeting_document = data.get("content") or data.get("cotent", "")
     meeting.save()
     _create_tasks_from_todo(meeting, data.get("todo_list", []))
+
+    print(Response({
+        "message": "회의록 및 태스크 생성이 완료되었습니다.",
+        "meeting_id": meeting_id,
+        "content": data.get("content", ""),
+        "todo_list": data.get("todo_list", [])
+    }))
 
     return Response({
         "message": "회의록 및 태스크 생성이 완료되었습니다.",

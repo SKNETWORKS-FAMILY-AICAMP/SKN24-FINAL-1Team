@@ -7,9 +7,6 @@ import {
   type Meeting,
   type Task,
 } from "../../services/meeting";
-import StepBar from "../../components/meeting/StepBar";
-
-const STEP_LABELS = ["회의록 검토 & 태스크 수정", "Jira 태스크 등록", "요약 메일 발송"];
 
 const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음",
@@ -82,8 +79,6 @@ export default function MeetingEmailPage() {
 
   return (
     <div className="mx-auto max-w-6xl p-8">
-      <StepBar steps={STEP_LABELS} activeStep={3} />
-
       <div className="mb-6">
         <h1 className="text-[24px] font-semibold text-[#141414]">요약 메일 발송</h1>
         <p className="mt-1 text-[13px] text-[#969696]">회의 참여자 전체에게 회의록과 태스크 요약을 발송합니다.</p>

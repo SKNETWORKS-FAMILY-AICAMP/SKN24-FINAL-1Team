@@ -2,9 +2,9 @@ import type { SpeakerMappingStep } from "../types/speakerMapping";
 import type { MeetingReviewMeta, MeetingReviewTask } from "../types/meetingReview";
 
 export const MEETING_REVIEW_STEPS: SpeakerMappingStep[] = [
-  { id: "speaker-mapping", label: "회의 발화자 매핑", status: "pending" },
-  { id: "minutes-task", label: "회의록 & 태스크 수정", status: "active" },
-  { id: "minutes-create", label: "회의록 생성", status: "pending" },
+  { id: "speaker-mapping", label: "발화자 매핑", status: "pending" },
+  { id: "minutes-task", label: "회의록 검토 & 태스크 수정", status: "active" },
+  { id: "jira-task", label: "Jira 태스크 등록", status: "pending" },
 ];
 
 export const MEETING_REVIEW_META: MeetingReviewMeta = {
