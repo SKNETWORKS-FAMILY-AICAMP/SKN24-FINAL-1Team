@@ -1,30 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-
-const DUMMY_MEETING = {
-  title: "2026 하반기 신규 서비스 런칭 전략 논의",
-  date: "2026-06-10 14:00",
-  location: "3층 회의실 A",
-};
-
-const DUMMY_RECIPIENTS_INIT = [
-  { id: "1", label: "김규호 부장" },
-  { id: "2", label: "황인규 대리" },
-  { id: "3", label: "김민준 대리" },
-  { id: "4", label: "박수영 팀장" },
-];
+import { getMeetingDetail } from "../../services/meeting";
 
 const MAX_GREETING = 200;
 
 export default function MeetingInviteEmailPage() {
-  useParams();
+  const { id } = useParams();
+  const meetingId = Number(id);
   const navigate = useNavigate();
 
+  const [meeting, setMeeting] = useState<{ title: string; meeting_at: string; location: string } | null>(null);
+  const [recipients, setRecipients] = useState<{ id: string; label: string }[]>([]);
   const [greeting, setGreeting] = useState(
     "안녕하세요.\n아래와 같이 회의를 진행하고자 하오니 참석 부탁드립니다.\n감사합니다."
   );
-  const [recipients, setRecipients] = useState(DUMMY_RECIPIENTS_INIT);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    getMeetingDetail(meetingId).then((m) => {
+      setMeeting({ title: m.title, meeting_at: m.meeting_at, location: m.location });
+      if (m.participants?.length) {
+        setRecipients(m.participants.map((p) => ({ id: String(p.user_id), label: p.name })));
+      }
+    }).catch(() => {});
+  }, [meetingId]);
 
   const removeRecipient = (id: string) =>
     setRecipients((prev) => prev.filter((r) => r.id !== id));
@@ -54,7 +53,7 @@ export default function MeetingInviteEmailPage() {
             <p className="text-[13px] font-bold text-[#141414] mb-2">
               회의 제목<span className="text-[12px] font-normal text-[#969696] ml-1">(수정 불가)</span>
             </p>
-            <p className="text-[14px] text-[#141414]">{DUMMY_MEETING.title}</p>
+            <p className="text-[14px] text-[#141414]">{meeting?.title ?? ""}</p>
           </div>
 
           {/* 회의 정보 */}
@@ -63,11 +62,11 @@ export default function MeetingInviteEmailPage() {
             <div className="flex flex-col gap-2">
               <div className="flex gap-4">
                 <span className="text-[13px] text-[#969696] w-20 flex-shrink-0">회의 일시</span>
-                <span className="text-[13px] text-[#141414]">{DUMMY_MEETING.date}</span>
+                <span className="text-[13px] text-[#141414]">{meeting?.meeting_at ?? ""}</span>
               </div>
               <div className="flex gap-4">
                 <span className="text-[13px] text-[#969696] w-20 flex-shrink-0">회의 장소</span>
-                <span className="text-[13px] text-[#141414]">{DUMMY_MEETING.location}</span>
+                <span className="text-[13px] text-[#141414]">{meeting?.location ?? ""}</span>
               </div>
             </div>
           </div>
@@ -113,14 +112,12 @@ export default function MeetingInviteEmailPage() {
         </div>
 
         {/* 오른쪽 이메일 미리보기 카드 */}
-        <div
-          className="w-[380px] flex-shrink-0 bg-white border border-[#E6E1E6] rounded-2xl p-6"
-        >
+        <div className="w-[380px] flex-shrink-0 bg-white border border-[#E6E1E6] rounded-2xl p-6">
           <p className="text-[16px] font-bold text-[#141414] mb-5">이메일 미리보기</p>
           <div className="text-[13px] text-[#141414] leading-relaxed space-y-4">
             <p style={{ whiteSpace: "pre-line" }}>{greeting}</p>
-            <p>일정 : {DUMMY_MEETING.date}</p>
-            <p>장소 : {DUMMY_MEETING.location}</p>
+            <p>일정 : {meeting?.meeting_at ?? ""}</p>
+            <p>장소 : {meeting?.location ?? ""}</p>
             <p>참여자 : {recipientNames}</p>
           </div>
         </div>

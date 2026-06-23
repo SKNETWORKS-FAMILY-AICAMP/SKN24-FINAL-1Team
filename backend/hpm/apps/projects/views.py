@@ -515,3 +515,9 @@ def project_detail(request, project_id):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@api_view(["GET"])
+def user_project_list(request, user_id):
+    owned = Project.objects.filter(project_owner_id = user_id)
+    joined = Project.objects.filter(projectusers__user_id = user_id)
+    qs = (owned | joined).distinct().order_by("-created_at")
+    return Response([_project_card_data(project) for project in qs])

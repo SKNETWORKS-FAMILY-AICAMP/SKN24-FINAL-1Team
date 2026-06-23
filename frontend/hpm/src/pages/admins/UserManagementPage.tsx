@@ -8,7 +8,7 @@ import {
   fetchAdminUsers, createAdminUser, deleteAdminUser,
   updateAdminUser, resetAdminUserPassword,
 } from "../../services/users";
-
+import { getUserProjects } from "../../services/meeting";
 
 interface AdminUser {
   users_id: number;
@@ -51,12 +51,6 @@ interface RegisterErrors {
 const STATUS_LABELS: Record<number, string> = { 0: "재직", 1: "휴직", 2: "퇴사" };
 const STATUS_VALUES: Record<string, number> = { "재직": 0, "휴직": 1, "퇴사": 2 };
 
-
-const DUMMY_PROJECTS: UserProject[] = [
-  { id: 1, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
-  { id: 2, project_name: "신규 웹사이트 제작", created_at: "2026.01.06", created_by: "김규호", participants: "김규호 외 3명" },
-];
-
 const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
 const NAME_PATTERN = /^[가-힣a-zA-Z]{1,30}$/;
 const EMAIL_PREFIX_PATTERN = /^[a-zA-Z0-9]{1,50}$/;
@@ -79,6 +73,7 @@ export default function UserManagementPage() {
   // ── 선택 상태 ───────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userProjects, setUserProjects] = useState<UserProject[]>([]);
 
   // ── 필터 ────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -134,6 +129,21 @@ export default function UserManagementPage() {
     .catch(console.error)
     .finally(() => setIsLoading(false));
 }, []);
+
+useEffect(() => {
+  if (!selectedUser) return;
+  getUserProjects(selectedUser.users_id)
+    .then((data: any[]) => {
+      setUserProjects(data.map((p: any) => ({
+        id: p.project_id,
+        project_name: p.project_name,
+        created_at: p.startDate ?? "",
+        created_by: p.members?.[0] ?? "",
+        participants: p.members?.join(", ") ?? "",
+      })));
+    })
+    .catch(() => setUserProjects([]));
+}, [selectedUser]);
   
 
   // ── 필터 적용 목록 ────────────────────────────────────────────────
@@ -396,6 +406,10 @@ export default function UserManagementPage() {
               </button>
             </div>
           </div>
+          {/* 로딩 */}
+          {isLoading && (
+            <p className="text-center py-4 text-[#969696]">불러오는 중...</p>
+          )}
 
           {/* 테이블 */}
           <div className="flex-1 overflow-auto">
@@ -555,7 +569,7 @@ export default function UserManagementPage() {
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">재직 상태</label>
-                  <Dropdown options={["재직", "휴직", "퇴사"]} value={editForm.status} onChange={(v) => setEditForm({ ...editForm, status: v as AdminUser["status"] })} />
+                  <Dropdown options={["재직", "휴직", "퇴사"]} value={editForm.status} onChange={(v) => setEditForm({ ...editForm, status: v as "재직" | "휴직" | "퇴사" })} />
                 </div>
               </div>
 
@@ -575,7 +589,7 @@ export default function UserManagementPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {DUMMY_PROJECTS.map((project) => (
+                      {userProjects.map((project) => (
                         <tr key={project.id} className="border-t border-[#E5E5E5]">
                           <td className="px-3 py-2 text-[#969696]">{project.id}</td>
                           <td className="px-3 py-2">{project.project_name}</td>

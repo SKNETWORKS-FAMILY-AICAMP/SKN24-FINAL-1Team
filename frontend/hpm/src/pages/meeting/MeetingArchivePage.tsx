@@ -6,6 +6,10 @@ import {
   getMeetingDetail,
   getTaskList,
   sendChatMessage,
+  getPrepMaterial,
+  getAgendaList,
+  type MeetingPreparation,
+  type AgendaItem,  
   type Meeting,
   type Task,
 } from "../../services/meeting";
@@ -76,35 +80,8 @@ const PRIORITY_LABEL: Record<string, string> = {
   High: "높음", Medium: "중간", Low: "낮음", Lowest: "최하",
 };
 
-const PREP_SECTIONS = [
-  {
-    label: "회의 목적",
-    value: "- 상반기 채용 진행 상황 공유\n- 신규 입사자 온보딩 현황 공유\n- 조직 개편 현황 공유\n- 직원 만족도 조사 결과 공유\n- 채용 프로세스 개선 방안 논의\n- 온보딩 자료 개선 방안 논의\n- 유연근무제 확대, 복지 포인트 확대 등 논의",
-  },
-  {
-    label: "프로젝트 현재 상태",
-    value: "채용 현황\n- 현재 지원자 수는 전체 기준 130명이며, 개발팀 특히 백엔드 지원자가 많음.\n- 프로젝트 경험은 적게 있지만 협업 경험 설명이 부족한 지원자가 다수 존재.\n신규 입사자 온보딩\n- 기존 온보딩 자료가 막연하다는 피드백이 다수 존재.\n- 협업 툴(슬랙, 노션, 지라) 사용법 포함 및 FAQ 문서 별도 제작 검토.\n직원 만족도\n- 유연근무제 확대 요구 다수.\n- 복지 포인트 사용 항목 확대.",
-  },
-  {
-    label: "관련 규정 및 제약사항",
-    value: "임금피크제 운영지침 (2025.12.04 개정)\n- 별도직무표에 따른 직무 수행 가능.\n직제규칙 (2026.04.30 개정)\n- 인사총무팀에서 인력 채용 및 배치, 직원 역량 개발 및 교육 훈련 담당.\n직원 채용 지침 (2025.12.04 개정)\n- 지원자의 발표 자료 작성, 발표 및 질의응답으로 진행하며 평가.",
-  },
-  {
-    label: "회의 종료 후 기대 결과",
-    value: "- 채용 프로세스 개선 방안 확정\n- 온보딩 자료 개선 방향 결정\n- 유연근무제 확대 및 복지 개선 방안 합의\n- 리더십 교육 및 멘토 제도 재운영 계획 수립",
-  },
-];
 
-const PREP_REFERENCES = [
-  "프로젝트 히스토리",
-  "내부 문서 (임금피크제 운영지침, 직제규칙, 직원 채용 지침)",
-];
 
-const DUMMY_AGENDA = [
-  "AI 매칭 엔진 고도화 진행 현황 검토",
-  "포털 프론트엔드 개편 수행기간 진도 점검",
-  "상반기 실태 점검 대응 준비",
-];
 
 interface ChatMessage {
   role: "user" | "bot";
@@ -147,14 +124,24 @@ export default function MeetingArchivePage() {
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
+  const [prep, setPrep] = useState<MeetingPreparation | null>(null);
+  const [agenda, setAgenda] = useState<AgendaItem[]>([]);
+
   useEffect(() => {
-    Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
-      .then(([m, t]) => {
+    Promise.all([
+      getMeetingDetail(meetingId), 
+      getTaskList(meetingId),
+      getPrepMaterial(meetingId),
+      getAgendaList(meetingId),
+    ])
+      .then(([m, t, p, a]) => {
         if (m?.title) {
           setMeeting(m);
           if (m.participants?.length) setRecipients(m.participants);
         }
         if (t?.length) setTasks(t);
+        if (p) setPrep(p);
+        if (a?.length) setAgenda(a);
       })
       .catch(() => {});
   }, [meetingId]);
@@ -594,14 +581,20 @@ export default function MeetingArchivePage() {
                 wrapper.appendChild(titleEl);
                 const agendaEl = document.createElement("div");
                 agendaEl.style.cssText = `margin-bottom:20px;font-size:13px;line-height:1.9;`;
-                agendaEl.innerHTML = `<b>기초안건</b><br/>${DUMMY_AGENDA.map((a,i) => `${i+1}. ${a}`).join("<br/>")}`;
+                agendaEl.innerHTML = `<b>기초안건</b><br/>${agenda.map((a,i) => `${i+1}. ${a.content}`).join("<br/>")}`;
                 wrapper.appendChild(agendaEl);
-                PREP_SECTIONS.forEach(s => {
-                  const sec = document.createElement("div");
-                  sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
-                  sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
-                  wrapper.appendChild(sec);
-                });
+                [
+                { label: "회의 목적", value: prep?.purpose },
+                { label: "프로젝트 현재 상태", value: prep?.project_status },
+                { label: "관련 규정 및 제약사항", value: prep?.rule },
+                { label: "회의 종료 후 기대 결과", value: prep?.effect },
+              ].forEach(s => {
+                if (!s.value) return;
+                const sec = document.createElement("div");
+                sec.style.cssText = `margin-bottom:16px;font-size:13px;line-height:1.9;`;
+                sec.innerHTML = `<b>${s.label}</b><br/><span style="white-space:pre-wrap">${s.value}</span>`;
+                wrapper.appendChild(sec);
+              });
                 document.body.appendChild(wrapper);
                 const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
                 document.body.removeChild(wrapper);
@@ -623,30 +616,35 @@ export default function MeetingArchivePage() {
           <div className="mb-5">
             <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>기초 안건</p>
             <div className="rounded-xl px-5 py-4 text-[13px]" style={{ backgroundColor: "#F4F5F8", color: "#141414" }}>
-              {DUMMY_AGENDA.map((a, i) => (
-                <p key={i} className="leading-relaxed">{i + 1}. {a}</p>
+              {agenda.map((a, i) => (
+                <p key={a.agenda_id ?? i} className="leading-relaxed">{i + 1}. {a.content}</p>
               ))}
             </div>
           </div>
 
           {/* 준비자료 섹션들 */}
           <div className="space-y-5">
-            {PREP_SECTIONS.map(section => (
+            {[
+              { label: "회의 목적",           value: prep?.purpose },
+              { label: "프로젝트 현재 상태",  value: prep?.project_status },
+              { label: "관련 규정 및 제약사항", value: prep?.rule },
+              { label: "회의 종료 후 기대 결과", value: prep?.effect },
+            ].map(section => section.value ? (
               <div key={section.label}>
                 <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
                 <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
                   {section.value}
                 </div>
               </div>
-            ))}
+            ) : null)}
 
             <div>
               <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>참고 자료</p>
               <div className="border rounded-xl px-5 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
-                {PREP_REFERENCES.map((ref, i) => (
+                {prep?.sources?.map((src, i) => (
                   <p key={i} className="text-[13px]">
-                    <span style={{ color: "#141414" }}>- {ref} </span>
-                    <span className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</span>
+                    <span style={{ color: "#141414" }}>- {src.title} </span>
+                    <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</a>
                   </p>
                 ))}
               </div>
