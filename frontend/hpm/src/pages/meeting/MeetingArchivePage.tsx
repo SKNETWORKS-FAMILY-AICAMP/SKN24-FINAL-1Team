@@ -447,8 +447,9 @@ export default function MeetingArchivePage() {
               업무
             </div>
             {/* 헤더 */}
-            <div className="grid text-[12px] font-semibold px-5 py-2.5" style={{ gridTemplateColumns: "1fr 120px 130px 100px", color: "#555", borderBottom: "1px solid #E6E1E6", backgroundColor: "#FAFAFA" }}>
+            <div className="grid text-[12px] font-semibold px-5 py-2.5" style={{ gridTemplateColumns: "1fr 72px 120px 130px 100px", color: "#555", borderBottom: "1px solid #E6E1E6", backgroundColor: "#FAFAFA" }}>
               <span>업무명</span>
+              <span aria-hidden="true" />
               <span className="text-center">담당자</span>
               <span className="text-center">기한</span>
               <span className="text-center">우선순위</span>
@@ -456,17 +457,14 @@ export default function MeetingArchivePage() {
 
             {tasks.map((task, idx) => (
               <div key={task.meeting_task_id} style={{ borderBottom: idx < tasks.length - 1 ? "1px solid #E6E1E6" : "none" }}>
-                <div className="grid items-center px-5 py-3" style={{ gridTemplateColumns: "1fr 120px 130px 100px" }}>
-                  {/* 접기/펼치기 버튼 */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <button
-                      onClick={() => toggleExpand(task.meeting_task_id)}
-                      style={{ color: "#623FB5", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}
-                    >
-                      {expandedIds.has(task.meeting_task_id) ? "접기 ▲" : "펼치기 ▼"}
-                    </button>
-                    <span style={{ fontSize: "13px", color: "#141414" }}>{task.title}</span>
-                  </div>
+                <div className="grid items-center px-5 py-3" style={{ gridTemplateColumns: "1fr 72px 120px 130px 100px" }}>
+                  <span style={{ fontSize: "13px", color: "#141414" }}>{task.title}</span>
+                  <button
+                    onClick={() => toggleExpand(task.meeting_task_id)}
+                    style={{ color: "#623FB5", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", justifySelf: "center" }}
+                  >
+                    {expandedIds.has(task.meeting_task_id) ? "접기 ▲" : "펼치기 ▼"}
+                  </button>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{task.owner}</span>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{task.due_date || "-"}</span>
                   <span className="text-center text-[13px]" style={{ color: "#555" }}>{PRIORITY_LABEL[task.priority] || task.priority}</span>

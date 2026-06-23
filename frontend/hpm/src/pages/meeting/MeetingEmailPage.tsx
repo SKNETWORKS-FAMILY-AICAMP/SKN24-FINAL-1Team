@@ -98,22 +98,22 @@ export default function MeetingEmailPage() {
                 onClick={() => toggle(task.meeting_task_id)}
                 className={`w-full text-left px-5 py-4 rounded-xl border transition-colors
                   ${isSelected
-                    ? "bg-indigo-50 border-indigo-200"
+                    ? "bg-[#F4F1FF] border-[#623FB5]"
                     : "bg-white border-gray-200 hover:bg-gray-50"}`}
               >
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-semibold mb-0.5 ${isSelected ? "text-indigo-900" : "text-gray-900"}`}>
+                    <p className={`text-sm font-semibold mb-0.5 ${isSelected ? "text-[#141414]" : "text-gray-900"}`}>
                       {task.owner || "미배정"}
                     </p>
-                    <p className={`text-xs ${isSelected ? "text-indigo-500" : "text-gray-500"}`}>
+                    <p className={`text-xs ${isSelected ? "text-[#623FB5]" : "text-gray-500"}`}>
                       담당 태스크: {task.title}{task.due_date ? ` (${task.due_date})` : ""}
                     </p>
                   </div>
                   <div
                     className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center border-2 transition-colors
                       ${isSelected
-                        ? "bg-indigo-600 border-indigo-600 text-white"
+                        ? "bg-[#623FB5] border-[#623FB5] text-white"
                         : "border-gray-300 bg-white"}`}
                   >
                     {isSelected && (

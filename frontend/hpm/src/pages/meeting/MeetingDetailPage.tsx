@@ -88,7 +88,7 @@ export default function MeetingDetailPage() {
         }
 
         if (data.status !== "scheduled" && data.status !== "in_progress") {
-          navigate(`/meetings/${meetingId}/minutes`, { replace: true });
+          navigate(`/meetings/${meetingId}/archive`, { replace: true });
           return;
         }
 
@@ -189,7 +189,7 @@ export default function MeetingDetailPage() {
             setElapsed(data.elapsed_seconds);
           }
           if (data.status !== "scheduled" && data.status !== "in_progress") {
-            navigate(`/meetings/${meetingId}/minutes`, { replace: true });
+            navigate(`/meetings/${meetingId}/archive`, { replace: true });
           }
         }
       } catch (err) {

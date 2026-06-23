@@ -53,14 +53,13 @@ export interface AgendaItem {
 export interface Task {
   meeting_task_id: number;
   meeting_id?: number;
+  meeting_users?: number | null;
   title: string;
   content?: string;
   owner: string;
   due_date: string | null;
   priority: string;
   status?: number;
-  is_jira_synced?: boolean;
-  jira_key?: string;
 }
 
 export interface Meeting {
@@ -72,8 +71,9 @@ export interface Meeting {
   minutes_status: "draft" | "reviewing" | "approved" | "rejected" | null;
   meeting_document: string | null;
   is_meeting: boolean;
+  is_meeting_approve?: boolean;
   project: number;
-  participants?: { user_id: number; name: string }[];
+  participants?: { meeting_users_id?: number | null; user_id: number; name: string }[];
   agenda?: AgendaItem[];
   tasks?: Task[];
   creator?: number;
@@ -88,6 +88,15 @@ export interface MeetingCreatePayload {
   location: string;
   meeting_at: string;
   participants: number[];
+}
+
+export interface TaskCreatePayload {
+  title: string;
+  content?: string;
+  due_date?: string | null;
+  priority?: string;
+  meeting_users_id?: number | null;
+  user_id?: number | null;
 }
 
 export interface Notification {
@@ -151,6 +160,11 @@ export const getMeetingList = async (project_id?: number): Promise<Meeting[]> =>
 
 export const getMeetingDetail = async (meetingId: number): Promise<Meeting> => {
   const res = await api.get(`/meetings/${meetingId}/`);
+  return res.data;
+};
+
+export const updateMeeting = async (meetingId: number, data: Partial<Meeting>): Promise<Meeting> => {
+  const res = await api.patch(`/meetings/${meetingId}/`, data);
   return res.data;
 };
 
@@ -219,14 +233,31 @@ export const getTaskList = async (meetingId: number): Promise<Task[]> => {
   return res.data;
 };
 
-export const updateTask = async (meetingId: number, taskId: number, data: Partial<Task>): Promise<Task> => {
+export const updateTask = async (
+  meetingId: number,
+  taskId: number,
+  data: Partial<Task> & { meeting_users_id?: number | null; user_id?: number | null },
+): Promise<Task> => {
   const res = await api.patch(`/meetings/${meetingId}/tasks/${taskId}/`, data);
   return res.data;
 };
 
+export const createTask = async (meetingId: number, data: TaskCreatePayload): Promise<Task> => {
+  const res = await api.post(`/meetings/${meetingId}/tasks/`, data);
+  return res.data;
+};
+
+export const deleteTask = async (meetingId: number, taskId: number): Promise<void> => {
+  await api.delete(`/meetings/${meetingId}/tasks/${taskId}/`);
+};
+
 // ── Jira 등록 ─────────────────────────────────────────────────────
-export const registerJiraTasks = async (meetingId: number, taskIds: number[]): Promise<{ registered: { task_id: number; jira_key: string }[]; failed: unknown[] }> => {
-  const res = await api.post(`/meetings/${meetingId}/jira/`, { task_ids: taskIds });
+export const registerJiraTasks = async (
+  meetingId: number,
+  taskIds: number[],
+  userId?: number,
+): Promise<{ registered: { task_id: number; jira_key: string }[]; failed: unknown[] }> => {
+  const res = await api.post(`/meetings/${meetingId}/jira/`, { task_ids: taskIds, user_id: userId });
   return res.data;
 };
 

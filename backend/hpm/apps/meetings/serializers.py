@@ -2,6 +2,37 @@ from rest_framework import serializers
 from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance
 
 
+def build_meeting_participants(meeting):
+    participants = []
+    seen_user_ids = set()
+
+    if meeting.creator_id and meeting.creator:
+        creator_meeting_user = MeetingUsers.objects.filter(
+            meeting=meeting,
+            user=meeting.creator,
+        ).first()
+        participants.append({
+            "meeting_users_id": creator_meeting_user.meeting_users_id if creator_meeting_user else None,
+            "user_id": meeting.creator.users_id,
+            "name": meeting.creator.name,
+        })
+        seen_user_ids.add(meeting.creator.users_id)
+
+    meeting_users = MeetingUsers.objects.filter(meeting=meeting).select_related("user")
+    for meeting_user in meeting_users:
+        user = meeting_user.user
+        if user.users_id in seen_user_ids:
+            continue
+        participants.append({
+            "meeting_users_id": meeting_user.meeting_users_id,
+            "user_id": user.users_id,
+            "name": user.name,
+        })
+        seen_user_ids.add(user.users_id)
+
+    return participants
+
+
 class MeetingSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     is_meeting = serializers.SerializerMethodField()
@@ -41,9 +72,7 @@ class MeetingSerializer(serializers.ModelSerializer):
         return obj.creator.name if obj.creator else None
 
     def get_participants(self, obj):
-        from .models import MeetingUsers
-        mus = MeetingUsers.objects.filter(meeting=obj).select_related("user")
-        return [{"user_id": mu.user.users_id, "name": mu.user.name} for mu in mus]
+        return build_meeting_participants(obj)
 
 
 class MeetingAgendaSerializer(serializers.ModelSerializer):
