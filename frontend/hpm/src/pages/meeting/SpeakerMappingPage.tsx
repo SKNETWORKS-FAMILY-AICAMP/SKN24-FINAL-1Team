@@ -6,6 +6,7 @@ import {
   getMeetingDetail,
   getTranscript,
   saveSpeakerMappings,
+  generateMinutes,
   type Meeting,
   type TranscriptItem,
 } from "../../services/meeting";
@@ -82,6 +83,7 @@ export default function SpeakerMappingPage() {
   const [activeSpeakerId, setActiveSpeakerId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -173,7 +175,7 @@ export default function SpeakerMappingPage() {
   };
 
   const goNext = async () => {
-    if (!Number.isFinite(meetingId) || saving) return;
+    if (!Number.isFinite(meetingId) || saving || generating) return;
 
     setSaving(true);
     try {
@@ -188,12 +190,17 @@ export default function SpeakerMappingPage() {
         await saveSpeakerMappings(meetingId, mappings);
       }
 
+      setSaving(false);
+      setGenerating(true);
+      await generateMinutes(meetingId);
+
       navigate(`/meetings/${meetingId}/minutes`);
     } catch (err) {
-      console.error("발화자 매핑 저장 실패:", err);
-      alert("발화자 매핑 저장에 실패했습니다.");
+      console.error("발화자 매핑 및 회의록 생성 실패:", err);
+      alert("발화자 매핑 저장 또는 회의록 생성에 실패했습니다.");
     } finally {
       setSaving(false);
+      setGenerating(false);
     }
   };
 
@@ -293,11 +300,11 @@ export default function SpeakerMappingPage() {
       <div className="mt-5 flex justify-end">
         <button
           className="flex h-[48px] w-[150px] items-center justify-center rounded-[7px] bg-[#623fb5] text-[17px] font-medium text-[#fdfdfd] transition-colors hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
-          disabled={saving}
+          disabled={saving || generating}
           onClick={goNext}
           type="button"
         >
-          {saving ? "저장 중..." : "다음"}
+          {saving ? "저장 중..." : generating ? "회의록 생성 중..." : "다음"}
         </button>
       </div>
     </div>

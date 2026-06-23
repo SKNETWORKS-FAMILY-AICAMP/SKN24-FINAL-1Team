@@ -12,7 +12,7 @@ class Project(models.Model):
     )
     project_name = models.CharField(max_length=90, verbose_name="프로젝트 이름")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="프로젝트 생성 일시")
-    context = models.CharField(max_length=300, null=True, blank=True, verbose_name="프로젝트 맥락 파악")
+    context = models.TextField(max_length=300, null=True, blank=True, verbose_name="프로젝트 맥락 파악")
     jira_project_key = models.CharField(max_length=50, null=True, blank=True, verbose_name="Jira 프로젝트 키")
 
     class Meta:

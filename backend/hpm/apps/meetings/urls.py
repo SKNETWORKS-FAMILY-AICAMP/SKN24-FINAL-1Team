@@ -30,10 +30,12 @@ urlpatterns = [
     # 회의 후 요약 이메일 발송
     path("<int:meeting_id>/email/", views.send_summary_email),
     # 안건생성
-    path("<int:meeting_id>/agenda/generate/", generate_agenda),
+    path("<int:meeting_id>/agenda/generate/", views.generate_agenda),
+    path("<int:meeting_id>/agenda/status/", views.check_agenda_status),
     # speaker_mapping_list
     path("<int:meeting_id>/speaker-mapping/", views.speaker_mapping_list),
     # 회의 준비 자료
     path("<int:meeting_id>/prep/", views.prep_material_detail),
     path("<int:meeting_id>/prep/generate/", views.generate_prep_material),
+    path('<int:meeting_id>/prep/status/', views.check_prep_status),
 ]
