@@ -16,7 +16,7 @@ class Rank(models.Model):
     rank_name = models.CharField(max_length=20, verbose_name="직급명")
 
     class Meta:
-        verbose_name="직급"
+        verbose_name = "직급"
         verbose_name_plural = "직급"
         db_table = "rank"
 

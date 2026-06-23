@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import os
+import re
+import threading
 import time
 from typing import Any
+import uuid
 
 import torch
 from fastapi import FastAPI, HTTPException
@@ -32,6 +36,42 @@ from schemas import AgendaRequest, ChatRequest, MinutesRequest, PreparationReque
 
 
 app = FastAPI(title="HPM Core LLM/RAG Server", version="1.0.0")
+MINUTES_JOBS: dict[str, dict[str, Any]] = {}
+MINUTES_JOBS_LOCK = threading.Lock()
+MINUTES_JOB_EXECUTOR = ThreadPoolExecutor(max_workers=int(os.getenv("MINUTES_JOB_WORKERS", "1")))
+
+
+def _now_ts() -> float:
+    return round(time.time(), 3)
+
+
+def _job_snapshot(job_id: str) -> dict[str, Any]:
+    with MINUTES_JOBS_LOCK:
+        job = MINUTES_JOBS.get(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Generate minutes job not found: {job_id}")
+        return dict(job)
+
+
+def _update_minutes_job(job_id: str, **updates: Any) -> None:
+    with MINUTES_JOBS_LOCK:
+        job = MINUTES_JOBS.get(job_id)
+        if job is None:
+            return
+        job.update(updates)
+        job["updated_at"] = _now_ts()
+
+
+def _serialize_error(exc: Exception) -> str:
+    if isinstance(exc, HTTPException):
+        return str(exc.detail)
+    return str(exc)
+
+
+def _text_response_dict(response: TextResponse) -> dict[str, Any]:
+    if hasattr(response, "model_dump"):
+        return response.model_dump()
+    return response.dict()
 
 
 def compact_documents(items: list[dict[str, Any]], *, limit: int = 3, text_chars: int = 700) -> list[dict[str, Any]]:
@@ -126,6 +166,155 @@ def preparation_sources(selected_documents: dict[str, Any]) -> list[dict[str, An
                 }
             )
     return sources
+
+
+def _coerce_int_or_none(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_text(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _source_document_id(source: dict[str, Any]) -> int | None:
+    viewer = source.get("viewer") if isinstance(source.get("viewer"), dict) else {}
+    metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
+    for value in [viewer.get("id"), metadata.get("document_id"), source.get("document_id")]:
+        document_id = _coerce_int_or_none(value)
+        if document_id is not None:
+            return document_id
+    return None
+
+
+def preparation_response_sources(sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    compacted: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        document_id = _source_document_id(source)
+        if document_id is None or document_id in seen:
+            continue
+        seen.add(document_id)
+        compacted.append(
+            {
+                "title": _clean_text(source.get("label") or source.get("title") or source.get("source") or f"document_{document_id}"),
+                "document_id": document_id,
+            }
+        )
+    return compacted
+
+
+def _append_field(fields: dict[str, str], key: str, value: Any) -> None:
+    text = _clean_text(value)
+    if not text:
+        return
+    if fields[key]:
+        fields[key] = f"{fields[key]}\n\n{text}"
+    else:
+        fields[key] = text
+
+
+def _preparation_field_for_title(title: str) -> str | None:
+    normalized = title.lower()
+    if "목적" in normalized:
+        return "purpose"
+    if any(keyword in normalized for keyword in ["현재 상태", "상태", "지난 회의", "회의 맥락", "논의 포인트", "진행"]):
+        return "project_status"
+    if any(keyword in normalized for keyword in ["규정", "제약", "근거", "리스크", "확인 필요", "내부문서"]):
+        return "rule"
+    if any(keyword in normalized for keyword in ["기대", "결과", "준비사항", "회의 전 준비", "효과"]):
+        return "effect"
+    return None
+
+
+def _extract_markdown_sections(text: str) -> list[dict[str, str]]:
+    sections: list[dict[str, str]] = []
+    current_title = ""
+    current_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        match = re.match(r"^\s*#{2,6}\s*(?:\d+\.\s*)?(.+?)\s*$", line)
+        if match:
+            if current_title or current_lines:
+                sections.append({"title": current_title, "content": "\n".join(current_lines).strip()})
+            current_title = match.group(1).strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_title or current_lines:
+        sections.append({"title": current_title, "content": "\n".join(current_lines).strip()})
+    return sections
+
+
+def _preparation_markdown_from_fields(fields: dict[str, str]) -> str:
+    return "\n".join(
+        [
+            "### 회의 준비 자료",
+            "",
+            "#### 1. 회의 목적",
+            fields.get("purpose", ""),
+            "",
+            "#### 2. 프로젝트 현재 상태",
+            fields.get("project_status", ""),
+            "",
+            "#### 3. 관련 규정 및 제약사항",
+            fields.get("rule", ""),
+            "",
+            "#### 4. 회의 종료 후 기대 결과",
+            fields.get("effect", ""),
+        ]
+    ).strip()
+
+
+def normalize_preparation_response(
+    req: PreparationRequest,
+    raw_result: Any,
+    sources: list[dict[str, Any]],
+) -> dict[str, Any]:
+    result = raw_result if isinstance(raw_result, dict) else {}
+    fields = {
+        "purpose": _clean_text(result.get("purpose")),
+        "project_status": _clean_text(result.get("project_status")),
+        "rule": _clean_text(result.get("rule")),
+        "effect": _clean_text(result.get("effect")),
+    }
+
+    for section in result.get("sections") if isinstance(result.get("sections"), list) else []:
+        if not isinstance(section, dict):
+            continue
+        field_name = _preparation_field_for_title(_clean_text(section.get("title")))
+        if field_name:
+            _append_field(fields, field_name, section.get("content"))
+
+    document_text = _clean_text(result.get("text") or result.get("document"))
+    if document_text:
+        for section in _extract_markdown_sections(document_text):
+            field_name = _preparation_field_for_title(section["title"])
+            if field_name:
+                _append_field(fields, field_name, section["content"])
+
+    if document_text and not any(fields.values()):
+        fields["purpose"] = document_text
+
+    meeting_id = _coerce_int_or_none(req.meeting_id)
+    preparation_id = _coerce_int_or_none(getattr(req, "preparation_id", None))
+    normalized = {
+        "preparation_id": preparation_id,
+        "meeting_id": meeting_id if meeting_id is not None else req.meeting_id,
+        "purpose": fields["purpose"],
+        "project_status": fields["project_status"],
+        "rule": fields["rule"],
+        "effect": fields["effect"],
+        "sources": preparation_response_sources(sources),
+    }
+    normalized["text"] = document_text or _preparation_markdown_from_fields(fields)
+    return normalized
 
 
 def simple_preparation_result(
@@ -266,8 +455,7 @@ def preload_models() -> None:
         load_embedding_model()
 
 
-@app.post("/generate-minutes", response_model=TextResponse)
-def generate_minutes(req: MinutesRequest) -> TextResponse:
+def _generate_minutes_response(req: MinutesRequest) -> TextResponse:
     started = time.perf_counter()
     try:
         result = generate_json(minutes_messages(req))
@@ -281,6 +469,64 @@ def generate_minutes(req: MinutesRequest) -> TextResponse:
         cleanup_cuda()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return TextResponse(result=result, elapsed_sec=round(time.perf_counter() - started, 3), model=TEXT_MODEL_ID)
+
+
+def _run_minutes_job(job_id: str, req: MinutesRequest) -> None:
+    _update_minutes_job(job_id, status="running", step="generate_minutes", started_at=_now_ts())
+    try:
+        response = _generate_minutes_response(req)
+        payload = _text_response_dict(response)
+        _update_minutes_job(
+            job_id,
+            status="succeeded",
+            step="done",
+            result=payload.get("result"),
+            elapsed_sec=payload.get("elapsed_sec"),
+            model=payload.get("model"),
+            error=None,
+            completed_at=_now_ts(),
+        )
+    except Exception as exc:
+        _update_minutes_job(
+            job_id,
+            status="failed",
+            step="failed",
+            error=_serialize_error(exc),
+            completed_at=_now_ts(),
+        )
+
+
+@app.post("/generate-minutes/jobs", status_code=202)
+def create_generate_minutes_job(req: MinutesRequest) -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    job = {
+        "job_id": job_id,
+        "type": "generate_minutes",
+        "status": "queued",
+        "step": "queued",
+        "result": None,
+        "elapsed_sec": None,
+        "model": None,
+        "error": None,
+        "created_at": _now_ts(),
+        "updated_at": _now_ts(),
+        "started_at": None,
+        "completed_at": None,
+    }
+    with MINUTES_JOBS_LOCK:
+        MINUTES_JOBS[job_id] = job
+    MINUTES_JOB_EXECUTOR.submit(_run_minutes_job, job_id, req)
+    return _job_snapshot(job_id)
+
+
+@app.get("/generate-minutes/jobs/{job_id}")
+def get_generate_minutes_job(job_id: str) -> dict[str, Any]:
+    return _job_snapshot(job_id)
+
+
+@app.post("/generate-minutes", response_model=TextResponse)
+def generate_minutes(req: MinutesRequest) -> TextResponse:
+    return _generate_minutes_response(req)
 
 
 @app.post("/generate-agendas", response_model=TextResponse)
@@ -349,16 +595,14 @@ def generate_preparation(req: PreparationRequest) -> TextResponse:
         news_error = ""
 
     if isinstance(result, dict):
-        result = {
-            "text": str(result.get("text") or result.get("document") or ""),
-            "sources": preparation_sources(
-                {
-                    "previous_meetings": previous_meetings,
-                    "internal_documents": internal_documents,
-                    "external_news": external_news,
-                }
-            ),
-        }
+        sources = preparation_sources(
+            {
+                "previous_meetings": previous_meetings,
+                "internal_documents": internal_documents,
+                "external_news": external_news,
+            }
+        )
+        result = normalize_preparation_response(req, result, sources)
     return TextResponse(result=result, elapsed_sec=round(time.perf_counter() - started, 3), model=TEXT_MODEL_ID)
 
 

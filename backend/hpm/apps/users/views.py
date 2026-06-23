@@ -15,6 +15,7 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from datetime import timedelta
 from django.http import HttpResponse
+from django.core.cache import cache
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -114,17 +115,30 @@ def login(request):
     raw_match = (password == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD)
     hash_match = (user.password == _hash_pw(password))
 
-    if not (raw_match or hash_match):
-        return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if user.status != 0:
-        return Response(
-            {"error": "비활성화된 계정입니다."},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
     if user.account_status == 2:
         return Response({"error": "잠금 처리된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    if user.status != 0:
+        return Response({"error": "비활성화된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    if not (raw_match or hash_match):
+        fail_key = f"login_fail_{user.users_id}"
+        fail_count = cache.get(fail_key, 0) + 1
+        cache.set(fail_key, fail_count, timeout=None)
+
+        if fail_count >= 5:
+            user.account_status = 2
+            user.save(update_fields=["account_status"])
+            cache.delete(fail_key)
+            return Response({"error": "잠금 처리된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(
+            {"error": "이메일 또는 비밀번호가 올바르지 않습니다.", "fail_count": fail_count},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    # 로그인 성공 시 실패 횟수 초기화
+    cache.delete(f"login_fail_{user.users_id}")
 
     tokens = get_tokens_for_user(user)
 
@@ -135,6 +149,7 @@ def login(request):
         "email": user.email,
         "name": user.name,
         "account_status": user.account_status,
+        "role": user.role,
     })
 
     response.set_cookie(
@@ -173,19 +188,38 @@ def get_me(request):
 @permission_classes([IsAuthenticated])
 def user_list(request):
     """전체 사용자 목록 (관리자용)"""
-    users = Users.objects.select_related("dept", "rank").all().order_by("-created_at")
+    users = Users.objects.select_related("dept", "rank").exclude(role="ADMIN").order_by("-created_at")
     return Response([
         {
             "users_id": user.users_id,
+            "emp_no": user.emp_no,
             "email": user.email,
             "name": user.name,
             "work": user.work,
-            "dept": user.dept_id,
-            "rank": user.rank_id,
-            "dept_name": user.dept.dept_name,
-            "rank_name": user.rank.rank_name,
+            "dept": user.dept.dept_name,
+            "rank": user.rank.rank_name,
+            "status": user.status,
         }
         for user in users
+    ])
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def user_projects(request, users_id):
+    from apps.projects.models import Project, ProjectUsers
+    owned = Project.objects.filter(project_owner_id=users_id)
+    joined = Project.objects.filter(projectusers__user_id=users_id)
+    projects = (owned | joined).distinct().select_related("project_owner").order_by("-created_at")
+    return Response([
+        {
+            "id": p.project_id,
+            "project_name": p.project_name,
+            "created_at": p.created_at.strftime("%Y.%m.%d"),
+            "created_by": p.project_owner.name,
+            "participants": str(ProjectUsers.objects.filter(project=p).count()) + "명",
+        }
+        for p in projects
     ])
 
 
@@ -288,7 +322,7 @@ def jira_oauth_callback(request):
         return _jira_redirect(next_path, "error")
 
     token_data = token_response.json()
-    access_token = token_data.get("access_token")
+    access_token = token_data.get("access_token")   
     refresh_token = token_data.get("refresh_token")
     expires_in = token_data.get("expires_in", 3600)  # 초 단위
 
@@ -698,6 +732,9 @@ def admin_user_detail(request, users_id):
 
     if "status" in request.data:
         user.status = request.data["status"]
+
+    if "account_status" in request.data:    
+        user.account_status = request.data["account_status"]
 
     if request.data.get("reset_password"):
         user.password = settings.DEFAULT_USER_PASSWORD

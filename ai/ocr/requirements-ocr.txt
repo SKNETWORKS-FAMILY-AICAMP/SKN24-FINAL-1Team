@@ -7,13 +7,13 @@ python-multipart==0.0.32
 requests==2.32.5
 python-dotenv>=1.0.0
 
-paddleocr==3.6.0
-paddlex==3.6.1
-paddlepaddle-gpu==3.2.2
+# paddleocr==3.6.0
+# paddlex[ocr]==3.6.1
+# paddlepaddle-gpu==3.2.2
 
-torch==2.8.0
-torchvision==0.23.0
-torchaudio==2.8.0
+# torch==2.8.0
+# torchvision==0.23.0
+# torchaudio==2.8.0
 
 # Internal document ingest: MinerU -> chunks -> embeddings -> Qdrant.
 mineru[all]

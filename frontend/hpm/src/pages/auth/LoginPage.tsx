@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
+const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
 
   let hasError = false;
@@ -44,11 +44,18 @@ const handleLogin = async (e: React.SubmitEvent<HTMLFormElement>) => {
 
     if (res.data.account_status === 0) {
       navigate("/change-password");
+    } else if (res.data.role === "ADMIN") {
+      navigate("/admin/users");
     } else {
       navigate("/projects");
     }
-  } catch {
-    setPasswordError(AUTH_ERRORS.INVALID_LOGIN);
+  } catch (err: any) {
+    const msg = err?.response?.data?.error ?? "";
+    if (msg === "잠금 처리된 계정입니다.") {
+      setPasswordError("계정이 잠금 처리되었습니다. 관리자에게 연락해주세요.");
+    } else {
+      setPasswordError(AUTH_ERRORS.INVALID_LOGIN);
+    }
   } finally {
     setLoading(false);
   }

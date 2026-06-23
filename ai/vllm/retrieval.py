@@ -368,9 +368,12 @@ def preparation_query(req: PreparationRequest) -> str:
         for item in req.participants
     )
     agenda_text = " ".join(str(item) for item in req.agendas)
+    ocr_text = str(getattr(req, "ocr_text", "") or "").strip()
+    if len(ocr_text) > 1000:
+        ocr_text = ocr_text[:1000]
     return " ".join(
         part.strip()
-        for part in [req.title, getattr(req, "project_context", ""), participant_text, agenda_text]
+        for part in [req.title, getattr(req, "project_context", ""), participant_text, agenda_text, ocr_text]
         if part and part.strip()
     )
 
@@ -433,6 +436,25 @@ MEETING_PREPARATION_CHUNK_PRIORITY = {
 }
 
 
+PREPARATION_RELEVANCE_STOPWORDS = {
+    "회의",
+    "안건",
+    "프로젝트",
+    "자료",
+    "문서",
+    "내용",
+    "관련",
+    "확인",
+    "검토",
+    "논의",
+    "생성",
+    "결과",
+    "정리",
+    "계획",
+    "방안",
+}
+
+
 def hit_chunk_type(hit: Any) -> str:
     meta = getattr(hit, "metadata", {}) if isinstance(getattr(hit, "metadata", {}), dict) else {}
     return str(meta.get("chunk_type") or meta.get("section_type") or meta.get("block_type") or "").strip()
@@ -446,6 +468,81 @@ def prioritize_meeting_hits(hits: list[Any]) -> list[Any]:
         return priority, index
 
     return [hit for _, hit in sorted(enumerate(hits), key=sort_key)]
+
+
+def _preparation_relevance_text(req: PreparationRequest) -> str:
+    agenda_text = " ".join(str(item) for item in req.agendas)
+    ocr_text = str(getattr(req, "ocr_text", "") or "").strip()
+    if len(ocr_text) > 2000:
+        ocr_text = ocr_text[:2000]
+    return " ".join(
+        part.strip()
+        for part in [req.title, getattr(req, "project_context", ""), agenda_text, ocr_text]
+        if part and part.strip()
+    )
+
+
+def _relevance_tokens(text: Any) -> set[str]:
+    tokens = {
+        token.lower()
+        for token in re.findall(r"[0-9A-Za-z가-힣]{2,}", str(text or ""))
+    }
+    return {token for token in tokens if token not in PREPARATION_RELEVANCE_STOPWORDS}
+
+
+def _hit_relevance_text(hit: Any) -> str:
+    meta = getattr(hit, "metadata", {}) if isinstance(getattr(hit, "metadata", {}), dict) else {}
+    metadata_text = " ".join(
+        str(meta.get(key) or "")
+        for key in [
+            "meeting_topic",
+            "title",
+            "source",
+            "file_name",
+            "source_filename",
+        ]
+    )
+    return f"{metadata_text} {getattr(hit, 'document', '') or ''}"
+
+
+def _hit_relevance_score(hit: Any) -> float:
+    for attr in ["rerank_score", "dense_score", "score"]:
+        value = getattr(hit, attr, None)
+        if value is None:
+            continue
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def previous_meeting_hit_is_relevant(req: PreparationRequest, hit: Any) -> bool:
+    if os.getenv("PREPARATION_PREVIOUS_FILTER_ENABLED", "true").lower() != "true":
+        return True
+
+    min_score = float(
+        os.getenv(
+            "PREPARATION_PREVIOUS_MIN_RELEVANCE_SCORE",
+            os.getenv("PREPARATION_RAG_MIN_RELEVANCE_SCORE", "0"),
+        )
+    )
+    if min_score > 0 and _hit_relevance_score(hit) < min_score:
+        return False
+
+    min_overlap = int(os.getenv("PREPARATION_PREVIOUS_MIN_KEYWORD_OVERLAP", "1"))
+    if min_overlap <= 0:
+        return True
+
+    query_tokens = _relevance_tokens(_preparation_relevance_text(req))
+    if not query_tokens:
+        return True
+    hit_tokens = _relevance_tokens(_hit_relevance_text(hit))
+    return len(query_tokens & hit_tokens) >= min_overlap
+
+
+def filter_previous_meeting_hits(req: PreparationRequest, hits: list[Any]) -> list[Any]:
+    return [hit for hit in hits if previous_meeting_hit_is_relevant(req, hit)]
 
 
 def hit_to_preparation_document(hit: Any, category: str, *, project_id: Any = None) -> dict[str, Any]:
@@ -478,7 +575,6 @@ def hit_to_preparation_document(hit: Any, category: str, *, project_id: Any = No
                 "storage_key",
                 "s3_key",
                 "s3_url",
-                "source",
                 "file_name",
                 "source_filename",
                 "page",
@@ -529,7 +625,7 @@ def select_preparation_documents(req: PreparationRequest) -> dict[str, Any]:
 
     docs: dict[str, list[dict[str, Any]]] = {"previous_meetings": [], "internal_documents": []}
     seen = {"previous_meetings": set(), "internal_documents": set()}
-    previous_hits = prioritize_meeting_hits(previous_hits)
+    previous_hits = prioritize_meeting_hits(filter_previous_meeting_hits(req, previous_hits))
     for hit, output_key, category in [
         *[(hit, "previous_meetings", "previous_meeting") for hit in previous_hits],
         *[(hit, "internal_documents", "internal_document") for hit in internal_hits],
