@@ -39,7 +39,7 @@ const router = createBrowserRouter([
       { path: "/change-password", element: <ChangePasswordPage /> },
       { path: "/projects", element: <ProjectSelectPage /> },
       { path: "/projects/create", element: <ProjectCreatePage /> },
-      { path: "/", element: <Navigate to="/dashboard" replace /> },
+      { path: "/", element: <Navigate to="/login" replace /> },
       { path: "/dashboard", element: <KanbanBoardPage /> },
       { path: "/meetings", element: <MeetingListPage /> },
       { path: "/meetings/create", element: <MeetingCreatePage /> },
