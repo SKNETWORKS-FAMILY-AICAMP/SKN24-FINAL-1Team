@@ -5,6 +5,7 @@ import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
+  getKanbanColumnHeight,
   KANBAN_COLUMNS,
   KANBAN_PRIORITIES,
   toKanbanFormValues,
@@ -96,6 +97,7 @@ const getApiErrorMessage = (error: unknown) => {
   const data = (error as { response?: { data?: { error?: string; detail?: string } } }).response?.data;
   return data?.error || data?.detail || "Failed to load Jira board.";
 };
+
 
 export default function KanbanBoardPage() {
   const { projectId, projectName, user } = useAuth();
@@ -196,6 +198,11 @@ export default function KanbanBoardPage() {
   const boardWidth = useMemo(
     () => Math.max(BOARD_MIN_WIDTH, COLUMN_LEFT_START * 2 + boardColumns.length * COLUMN_STEP),
     [boardColumns.length],
+  );
+
+  const maxColumnHeight = useMemo(
+  () => Math.max(...boardColumns.map(col => getKanbanColumnHeight((tasksByColumn[col.id] || []).length))),
+  [boardColumns, tasksByColumn]
   );
 
   const assigneeOptions = useMemo(
@@ -408,6 +415,7 @@ export default function KanbanBoardPage() {
             draggingTaskId={draggingTask?.id ?? null}
             isDragActive={draggingTask !== null}
             canManage={canManageJira}
+            minHeight={maxColumnHeight}
           />
         ))}
       </section>
