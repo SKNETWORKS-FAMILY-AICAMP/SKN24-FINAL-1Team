@@ -115,10 +115,6 @@ def _status_name_map(access_token, cloud_id):
 
 
 def _get_jira_board_columns(access_token, cloud_id, project_key):
-    """
-    /rest/api/3/project/{key}/statuses 로 status category별 컬럼을 동적 생성.
-    read:jira-work 스코프만으로 동작.
-    """
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
 
     try:
@@ -135,50 +131,36 @@ def _get_jira_board_columns(access_token, cloud_id, project_key):
         print(f"[BOARD] statuses 응답 오류: {res.status_code} {res.text[:200]}")
         return DEFAULT_JIRA_COLUMNS
 
-    # status category별로 status_name / status_id 수집
-    # statusCategory.key: "new"(할 일) / "indeterminate"(진행중) / "done"(완료) / 기타
-    cat_data: dict[str, dict] = {}
+    # statusCategory 순서: new(할 일) → indeterminate(진행) → done(완료)
+    CATEGORY_ORDER = {"new": 0, "indeterminate": 1, "done": 2}
+
+    seen_ids = set()
+    statuses = []
+
     for issue_type in res.json():
         for st in issue_type.get("statuses", []):
-            cat = st.get("statusCategory", {})
-            cat_key = cat.get("key", "undefined")
-            cat_name = cat.get("name", cat_key)
-            if cat_key not in cat_data:
-                cat_data[cat_key] = {
-                    "category_name": cat_name,
-                    "status_names": [],
-                    "status_ids": [],
-                }
-            name = st.get("name", "")
             sid = str(st.get("id", ""))
-            if name and name not in cat_data[cat_key]["status_names"]:
-                cat_data[cat_key]["status_names"].append(name)
-            if sid and sid not in cat_data[cat_key]["status_ids"]:
-                cat_data[cat_key]["status_ids"].append(sid)
+            if not sid or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            cat_key = st.get("statusCategory", {}).get("key", "undefined")
+            sort_key = CATEGORY_ORDER.get(cat_key, 3)
+            statuses.append((sort_key, st.get("name", ""), sid))
 
-    # 고정 순서: new → indeterminate → done → 기타
-    CATEGORY_ORDER = ["new", "indeterminate", "done"]
-    CATEGORY_LABELS = {"new": "할 일", "indeterminate": "진행중", "done": "완료"}
+    statuses.sort(key=lambda x: x[0])
 
-    columns = []
-    for cat_key in CATEGORY_ORDER:
-        if cat_key in cat_data:
-            columns.append({
-                "id": f"jira-{cat_key}",
-                "label": CATEGORY_LABELS.get(cat_key, cat_data[cat_key]["category_name"]),
-                "status_ids": cat_data[cat_key]["status_ids"],
-                "status_names": cat_data[cat_key]["status_names"],
-            })
-    for cat_key, data in cat_data.items():
-        if cat_key not in CATEGORY_ORDER:
-            columns.append({
-                "id": f"jira-{cat_key}",
-                "label": data["category_name"],
-                "status_ids": data["status_ids"],
-                "status_names": data["status_names"],
-            })
+    columns = [
+        {
+            "id": f"status-{sid}",
+            "label": name,
+            "status_ids": [sid],
+            "status_names": [name],
+        }
+        for sort_key, name, sid in statuses
+        if name
+    ]
 
-    print(f"[BOARD] 동적 컬럼: {[(c['label'], c['status_names']) for c in columns]}")
+    print(f"[BOARD] 동적 컬럼: {[c['label'] for c in columns]}")
     return columns or DEFAULT_JIRA_COLUMNS
 
 
@@ -336,34 +318,40 @@ def project_jira_board(request, project_id):
 
         return Response(result, status=status.HTTP_201_CREATED)
 
-    try:
-        res = requests.post(
-            f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/search/jql",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
-            json={
-                "jql": f"project = {project.jira_project_key} ORDER BY created DESC",
-                "maxResults": 100,
-                "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"],
-            },
+    # 1) Agile 보드 이슈 조회 시도
+    raw_issues = []
+    board_res = requests.get(
+        f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/agile/1.0/board",
+        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        params={"projectKeyOrId": project.jira_project_key, "type": "kanban"},
+        timeout=10,
+    )
+
+    if board_res.ok and board_res.json().get("values"):
+        board_id = board_res.json()["values"][0]["id"]
+        agile_res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/agile/1.0/board/{board_id}/issue",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            params={"maxResults": 100, "fields": "summary,description,status,assignee,priority,duedate,created,parent,issuetype"},
             timeout=10,
         )
-    except requests.RequestException as exc:
-        return Response(
-            {"error": "Jira 업무 조회에 실패했습니다.", "detail": str(exc)},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
+        if agile_res.ok:
+            raw_issues = agile_res.json().get("issues", [])
 
-    if not res.ok:
-        return Response(
-            {"error": "Jira 업무 조회에 실패했습니다.", "detail": res.text},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
-
-    raw_issues = res.json().get("issues", [])
+    # 2) Agile API 실패 시 JQL 폴백
+    if not raw_issues:
+        try:
+            res = requests.post(
+                f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/search/jql",
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "Content-Type": "application/json"},
+                json={"jql": f"project = {project.jira_project_key} ORDER BY created DESC", "maxResults": 100, "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"]},
+                timeout=10,
+            )
+            if res.ok:
+                raw_issues = res.json().get("issues", [])
+        except requests.RequestException:
+            pass
+    
     print(f"[BOARD] JQL 결과 이슈 수: {len(raw_issues)}")
     issues_by_column = {column["id"]: [] for column in jira_columns}
     for issue in raw_issues:
