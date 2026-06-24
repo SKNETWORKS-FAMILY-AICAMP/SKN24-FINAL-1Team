@@ -91,8 +91,11 @@ export default function MeetingEmailPage() {
     const recipientIds = recipients.map((r) => Number(r.id));
     await sendMeetingSummaryEmail(meetingId, recipientIds);
     setSent(true);
-  } catch {
-    alert("요약 이메일 발송에 실패했습니다.");
+  } catch (error) {
+    const message =
+      (error as { response?: { data?: { error?: string; failed?: unknown[] } } }).response?.data?.error ||
+      "요약 이메일 발송에 실패했습니다. 이메일 발송 설정 또는 수신자 정보를 확인해주세요.";
+    alert(message);
   } finally {
     setSending(false);
   }

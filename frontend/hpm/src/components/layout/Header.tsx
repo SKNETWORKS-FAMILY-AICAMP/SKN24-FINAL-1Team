@@ -67,20 +67,10 @@ export default function Header() {
   useEffect(() => {
     if (!user || isAdmin) return;
 
-    let accessToken = "";
-    try {
-      const savedUser = JSON.parse(localStorage.getItem("hpm_user") || "null");
-      accessToken = savedUser?.access || "";
-    } catch {
-      accessToken = "";
-    }
-
-    if (!accessToken) return;
-
-    const url = new URL(`${import.meta.env.VITE_API_BASE_URL}/notifications/stream/`);
-    url.searchParams.set("token", accessToken);
-
-    const source = new EventSource(url.toString());
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
+    const source = new EventSource(`${apiBaseUrl}/notifications/stream/`, {
+      withCredentials: true,
+    });
     const handleNotification = (event: Event) => {
       try {
         const message = event as MessageEvent<string>;

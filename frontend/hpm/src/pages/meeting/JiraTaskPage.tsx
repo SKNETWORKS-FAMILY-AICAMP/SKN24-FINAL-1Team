@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getTaskList, registerJiraTasks, type Task } from "../../services/meeting";
 import StepBar from "../../components/meeting/StepBar";
+import useMeetingReviewNavigationGuard from "../../hooks/useMeetingReviewNavigationGuard";
 
 const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
@@ -30,6 +31,7 @@ export default function JiraTaskPage() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [showRetryModal, setShowRetryModal] = useState(false);
+  const allowReviewNavigation = useMeetingReviewNavigationGuard(!loading);
 
   useEffect(() => {
     setLoading(true);
@@ -76,6 +78,7 @@ export default function JiraTaskPage() {
         return;
       }
 
+      allowReviewNavigation();
       navigate(`/meetings/${meetingId}/archive`);
     } catch (error) {
       console.error("Jira 등록 실패:", error);
@@ -153,7 +156,10 @@ export default function JiraTaskPage() {
       <div className="mt-6 text-center">
         <button
           type="button"
-          onClick={() => navigate(`/meetings/${meetingId}/archive`)}
+          onClick={() => {
+            allowReviewNavigation();
+            navigate(`/meetings/${meetingId}/archive`);
+          }}
           className="text-sm text-[#969696] underline hover:text-[#555]"
         >
           Jira 태스크 등록을 건너뛰시겠습니까? 이후 자동 등록은 불가합니다.
@@ -182,6 +188,7 @@ export default function JiraTaskPage() {
                 type="button"
                 onClick={() => {
                   setShowRetryModal(false);
+                  allowReviewNavigation();
                   navigate(`/meetings/${meetingId}/archive`);
                 }}
                 className="flex-1 py-4 text-sm text-gray-700 transition hover:bg-gray-50"

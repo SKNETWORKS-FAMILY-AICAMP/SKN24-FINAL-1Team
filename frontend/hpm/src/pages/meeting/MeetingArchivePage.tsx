@@ -274,7 +274,10 @@ export default function MeetingArchivePage() {
     } catch (error) {
       console.error("요약 이메일 발송 실패:", error);
       setEmailSending(false);
-      alert("요약 이메일 발송에 실패했습니다.");
+      const message =
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+        "요약 이메일 발송에 실패했습니다. 이메일 발송 설정 또는 수신자 정보를 확인해주세요.";
+      alert(message);
     }
   };
 

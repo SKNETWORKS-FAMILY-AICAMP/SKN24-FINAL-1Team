@@ -105,7 +105,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
             }`}
           >
             <span>
-              <img src={dashboard} alt="" />
+              <img src={dashboard} alt="" className="h-[18px] w-[18px] object-contain" />
             </span>
             <span>대시보드</span>
           </button>

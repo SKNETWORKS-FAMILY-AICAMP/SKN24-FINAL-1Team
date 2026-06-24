@@ -5,7 +5,6 @@ import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
-  getKanbanColumnHeight,
   KANBAN_COLUMNS,
   KANBAN_PRIORITIES,
   toKanbanFormValues,
@@ -95,7 +94,7 @@ const jiraBoardToTasks = (board: ProjectJiraBoard, columns: KanbanColumnConfig[]
 
 const getApiErrorMessage = (error: unknown) => {
   const data = (error as { response?: { data?: { error?: string; detail?: string } } }).response?.data;
-  return data?.error || data?.detail || "Failed to load Jira board.";
+  return data?.error || data?.detail || "Jira 칸반을 불러오지 못했습니다.";
 };
 
 
@@ -198,11 +197,6 @@ export default function KanbanBoardPage() {
   const boardWidth = useMemo(
     () => Math.max(BOARD_MIN_WIDTH, COLUMN_LEFT_START * 2 + boardColumns.length * COLUMN_STEP),
     [boardColumns.length],
-  );
-
-  const maxColumnHeight = useMemo(
-  () => Math.max(...boardColumns.map(col => getKanbanColumnHeight((tasksByColumn[col.id] || []).length))),
-  [boardColumns, tasksByColumn]
   );
 
   const assigneeOptions = useMemo(
@@ -374,7 +368,7 @@ export default function KanbanBoardPage() {
   };
 
   return (
-    <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[80px] pt-[64px] font-pretendard">
+    <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[32px] pt-[32px] font-pretendard">
       <section
         className="relative transition-all duration-200 ease-out"
         style={{ height: boardHeight, width: boardWidth }}
@@ -399,10 +393,10 @@ export default function KanbanBoardPage() {
         ) : null}
         {!canManageJira && !loading && !error ? (
           <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#969696]">
-            Jira 미연동 계정은 칸반 조회만 가능합니다.
+            Jira 연동 또는 Jira 프로젝트 접근 권한이 필요합니다.
           </div>
         ) : null}
-        {boardColumns.map((column) => (
+        {!loading && !error ? boardColumns.map((column) => (
           <KanbanColumn
             key={column.id}
             column={column}
@@ -415,9 +409,8 @@ export default function KanbanBoardPage() {
             draggingTaskId={draggingTask?.id ?? null}
             isDragActive={draggingTask !== null}
             canManage={canManageJira}
-            minHeight={maxColumnHeight}
           />
-        ))}
+        )) : null}
       </section>
 
       {modal ? (

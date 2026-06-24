@@ -151,7 +151,6 @@ export default function MeetingDetailPage() {
   }, [elapsed, meeting?.status, isPaused]);
 
   useEffect(() => {
-    if (isCreator) return;
     if (!meeting || meeting.status === "finished") return;
 
     const interval = setInterval(async () => {
@@ -196,7 +195,7 @@ export default function MeetingDetailPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [meeting?.status, meeting?.is_paused, meetingId, isCreator, ctxMeetingId, ctxIsPaused, startRecording, pauseRecording, resumeRecording]);
+  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, pauseRecording, resumeRecording, navigate]);
 
   useEffect(() => {
     if (meeting) {
@@ -257,14 +256,15 @@ export default function MeetingDetailPage() {
     `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   const handleStart = async () => {
+    let stream: MediaStream | null = null;
     try {
-      await startMeeting(meetingId);
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
 
       chunksRef.current = [];
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
+
+      await startMeeting(meetingId);
       recorder.start();
 
       mediaRef.current = recorder;
@@ -273,10 +273,8 @@ export default function MeetingDetailPage() {
       setElapsed(0);
     } catch (err) {
       console.error("회의 시작 중 에러 발생:", err);
-      alert("회의 시작에 실패했습니다. (데모 환경에서는 가상으로 회의를 시작합니다.)");
-      startRecording(meetingId);
-      setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
-      setElapsed(0);
+      stream?.getTracks().forEach((track) => track.stop());
+      alert("마이크 권한이 필요합니다. 브라우저에서 마이크 권한을 허용한 뒤 다시 시작해주세요.");
     }
   };
 
@@ -316,7 +314,6 @@ export default function MeetingDetailPage() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     setEndLoading(true);
-    stopRecording();
 
     try {
       let audioFile: File | undefined;
@@ -331,12 +328,20 @@ export default function MeetingDetailPage() {
         audioFile = new File([blob], `meeting-${meetingId}.webm`, { type: "audio/webm" });
       }
 
+      if (!audioFile || audioFile.size === 0) {
+        throw new Error("녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.");
+      }
+
       await endMeeting(meetingId, audioFile);
+      stopRecording();
       navigate(`/meetings/${meetingId}/speaker-mapping`);
     } catch (err) {
       console.error("회의 종료 에러:", err);
-      alert("회의가 종료되었습니다. (발화자 매핑 화면으로 이동합니다.)");
-      navigate(`/meetings/${meetingId}/speaker-mapping`);
+      const message =
+        (err as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error ||
+        (err as Error).message ||
+        "회의 종료 또는 STT 처리에 실패했습니다.";
+      alert(message);
     } finally {
       setEndLoading(false);
     }
