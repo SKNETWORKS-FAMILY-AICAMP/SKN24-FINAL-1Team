@@ -155,7 +155,12 @@ def transcribe_audio_bytes(
             pass
 
 
-def _run_stt_job(job_id: str, file_bytes: bytes, filename: str, params: dict[str, Any]) -> None:
+def _run_stt_job(
+    job_id: str,
+    file_bytes: bytes,
+    filename: str,
+    params: dict[str, Any],
+) -> None:
     _update_stt_job(job_id, status="running", step="transcribe", started_at=_now_ts())
     started = time.perf_counter()
     try:

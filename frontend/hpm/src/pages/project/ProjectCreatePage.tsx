@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import api from "../../services/meeting";
 import jiraLogo from "../../assets/jira.png"; 
 
-const STEPS = ["Jira 계정 연동", "프로젝트 선택", "구성원 초대", "프로젝트 생성"];
+const STEPS = ["Jira 계정 연동", "프로젝트 선택", "구성원 추가", "프로젝트 생성"];
 
 function StepBar({ current }: { current: number }) {
   return (
@@ -27,7 +27,7 @@ function StepBar({ current }: { current: number }) {
   );
 }
 
-interface UserOption { users_id: number; name: string; work: string; email?: string; }
+interface UserOption { users_id: number; name: string; email?: string; rank_name?: string; dept_name?: string; }
 interface JiraProject { key: string; name: string; }
 
 export default function ProjectCreatePage() {
@@ -109,7 +109,7 @@ export default function ProjectCreatePage() {
       if (currentUserId) {
         const owner =
           users.find((u) => u.users_id === currentUserId) ||
-          { users_id: currentUserId, name: user?.name || "-", work: "", email: user?.email };
+          { users_id: currentUserId, name: user?.name || "-", email: user?.email };
 
         setMembers((current) =>
           current.some((member) => member.users_id === owner.users_id)
@@ -151,7 +151,7 @@ export default function ProjectCreatePage() {
     ? allUsers.filter(u =>
         u.name.includes(searchName) ||
         (u.email || "").includes(searchName) ||
-        (u.work || "").includes(searchName)
+        (u.dept_name || "").includes(searchName)
       )
     : [];
 
@@ -376,7 +376,7 @@ export default function ProjectCreatePage() {
                             key={m.users_id}
                             className="inline-flex items-center gap-1 bg-[#ECECF2] rounded-lg px-3 py-1 text-sm text-gray-700"
                           >
-                            {m.name}
+                            {m.name}{m.rank_name ? ` ${m.rank_name}` : ""}
                             {m.users_id !== currentUserId ? (
                             <button
                               onClick={() => handleRemoveMember(m.users_id)}
@@ -407,10 +407,10 @@ export default function ProjectCreatePage() {
                               ${isSelected ? "bg-[#ECECF2]" : "bg-white hover:bg-gray-50"}`}
                           >
                             <p className="text-sm font-medium text-gray-800">
-                              {u.name}{u.email ? `(${u.email})` : ""}
+                              {u.name}{u.rank_name ? ` ${u.rank_name}` : ""}({u.email})
                             </p>
-                            {u.work && (
-                              <p className="text-xs text-gray-400 mt-0.5">{u.work}</p>
+                            {u.dept_name && (
+                              <p className="text-xs text-gray-400 mt-0.5">{u.dept_name}</p>
                             )}
                           </div>
                         );
