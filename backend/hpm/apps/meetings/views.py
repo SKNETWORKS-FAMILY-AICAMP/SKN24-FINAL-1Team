@@ -289,6 +289,34 @@ def meeting_list(request):
         return Response(MeetingSerializer(qs, many=True).data)
 
     data = request.data
+
+    title = data.get("title", "")
+    if not title or len(title) > 30:
+        return Response({"error": "회의 주제는 1~30자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    location = data.get("location", "")
+    if not location or len(location) > 50:
+        return Response({"error": "장소는 1~50자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    from django.utils import timezone
+    meeting_at = data.get("meeting_at")
+    if not meeting_at:
+        return Response({"error": "회의 일정을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+    if timezone.datetime.fromisoformat(str(meeting_at)).replace(tzinfo=timezone.utc) <= timezone.now():
+        return Response({"error": "현재 시각 이후의 일정만 등록할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+    participants = data.get("participants", [])
+    if len(participants) < 1:  
+        return Response({"error": "참여자를 최소 1명 이상 추가해야 합니다. (생성자 포함 2명)"}, status=status.HTTP_400_BAD_REQUEST)
+
+ 
+    invalid_users = Users.objects.filter(users_id__in=participants, status__in=[1, 2])
+    if invalid_users.exists():
+        names = ", ".join(u.name for u in invalid_users)
+        return Response({"error": f"휴직 또는 퇴사 처리된 사용자는 참여자로 추가할 수 없습니다: {names}"}, status=status.HTTP_400_BAD_REQUEST)
     try:
         from apps.projects.models import Project
         project = Project.objects.get(pk=data.get("project_id", 1))
@@ -346,15 +374,20 @@ def meeting_detail(request, meeting_id):
         return Response(data)
 
     if request.method == "DELETE":
+       
+        if meeting.creator_id != request.auth["user_id"]:
+            return Response({"error": "회의 생성자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+     
+        if meeting.meeting_status != Meeting.MeetingStatus.SCHEDULED:
+            return Response({"error": "진행 전인 회의만 삭제할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+      
+        if meeting.minutes_status == "approved":
+            return Response({"error": "회의록이 확정된 회의는 삭제할 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
         meeting.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    # special_note 제거 (모델에 없음) → title, location만 수정 가능
-    for field in ["title", "location"]:
-        if field in request.data:
-            setattr(meeting, field, request.data[field])
-    meeting.save()
-    return Response(MeetingSerializer(meeting).data)
 
 
 # ── 기초 안건 ────────────────────────────────────────────────────
@@ -725,16 +758,12 @@ def task_list(request, meeting_id):
     return Response(MeetingTaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
 
-@api_view(["PATCH", "DELETE"])
+@api_view(["PATCH"])
 def task_detail(request, meeting_id, task_id):
     try:
         task = MeetingTask.objects.get(meeting_task_id=task_id, meeting_id=meeting_id)
     except MeetingTask.DoesNotExist:
         return Response({"error": "태스크를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-
-    if request.method == "DELETE":
-        task.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
 
     old_meeting_users_id = task.meeting_users_id
 
@@ -765,7 +794,7 @@ def register_jira_tasks(request, meeting_id):
     if not meeting.project.jira_project_key:
         return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # 요청자 user_id로 Jira 토큰 확인
+
     user_id = request.data.get("user_id") or request.auth.get("user_id")
     if not user_id:
         return Response({"error": "user_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)

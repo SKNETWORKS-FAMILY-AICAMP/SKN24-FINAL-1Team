@@ -194,8 +194,11 @@ def project_list(request):
 
         return Response([_project_card_data(project) for project in qs])
 
-    # POST - 프로젝트 생성
+
     data = request.data
+    member_ids = data.get("member_ids", [])
+    if not member_ids:
+        return Response({"error": "구성원을 최소 1명 이상 추가해야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
     jira_project_key = data.get("jira_project_key") or None
     if jira_project_key and Project.objects.filter(jira_project_key=jira_project_key).exists():
         return Response(
@@ -212,10 +215,10 @@ def project_list(request):
         project_name=data.get("project_name", ""),
         jira_project_key=jira_project_key,
     )
-    # 생성자를 구성원으로 자동 추가
+    
     ProjectUsers.objects.get_or_create(project=project, user=owner)
-
-    # 초대 구성원 추가
+    
+    
     for uid in data.get("member_ids", []):
         try:
             if uid == owner.users_id:

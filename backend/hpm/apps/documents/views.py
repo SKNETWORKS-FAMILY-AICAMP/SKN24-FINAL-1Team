@@ -106,6 +106,9 @@ def document_delete(request, project_id, document_id):
     except Document.DoesNotExist:
         return Response({"error": "문서를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
+    if doc.uploader_id != project_user.id:
+        return Response({"error": "문서를 업로드한 사용자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
     if os.path.exists(doc.path):
         os.remove(doc.path)
     doc.delete()
