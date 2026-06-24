@@ -177,6 +177,34 @@ def _format_stt_time(value):
     return f"[{seconds // 60:02d}:{seconds % 60:02d}]"
 
 
+def _parse_formatted_transcript(text):
+    parsed = []
+    line_pattern = re.compile(
+        r"^\[(?P<time>\d{1,2}:\d{2}(?::\d{2})?)\]\s*(?P<speaker>[^:：]+)[:：]\s*(?P<content>.*)$"
+    )
+
+    for line in str(text or "").splitlines():
+        line = line.strip()
+        if not line or line in {"[참석자]", "[발화 원문]"} or line.startswith("- "):
+            continue
+
+        match = line_pattern.match(line)
+        if not match:
+            continue
+
+        content = match.group("content").strip()
+        if not content:
+            continue
+
+        parsed.append({
+            "speaker": match.group("speaker").strip(),
+            "time": f"[{match.group('time')}]",
+            "content": content,
+        })
+
+    return parsed
+
+
 def _stt_utterance_items(result, full_text):
     if not isinstance(result, dict):
         result = {}
@@ -204,11 +232,18 @@ def _stt_utterance_items(result, full_text):
 
             speaker = (
                 item.get("speaker")
+                or item.get("speaker_id")
                 or item.get("speaker_label")
                 or item.get("label")
-                or f"SPEAKER_{index + 1:02d}"
+                or f"SPEAKER_{index:02d}"
             )
-            time_value = item.get("time") or item.get("start") or item.get("start_time") or ""
+            time_value = item.get("time")
+            if time_value in (None, ""):
+                time_value = item.get("start")
+            if time_value in (None, ""):
+                time_value = item.get("start_time")
+            if time_value is None:
+                time_value = ""
             normalized.append({
                 "speaker": str(speaker),
                 "time": str(time_value) if str(time_value).startswith("[") else _format_stt_time(time_value),
@@ -222,7 +257,11 @@ def _stt_utterance_items(result, full_text):
     if not text:
         return []
 
-    return [{"speaker": "SPEAKER_01", "time": "[00:00]", "content": text}]
+    parsed = _parse_formatted_transcript(text)
+    if parsed:
+        return parsed
+
+    return [{"speaker": "SPEAKER_00", "time": "[00:00]", "content": text}]
 
 
 def _replace_record_utterances(record, result, full_text):
@@ -453,8 +492,13 @@ def end_meeting(request, meeting_id):
             for chunk in audio_file.chunks():
                 f.write(chunk)
 
-        stt_base_url = settings.RUNPOD_STT_BASE_URL
-        core_base_url = settings.RUNPOD_CORE_BASE_URL
+        stt_base_url = getattr(settings, "RUNPOD_STT_BASE_URL", "") or settings.RUNPOD_BASE_URL
+        if not stt_base_url:
+            return Response(
+                {"error": "STT 서버 주소가 설정되지 않았습니다.", "meeting_id": meeting_id},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
         try:
             with open(file_path, "rb") as f:
                 stt_res = requests.post(f"{stt_base_url}/transcribe/jobs", files={"file": f}, timeout=600)
@@ -488,8 +532,8 @@ def end_meeting(request, meeting_id):
             else:
                 raise Exception("STT 작업 대기 시간 초과")
 
-            result = stt_data.get("result")
-            if result is None:
+            result = stt_data.get("result", {})
+            if not isinstance(result, dict):
                 result = {}
             full_text = result.get("text", "")
 
@@ -530,7 +574,7 @@ def _create_tasks_from_todo(meeting, todo_list):
         except (ValueError, TypeError):
             due_date = None
 
-        # owner(SPEAKER_01 등)로 SpeakerMapping 조회 → meeting_users FK 연결
+        # owner(SPEAKER_00 등)로 SpeakerMapping 조회 → meeting_users FK 연결
         owner_label = todo.get("owner", "")
         meeting_users = None
         if owner_label:

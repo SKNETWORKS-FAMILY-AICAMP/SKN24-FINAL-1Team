@@ -119,7 +119,10 @@ RUNPOD_OCR_BASE_URL = os.getenv("RUNPOD_OCR_BASE_URL", "")
 
 RUNPOD_BASE_URL = RUNPOD_CORE_BASE_URL
 RUNPOD_MINUTES_URL = f"{RUNPOD_CORE_BASE_URL}/generate"
-RAG_SERVER_URL = os.getenv("RAG_SERVER_URL", f"{RUNPOD_CORE_BASE_URL}/chat" if RUNPOD_CORE_BASE_URL else "http://127.0.0.1:8088/chat")
+RAG_SERVER_URL = os.getenv(
+    "RAG_SERVER_URL",
+    f"{RUNPOD_CORE_BASE_URL}/chat" if RUNPOD_CORE_BASE_URL else "http://127.0.0.1:8088/chat",
+)
 
 # Jira 연동 (옵션)
 JIRA_BASE_URL    = os.getenv("JIRA_BASE_URL", "")
