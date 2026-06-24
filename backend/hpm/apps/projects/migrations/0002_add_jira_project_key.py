@@ -1,4 +1,4 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
@@ -7,10 +7,4 @@ class Migration(migrations.Migration):
         ('projects', '0001_initial'),
     ]
 
-    operations = [
-        migrations.AddField(
-            model_name='project',
-            name='jira_project_key',
-            field=models.CharField(blank=True, max_length=50, null=True, verbose_name='Jira 프로젝트 키'),
-        ),
-    ]
+    operations = []

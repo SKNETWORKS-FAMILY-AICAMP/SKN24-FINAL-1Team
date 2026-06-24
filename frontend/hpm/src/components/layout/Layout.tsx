@@ -30,13 +30,13 @@ export default function Layout() {
     return <Navigate to="/change-password" replace />;
   }
 
-  const noLayoutPaths = ["/login", "/projects", "/projects/create"];
+  const noLayoutPaths = ["/login", "/projects", "/admin/users", "/projects/create"];
   const isNoLayout =
     noLayoutPaths.includes(location.pathname) ||
     (isChangePasswordPage && (requiresInitialPasswordChange || !user));
 
   if (isNoLayout) {
-      const showHeader = location.pathname === "/projects";
+      const showHeader = location.pathname === "/projects" || location.pathname === "/admin/users";
       return (
         <div className="w-full min-h-screen bg-[#F6F5FA] flex flex-col">
           {showHeader && <Header />}
