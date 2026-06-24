@@ -42,7 +42,7 @@ export default function MeetingUploadPage() {
     const file = incoming[0];
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     if (!["jpg", "jpeg", "png", "pdf"].includes(ext)) {
-      setErrorMessage("지원되지 않는 파일 형식입니다. (JPG, JPEG, PNG, PDF만 가능)");
+      setErrorMessage("지원되지 않는 파일 형식입니다.\n(JPG, JPEG, PNG, PDF만 가능)");
       setShowErrorModal(true);
       return;
     }
@@ -118,7 +118,7 @@ export default function MeetingUploadPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed">{errorMessage}</p>
+              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">{errorMessage}</p>
             </div>
             <div className="border-t border-gray-200">
               <button
@@ -143,7 +143,7 @@ export default function MeetingUploadPage() {
       <div className="bg-[#F4F5F8] rounded-[12px] border border-[#E6E1E6] p-6">
         <div className="flex gap-6 min-h-[300px]">
 
-          {/* 드롭존 (하얀색 유지) */}
+          {/* 드롭존 */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}

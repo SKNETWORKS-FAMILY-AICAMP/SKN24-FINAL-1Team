@@ -32,7 +32,7 @@ export default function MeetingDetailPage() {
   const { showAgenda = true, showPrepMaterial = true, status: navStatus } =
     (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; status?: string }) ?? {};
 
-  const { meetingId: ctxMeetingId, startTime: ctxStartTime, startRecording, stopRecording } = useRecording();
+  const { meetingId: ctxMeetingId, startTime: ctxStartTime, isPaused: ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording } = useRecording();
 
   const isReturningToRecording = ctxMeetingId === meetingId && ctxStartTime !== null;
   const initialStatus = isReturningToRecording || navStatus === "in_progress" ? "in_progress" : "scheduled";
@@ -50,6 +50,9 @@ export default function MeetingDetailPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [endLoading, setEndLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [showShortRecordingModal, setShowShortRecordingModal] = useState(false);
+  const [showTenMinWarningModal, setShowTenMinWarningModal] = useState(false);
+  const [showMaxTimeModal, setShowMaxTimeModal] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(true);
   const [materialsOpen, setMaterialsOpen] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -70,6 +73,8 @@ export default function MeetingDetailPage() {
   const chatRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const tenMinWarnedRef = useRef(false);
+  const maxTimeTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (initialStatus === "in_progress" && ctxMeetingId !== meetingId) {
@@ -131,7 +136,20 @@ export default function MeetingDetailPage() {
     };
   }, [meeting?.status, isPaused]);
 
-  // Poll meeting status for participants to sync start/end/pause in real-time
+  useEffect(() => {
+    if (meeting?.status !== "in_progress" || isPaused) return;
+
+    if (elapsed >= 6600 && !tenMinWarnedRef.current) {
+      tenMinWarnedRef.current = true;
+      setShowTenMinWarningModal(true);
+    }
+
+    if (elapsed >= 7200 && !maxTimeTriggeredRef.current) {
+      maxTimeTriggeredRef.current = true;
+      setShowMaxTimeModal(true);
+    }
+  }, [elapsed, meeting?.status, isPaused]);
+
   useEffect(() => {
     if (isCreator) return;
     if (!meeting || meeting.status === "finished") return;
@@ -151,6 +169,15 @@ export default function MeetingDetailPage() {
           }
 
           if (data.status === "in_progress") {
+            // 참석자: 녹음 컨텍스트 동기화
+            if (ctxMeetingId !== meetingId) {
+              startRecording(meetingId, data.elapsed_seconds ?? 0);
+            } else if (data.is_paused && !ctxIsPaused) {
+              pauseRecording(data.elapsed_seconds ?? 0);
+            } else if (!data.is_paused && ctxIsPaused) {
+              resumeRecording();
+            }
+
             if (data.is_paused) {
               setElapsed(data.elapsed_seconds ?? 0);
             } else if (data.elapsed_seconds !== undefined) {
@@ -169,16 +196,14 @@ export default function MeetingDetailPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [meeting?.status, meeting?.is_paused, meetingId, isCreator]);
+  }, [meeting?.status, meeting?.is_paused, meetingId, isCreator, ctxMeetingId, ctxIsPaused, startRecording, pauseRecording, resumeRecording]);
 
-  // Sync local isPaused state with backend meeting.is_paused value
   useEffect(() => {
     if (meeting) {
       setIsPaused(meeting.is_paused || false);
     }
   }, [meeting?.is_paused]);
 
-  // Refetch meeting details when page is shown (bfcache restore) or tab visibility changes
   useEffect(() => {
     const refetch = async () => {
       try {
@@ -262,6 +287,7 @@ export default function MeetingDetailPage() {
 
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPaused(true);
+    pauseRecording(elapsed);
 
     try {
       await pauseMeeting(meetingId);
@@ -277,6 +303,7 @@ export default function MeetingDetailPage() {
 
     timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     setIsPaused(false);
+    resumeRecording();
 
     try {
       await resumeMeeting(meetingId);
@@ -285,7 +312,7 @@ export default function MeetingDetailPage() {
     }
   };
 
-  const handleEnd = async () => {
+  const doEndMeeting = async () => {
     if (timerRef.current) clearInterval(timerRef.current);
 
     setEndLoading(true);
@@ -313,6 +340,14 @@ export default function MeetingDetailPage() {
     } finally {
       setEndLoading(false);
     }
+  };
+
+  const handleEnd = async () => {
+    if (elapsed < 300) {
+      setShowShortRecordingModal(true);
+      return;
+    }
+    await doEndMeeting();
   };
 
   const sendChat = async () => {
@@ -425,6 +460,76 @@ export default function MeetingDetailPage() {
   const hasPrepMaterial = Boolean(meeting.meeting_document);
 
   return (
+    <>
+      {/* 5분 미만 종료 확인 모달 */}
+      {showShortRecordingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+                {"5분 미만의 녹음은 회의록이\n생성되지 않습니다. 종료하시겠습니까?"}
+              </p>
+            </div>
+            <div className="border-t border-gray-200 flex">
+              <button
+                onClick={() => setShowShortRecordingModal(false)}
+                className="flex-1 py-4 text-sm text-gray-700 hover:bg-gray-50 transition border-r border-gray-200"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => { setShowShortRecordingModal(false); doEndMeeting(); }}
+                className="flex-1 py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10분 후 종료 예정 경고 모달 */}
+      {showTenMinWarningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+                {"회의 녹음 최대 시간은 2시간입니다.\n10분 후 회의가 종료될 예정입니다."}
+              </p>
+            </div>
+            <div className="border-t border-gray-200">
+              <button
+                onClick={() => setShowTenMinWarningModal(false)}
+                className="w-full py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 최대 시간 도달 자동 종료 모달 */}
+      {showMaxTimeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+            <div className="px-8 py-10 text-center">
+              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+                {"회의가 최대 시간에 도달하였습니다.\n회의를 종료합니다."}
+              </p>
+            </div>
+            <div className="border-t border-gray-200">
+              <button
+                onClick={() => { setShowMaxTimeModal(false); doEndMeeting(); }}
+                className="w-full py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     <div className="flex w-full h-[calc(100vh-112px)] overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         <div
@@ -872,5 +977,6 @@ export default function MeetingDetailPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
