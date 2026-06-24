@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DocumentManagementPanel from "../../components/document/DocumentManagementPanel";
+import UploadWarningModal from "../../components/document/UploadWarningModal";
 import {
   ALL_DOCUMENT_FILTER,
-  EMPTY_UPLOAD_DATE_FILTER,
+  PERIOD_DAYS,
 } from "../../constants/documentManagement";
 import { useAuth } from "../../context/AuthContext";
 import { deleteDocument, getDocuments } from "../../services/documents";
@@ -42,7 +43,11 @@ export default function DocumentManagementPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [query, setQuery] = useState("");
   const [creatorFilter, setCreatorFilter] = useState(ALL_DOCUMENT_FILTER);
-  const [uploadDateFilter, setUploadDateFilter] = useState(EMPTY_UPLOAD_DATE_FILTER);
+  const [uploadPeriod, setUploadPeriod] = useState("전체");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [sortOrder, setSortOrder] = useState("전체");
+  const [showDeletePermissionModal, setShowDeletePermissionModal] = useState(false);
 
   const loadDocuments = useCallback(async () => {
     if (!projectId) {
@@ -63,34 +68,62 @@ export default function DocumentManagementPage() {
   }, [loadDocuments]);
 
   const creators = useMemo(
-    () => [ALL_DOCUMENT_FILTER, ...Array.from(new Set(documents.map((item) => item.creator)))],
-    [documents],
-  );
-
-  const uploadDates = useMemo(
-    () => Array.from(new Set(documents.map((item) => item.uploadedAt))).sort().reverse(),
+    () => [
+      ALL_DOCUMENT_FILTER,
+      ...Array.from(
+        new Set(
+          documents.map((item) =>
+            item.creatorRank ? `${item.creator}(${item.creatorRank})` : item.creator,
+          ),
+        ),
+      ),
+    ],
     [documents],
   );
 
   const filteredDocuments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return documents.filter((item) => {
+    const filtered = documents.filter((item) => {
       const matchesQuery =
         !normalizedQuery ||
         [item.name, item.creator, item.department, item.uploadedAt]
           .join(" ")
           .toLowerCase()
           .includes(normalizedQuery);
+
+      const creatorLabel = item.creatorRank
+        ? `${item.creator}(${item.creatorRank})`
+        : item.creator;
       const matchesCreator =
-        creatorFilter === ALL_DOCUMENT_FILTER || item.creator === creatorFilter;
-      const matchesDate =
-        uploadDateFilter === EMPTY_UPLOAD_DATE_FILTER ||
-        item.uploadedAt === uploadDateFilter;
+        creatorFilter === ALL_DOCUMENT_FILTER || creatorLabel === creatorFilter;
+
+      const matchesDate = (() => {
+        if (startDate || endDate) {
+          const d = new Date(item.uploadedAt);
+          if (startDate && d < new Date(startDate)) return false;
+          if (endDate && d > new Date(endDate)) return false;
+          return true;
+        }
+        if (uploadPeriod === "전체") return true;
+        const days = PERIOD_DAYS[uploadPeriod];
+        if (!days) return true;
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        return new Date(item.uploadedAt) >= cutoff;
+      })();
 
       return matchesQuery && matchesCreator && matchesDate;
     });
-  }, [creatorFilter, documents, query, uploadDateFilter]);
+
+    if (sortOrder === "내림차순") {
+      filtered.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+    } else if (sortOrder === "오름차순") {
+      filtered.sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt));
+    }
+
+    return filtered;
+  }, [creatorFilter, documents, query, uploadPeriod, startDate, endDate, sortOrder]);
 
   const allVisibleSelected =
     filteredDocuments.length > 0 &&
@@ -125,6 +158,16 @@ export default function DocumentManagementPage() {
   const deleteSelected = async () => {
     if (!projectId || selectedIds.size === 0) return;
 
+    const selectedDocs = documents.filter((item) => selectedIds.has(item.id));
+    const currentUserId = user?.users_id ?? user?.user_id;
+    const hasUnauthorized = selectedDocs.some(
+      (doc) => doc.uploaderId !== undefined && doc.uploaderId !== currentUserId,
+    );
+    if (hasUnauthorized) {
+      setShowDeletePermissionModal(true);
+      return;
+    }
+
     await Promise.all(
       Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
     );
@@ -140,6 +183,12 @@ export default function DocumentManagementPage() {
 
   return (
     <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
+      {showDeletePermissionModal && (
+        <UploadWarningModal
+          message="삭제 권한이 없습니다"
+          onClose={() => setShowDeletePermissionModal(false)}
+        />
+      )}
       <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[47px]">
         <DocumentManagementPanel
           allVisibleSelected={allVisibleSelected}
@@ -148,8 +197,10 @@ export default function DocumentManagementPage() {
           documents={filteredDocuments}
           query={query}
           selectedIds={selectedIds}
-          uploadDateFilter={uploadDateFilter}
-          uploadDates={uploadDates}
+          uploadPeriod={uploadPeriod}
+          startDate={startDate}
+          endDate={endDate}
+          sortOrder={sortOrder}
           onCreatorFilterChange={setCreatorFilter}
           onDeleteSelected={() => void deleteSelected()}
           onDownloadSelected={downloadSelected}
@@ -157,7 +208,11 @@ export default function DocumentManagementPage() {
           onQueryChange={setQuery}
           onToggleAllVisible={toggleAllVisible}
           onToggleSelected={toggleSelected}
-          onUploadDateFilterChange={setUploadDateFilter}
+          onUploadPeriodChange={setUploadPeriod}
+          onStartDateChange={setStartDate}
+          onEndDateChange={setEndDate}
+          onSortOrderChange={setSortOrder}
+          onDownloadDocument={downloadDocumentFile}
         />
       </section>
     </div>
