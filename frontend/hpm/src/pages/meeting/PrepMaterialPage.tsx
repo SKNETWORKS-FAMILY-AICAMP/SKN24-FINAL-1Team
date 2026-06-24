@@ -35,12 +35,13 @@ export default function PrepMaterialPage() {
   const [currentState, setCurrentState] = useState("");
   const [regulations, setRegulations] = useState("");
   const [expected, setExpected] = useState("");
+  const [sources, setSources] = useState<{ document_id: number; title: string; file_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-
+ 
     const loadData = async () => {
       try {
         const prep = await getPrepMaterial(meetingId);
@@ -50,6 +51,7 @@ export default function PrepMaterialPage() {
             setCurrentState(prep.project_status || "");
             setRegulations(prep.rule || "");
             setExpected(prep.effect || "");
+            setSources(prep.sources || []);
             setLoading(false);
           } else {
             const generated = await generatePrepMaterial(meetingId);
@@ -58,6 +60,7 @@ export default function PrepMaterialPage() {
               setCurrentState(generated.project_status || "");
               setRegulations(generated.rule || "");
               setExpected(generated.effect || "");
+              setSources(generated.sources || []);
               setLoading(false);
             }
           }
@@ -69,13 +72,14 @@ export default function PrepMaterialPage() {
           setCurrentState(DUMMY.currentState);
           setRegulations(DUMMY.regulations);
           setExpected(DUMMY.expected);
+          setSources([]);
           setLoading(false);
         }
       }
     };
-
+ 
     loadData();
-
+ 
     return () => {
       active = false;
     };
@@ -103,7 +107,7 @@ export default function PrepMaterialPage() {
         { label: "프로젝트 현재 상태", value: currentState },
         { label: "관련 규정 및 제약사항", value: regulations },
         { label: "회의 종료 후 기대 결과", value: expected },
-        { label: "참조 문서 목록", value: DUMMY.references.map(r => `- ${r.label}`).join("\n") },
+        { label: "출처", value: sources && sources.length > 0 ? sources.map(r => `- ${r.title}`).join("\n") : "- 출처가 없습니다." },
       ];
 
       const wrapper = document.createElement("div");
@@ -269,16 +273,31 @@ export default function PrepMaterialPage() {
           </div>
         ))}
 
-        {/* 참조 문서 목록*/}
+        {/* 출처 */}
         <div>
-          <p className="text-[14px] text-[#141414] font-bold mb-2">참조 문서 목록</p>
-          <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-1">
-            {DUMMY.references.map((ref, i) => (
-              <p key={i} className="text-[13px]">
-                <span className="text-[#141414]">- {ref.label} </span>
-                <span className="text-[#623FB5] hover:underline cursor-pointer">더보기</span>
-              </p>
-            ))}
+          <p className="text-[14px] text-[#141414] font-bold mb-2">출처</p>
+          <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-2">
+            {sources && sources.length > 0 ? (
+              sources.map((src, i) => (
+                <div key={i} className="flex items-center gap-2 text-[13px]">
+                  <span className="text-[#767676]">- {src.title}</span>
+                  {src.file_url ? (
+                    <a
+                      href={src.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                    >
+                      더보기
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 font-medium select-none text-[12px]">더보기 없음</span>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+            )}
           </div>
         </div>
       </div>

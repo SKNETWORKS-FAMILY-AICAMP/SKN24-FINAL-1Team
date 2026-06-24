@@ -104,8 +104,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
-    "http://192.168.56.1:5173",
-    "http://192.168.56.1:5174",
 ]
 
 # ── 미디어 파일 ───────────────────────────────────────────────────
@@ -117,6 +115,7 @@ RUNPOD_CORE_BASE_URL = os.getenv("RUNPOD_CORE_BASE_URL", os.getenv("RUNPOD_BASE_
 RUNPOD_STT_BASE_URL = os.getenv("RUNPOD_STT_BASE_URL", os.getenv("RUNPOD_BASE_URL", ""))
 RUNPOD_OCR_BASE_URL = os.getenv("RUNPOD_OCR_BASE_URL", "")
 
+RUNPOD_CHAT_URL = RUNPOD_CORE_BASE_URL
 RUNPOD_BASE_URL = RUNPOD_CORE_BASE_URL
 RUNPOD_MINUTES_URL = f"{RUNPOD_CORE_BASE_URL}/generate"
 RAG_SERVER_URL = os.getenv(
@@ -142,7 +141,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME' : timedelta(hours= 1),
+    'ACCESS_TOKEN_LIFETIME' : timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME' : timedelta(days=1),
 }
 

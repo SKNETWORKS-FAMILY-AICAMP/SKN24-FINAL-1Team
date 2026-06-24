@@ -1092,6 +1092,9 @@ def _parse_prep_markdown(text):
 
 
 def _compile_prep_markdown(prep):
+    effect = prep.effect or ""
+    if "\n\n__RAW_SOURCES__\n" in effect:
+        effect = effect.split("\n\n__RAW_SOURCES__\n", 1)[0]
     lines = [
         "### 회의 준비 자료",
         "",
@@ -1105,7 +1108,7 @@ def _compile_prep_markdown(prep):
         prep.rule or "",
         "",
         "#### 4. 회의 종료 후 기대 결과",
-        prep.effect or ""
+        effect
     ]
     return "\n".join(lines)
 
@@ -1145,7 +1148,13 @@ def prep_material_detail(request, meeting_id):
         prep.purpose = data.get("purpose", prep.purpose)
         prep.project_status = data.get("project_status", prep.project_status)
         prep.rule = data.get("rule", prep.rule)
-        prep.effect = data.get("effect", prep.effect)
+        
+        new_effect = data.get("effect", prep.effect)
+        if prep.effect and "\n\n__RAW_SOURCES__\n" in prep.effect:
+            raw_sources_part = prep.effect.split("\n\n__RAW_SOURCES__\n", 1)[1]
+            if "\n\n__RAW_SOURCES__\n" not in new_effect:
+                new_effect = f"{new_effect}\n\n__RAW_SOURCES__\n{raw_sources_part}"
+        prep.effect = new_effect
         prep.save()
 
     meeting.meeting_document = _compile_prep_markdown(prep)
@@ -1153,6 +1162,7 @@ def prep_material_detail(request, meeting_id):
 
     serializer = MeetingPreparationSerializer(prep, context={"request": request})
     return Response(serializer.data)
+
 
 
 @api_view(["POST"])
@@ -1213,31 +1223,66 @@ def generate_prep_material(request, meeting_id):
         return Response({"error": f"준비자료 생성 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     result_data = resp_data.get("result", {})
-    text = result_data.get("text") or result_data.get("document") or ""
 
-    parsed = _parse_prep_markdown(text)
+    import json
+    effect_val = result_data.get("effect") or ""
+    raw_sources_str = json.dumps(result_data.get("sources", []), ensure_ascii=False)
 
     prep, created = MeetingPreparation.objects.get_or_create(meeting=meeting)
-    prep.purpose = parsed["purpose"]
-    prep.project_status = parsed["project_status"]
-    prep.rule = parsed["rule"]
-    prep.effect = parsed["effect"]
+    prep.purpose = result_data.get("purpose") or ""
+    prep.project_status = result_data.get("project_status") or ""
+    prep.rule = result_data.get("rule") or ""
+    prep.effect = f"{effect_val}\n\n__RAW_SOURCES__\n{raw_sources_str}"
     prep.save()
 
     meeting.meeting_document = _compile_prep_markdown(prep)
     meeting.save(update_fields=["meeting_document"])
 
+    from apps.documents.models import Document
     PreparationDocument.objects.filter(preparation=prep).delete()
     for source in result_data.get("sources", []):
         try:
-            doc_id = source.get("document_id")
+            raw_doc_id = source.get("document_id")
+            doc_id = None
+            if raw_doc_id not in (None, "", "null", "None"):
+                try:
+                    doc_id = int(raw_doc_id)
+                except (ValueError, TypeError):
+                    pass
+
+            if doc_id is None:
+                title = source.get("title", "")
+                import re
+                def normalize_filename(name):
+                    name_part = re.split(r'\s+p\.', name, flags=re.IGNORECASE)[0]
+                    name_part = re.split(r'\s+page', name_part, flags=re.IGNORECASE)[0]
+                    name_part = re.sub(r'\.[a-zA-Z0-9]+$', '', name_part)
+                    return re.sub(r'[\s_\-\(\)]+', '', name_part).lower()
+
+                target_norm = normalize_filename(title)
+                doc = None
+                for d in Document.objects.filter(project=meeting.project):
+                    if normalize_filename(d.title) == target_norm:
+                        doc = d
+                        break
+
+                if not doc:
+                    for d in Document.objects.filter(project=meeting.project):
+                        d_norm = normalize_filename(d.title)
+                        if target_norm and d_norm and (target_norm in d_norm or d_norm in target_norm):
+                            doc = d
+                            break
+
+                if doc:
+                    doc_id = doc.document_id
+
             if doc_id is not None:
                 PreparationDocument.objects.create(
                     preparation=prep,
-                    document_id=int(doc_id)
+                    document_id=doc_id
                 )
-        except (ValueError, TypeError):
-            pass
+        except Exception as e:
+            print("Error saving preparation document:", e)
 
     serializer = MeetingPreparationSerializer(prep, context={"request": request})
     print(serializer.data)
@@ -1308,6 +1353,10 @@ def check_prep_status(request, meeting_id):
         response.raise_for_status()
         response.encoding = "utf-8"
         resp_data = response.json()
+        resp_data = response.json()
+
+        print("=== RUNPOD RESPONSE ===")
+        print(resp_data)
     except Exception as e:
         import traceback
         print("❌ 준비자료 생성 에러 발생:")
@@ -1315,31 +1364,62 @@ def check_prep_status(request, meeting_id):
         return Response({"error": f"준비자료 생성 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
     result_data = resp_data.get("result", {})
-    text = result_data.get("text") or result_data.get("document") or ""
-
-    parsed = _parse_prep_markdown(text)
 
     prep, created = MeetingPreparation.objects.get_or_create(meeting=meeting)
-    prep.purpose = parsed["purpose"]
-    prep.project_status = parsed["project_status"]
-    prep.rule = parsed["rule"]
-    prep.effect = parsed["effect"]
+    prep.purpose = result_data.get("purpose") or ""
+    prep.project_status = result_data.get("project_status") or ""
+    prep.rule = result_data.get("rule") or ""
+    prep.effect = result_data.get("effect") or ""
     prep.save()
 
     meeting.meeting_document = _compile_prep_markdown(prep)
     meeting.save(update_fields=["meeting_document"])
 
+    from apps.documents.models import Document
     PreparationDocument.objects.filter(preparation=prep).delete()
     for source in result_data.get("sources", []):
         try:
-            doc_id = source.get("document_id")
+            raw_doc_id = source.get("document_id")
+            doc_id = None
+            if raw_doc_id not in (None, "", "null", "None"):
+                try:
+                    doc_id = int(raw_doc_id)
+                except (ValueError, TypeError):
+                    pass
+
+            if doc_id is None:
+                title = source.get("title", "")
+                import re
+                def normalize_filename(name):
+                    name_part = re.split(r'\s+p\.', name, flags=re.IGNORECASE)[0]
+                    name_part = re.split(r'\s+page', name_part, flags=re.IGNORECASE)[0]
+                    name_part = re.sub(r'\.[a-zA-Z0-9]+$', '', name_part)
+                    return re.sub(r'[\s_\-\(\)]+', '', name_part).lower()
+
+                target_norm = normalize_filename(title)
+                doc = None
+                for d in Document.objects.filter(project=meeting.project):
+                    if normalize_filename(d.title) == target_norm:
+                        doc = d
+                        break
+
+                if not doc:
+                    for d in Document.objects.filter(project=meeting.project):
+                        d_norm = normalize_filename(d.title)
+                        if target_norm and d_norm and (target_norm in d_norm or d_norm in target_norm):
+                            doc = d
+                            break
+
+                if doc:
+                    doc_id = doc.document_id
+
             if doc_id is not None:
                 PreparationDocument.objects.create(
                     preparation=prep,
-                    document_id=int(doc_id)
+                    document_id=doc_id
                 )
-        except (ValueError, TypeError):
-            pass
+        except Exception as e:
+            print("Error saving preparation document:", e)
 
     serializer = MeetingPreparationSerializer(prep, context={"request": request})
     print(serializer.data)

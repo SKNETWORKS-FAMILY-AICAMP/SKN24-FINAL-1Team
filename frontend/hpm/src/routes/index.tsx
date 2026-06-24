@@ -23,6 +23,7 @@ import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 import UserManagementPage from "../pages/admins/UserManagementPage";
+import NotFoundPage from "../pages/error/NotFoundPage";
 
 
 
@@ -66,6 +67,8 @@ const router = createBrowserRouter([
       { path: "/admin/users", element: <UserManagementPage /> },
     ],
   },
+  { path: "/admin/users", element: <UserManagementPage /> },
+  { path: "*", element: <NotFoundPage /> },
 ]);
 
 export default router;
