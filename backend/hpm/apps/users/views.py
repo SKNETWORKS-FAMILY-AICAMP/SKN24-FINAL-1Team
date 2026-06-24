@@ -170,6 +170,15 @@ def login(request):
 
     return response
 
+# 로그아웃
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def logout(request):
+    response = Response({"message": "로그아웃 성공"})
+    response.delete_cookie("access", path="/")
+    response.delete_cookie("refresh", path="/")
+    return response
+
 # 로그인 유지
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

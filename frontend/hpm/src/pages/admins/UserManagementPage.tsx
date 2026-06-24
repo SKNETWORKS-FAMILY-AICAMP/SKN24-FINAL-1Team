@@ -330,7 +330,7 @@ export default function UserManagementPage() {
               </button>
               {/* 로그아웃 */}
               <button
-                onClick={() => { logout(); navigate("/login"); }}
+                onClick={async () => { await logout(); navigate("/login"); }}
                 className="flex items-center gap-3 w-full px-2 py-2 text-[14px] text-[#0A0A0A] hover:bg-[#F6F5FA] rounded-lg transition-colors"
               >
                 <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

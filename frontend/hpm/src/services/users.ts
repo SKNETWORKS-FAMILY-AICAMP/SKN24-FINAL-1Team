@@ -11,6 +11,11 @@ export const loginUser = async (credentials: { email: string; password: string }
   return response.data;
 };
 
+export const logoutUser = async () => {
+  const response = await api.post("/users/logout/");
+  return response.data;
+};
+
 export const getMe = async (): Promise<User> => {
   const response = await api.get<User>("/users/me/");
   console.log(response.data)
