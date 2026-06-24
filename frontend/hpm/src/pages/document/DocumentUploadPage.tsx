@@ -7,11 +7,16 @@ import {
   DOCUMENT_MAX_UPLOAD_SIZE,
 } from "../../constants/documentManagement";
 import { useAuth } from "../../context/AuthContext";
-import { getUploadConfig, uploadDocuments } from "../../services/documents";
+import {
+  getDocumentIngestStatus,
+  getUploadConfig,
+  uploadDocuments,
+} from "../../services/documents";
 import type { UploadConfig } from "../../services/documents";
 import type { UploadedDocument } from "../../types/documentManagement";
 
 const getExtension = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_MESSAGES = {
   entry: "최대 파일 10개만 업로드 가능합니다",
@@ -68,6 +73,26 @@ export default function DocumentUploadPage() {
     setUploadMessage("");
   };
 
+  const waitForDocumentIngest = async (jobId: string) => {
+    if (!projectId) return;
+
+    const maxAttempts = 120;
+    for (let attempts = 1; attempts <= maxAttempts; attempts += 1) {
+      setUploadMessage(`내부문서 적재 중입니다. (${attempts}/${maxAttempts})`);
+      await delay(3000);
+
+      const status = await getDocumentIngestStatus(projectId, jobId);
+      if (status.status === "completed") {
+        return;
+      }
+      if (status.status === "failed") {
+        throw new Error(status.error || "내부문서 적재에 실패했습니다.");
+      }
+    }
+
+    throw new Error("내부문서 적재 시간이 초과되었습니다.");
+  };
+
   const completeUpload = async () => {
     if (!projectId) {
       setUploadMessage("프로젝트를 먼저 선택해야 합니다.");
@@ -87,9 +112,20 @@ export default function DocumentUploadPage() {
         return;
       }
 
+      if (result.ingest_error) {
+        setUploadMessage(`문서는 저장됐지만 내부문서 적재 요청에 실패했습니다. ${result.ingest_error}`);
+        return;
+      }
+
+      if (result.ingest_job_id) {
+        await waitForDocumentIngest(result.ingest_job_id);
+      }
+
       navigate("/documents");
-    } catch {
-      setUploadMessage("문서 업로드에 실패했습니다.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "문서 업로드에 실패했습니다.";
+      setUploadMessage(message);
+      return;
     } finally {
       setSubmitting(false);
     }
