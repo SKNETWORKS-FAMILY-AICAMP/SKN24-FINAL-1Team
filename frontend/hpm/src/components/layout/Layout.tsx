@@ -1,12 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import * as DESIGN from "../../constants/design";
+import GlobalLoginModal from "../ui/GlobalLoginModal";
+import { useAuth } from "../../context/AuthContext";
+import { useAuthStore } from "../../constants/auth";
 
 export default function Layout() {
+  const { user } = useAuth();
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { openLoginModal, closeLoginModal } = useAuthStore();
+
+  useEffect(() => {
+    if (!user && location.pathname !== "/login") {
+      openLoginModal();
+    }
+    if (location.pathname === "/login") {
+      closeLoginModal();
+    }
+  }, [user, location.pathname, openLoginModal, closeLoginModal]);
 
   const noLayoutPaths = ["/login", "/change-password", "/projects", "/projects/create"];
   const isNoLayout = noLayoutPaths.includes(location.pathname);
@@ -19,6 +33,7 @@ export default function Layout() {
           <div className="flex-1">
             <Outlet />
           </div>
+          <GlobalLoginModal />
         </div>
       );
     }
@@ -34,6 +49,7 @@ export default function Layout() {
             </div>
           </main>
         </div>
+        <GlobalLoginModal />
       </div>
   );
 }

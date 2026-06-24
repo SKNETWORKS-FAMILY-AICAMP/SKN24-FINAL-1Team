@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import type { User, AuthContextType } from "../types/user";
-import { getMe } from "../services/users";
+import { getMe, logoutUser } from "../services/users";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -42,14 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (u: User) => {
     setUser(normalizeUser(u));
+    localStorage.setItem("hpm_user", JSON.stringify(u));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      console.error("Backend logout failed:", error);
+    }
     setUser(null);
     setProjectId(null);
     setProjectName("");
     localStorage.removeItem("hpm_project_id");
     localStorage.removeItem("hpm_project_name");
+    localStorage.removeItem("hpm_user");
   };
 
   const selectProject = (id: number, name: string) => {

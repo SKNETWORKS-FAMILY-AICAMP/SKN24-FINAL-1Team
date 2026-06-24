@@ -171,8 +171,8 @@ export default function Header() {
     navigate("/change-password");
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setOpenPopover(null);
     navigate("/login");
   };
