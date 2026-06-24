@@ -377,12 +377,14 @@ def _canonical_chunk_payload(chunk: dict[str, Any], metadata: dict[str, Any]) ->
     )
 
     canonical = {
+        "doc_id": _first_value(combined_metadata, "doc_id"),
         "document_id": _first_value(combined_metadata, "document_id"),
         "project_id": _first_value(combined_metadata, "project_id"),
         "title": title,
         "page": page,
         "chunk_index": chunk_index,
         "source_path": source_path,
+        "source_sha256": _first_value(combined_metadata, "source_sha256"),
         "source_type": _first_value(combined_metadata, "source_type", "document_type", "doc_type"),
         "viewer_type": _first_value(combined_metadata, "viewer_type"),
         "viewer_id": _first_value(combined_metadata, "viewer_id", "document_id"),

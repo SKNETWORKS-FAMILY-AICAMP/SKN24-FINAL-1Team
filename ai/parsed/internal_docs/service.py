@@ -119,6 +119,30 @@ def _file_metadata(base_metadata: dict[str, Any], upload: UploadedDocument, save
     return metadata
 
 
+def _int_like(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    text = str(value).strip()
+    return text if text.isdigit() else None
+
+
+def _normalize_document_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(metadata)
+    normalized.setdefault("source_type", "internal_document")
+    normalized.setdefault("doc_type", "internal_document")
+    normalized.setdefault("document_type", "internal_document")
+    normalized.setdefault("viewer_type", "document")
+
+    document_id = _int_like(normalized.get("document_id"))
+    viewer_id = _int_like(normalized.get("viewer_id"))
+    if document_id and not viewer_id:
+        normalized["viewer_id"] = document_id
+    elif viewer_id and not document_id:
+        normalized["document_id"] = viewer_id
+
+    return normalized
+
+
 def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path, metadata: dict[str, Any]) -> dict[str, Any]:
     raw_dir.mkdir(parents=True, exist_ok=True)
     pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -188,10 +212,7 @@ def ingest_uploaded_documents(
     metadata = _metadata_from_json(metadata_json)
     if project_id not in (None, ""):
         metadata["project_id"] = str(project_id)
-    metadata.setdefault("source_type", "internal_document")
-    metadata.setdefault("doc_type", "internal_document")
-    metadata.setdefault("document_type", "internal_document")
-    metadata.setdefault("viewer_type", "document")
+    metadata = _normalize_document_metadata(metadata)
     collection_name = collection or qdrant_collection_for_project(metadata.get("project_id"))
     started = time.perf_counter()
     work_root = Path(os.getenv("INTERNAL_DOCS_WORK_ROOT", tempfile.gettempdir())).resolve()
