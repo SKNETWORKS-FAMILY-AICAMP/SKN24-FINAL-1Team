@@ -1,7 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import logo from "../../assets/login/logo.png";
-import { useAuth } from "../../context/AuthContext";
 import Dropdown from "../../components/ui/Dropdown";
 import Checkbox from "../../components/ui/Checkbox";
 import Pagination from "../../components/ui/Pagination";
@@ -67,9 +65,6 @@ const INIT_ERRORS: RegisterErrors = {
 const USERS_PER_PAGE = 10;
 
 export default function UserManagementPage() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
   // ── 사용자 목록 (CRUD 반영) ──────────────────────────────────────
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -94,7 +89,6 @@ export default function UserManagementPage() {
   });
 
   // ── 모달 표시 여부 ────────────────────────────────────────────────
-  const [showAdminMenu, setShowAdminMenu]       = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal]   = useState(false);
   const [showSaveModal, setShowSaveModal]       = useState(false);
@@ -103,18 +97,6 @@ export default function UserManagementPage() {
   // ── 등록 폼 ─────────────────────────────────────────────────────
   const [registerForm, setRegisterForm] = useState<RegisterForm>(INIT_REGISTER);
   const [registerErrors, setRegisterErrors] = useState<RegisterErrors>(INIT_ERRORS);
-
-  // ── 관리자 메뉴 외부 클릭 닫기 ────────────────────────────────────
-  const adminMenuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
-        setShowAdminMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
 
   useEffect(() => {
   setIsLoading(true);
@@ -319,56 +301,8 @@ export default function UserManagementPage() {
   return (
     <div className="min-h-screen bg-[#F6F5FA] flex flex-col">
 
-      {/* 헤더 */}
-      <header className="h-16 bg-white border-b border-[#E5E5E5] flex items-center justify-between px-8">
-        <img src={logo} alt="logo" className="w-9 h-9 object-contain" />
 
-        {/* 관리자 드롭다운 */}
-        <div ref={adminMenuRef} className="relative">
-          <button
-            onClick={() => setShowAdminMenu((prev) => !prev)}
-            className="flex items-center gap-2 px-4 py-2 border border-[#E5E5E5] rounded-full bg-white text-[15px] text-[#0A0A0A] hover:bg-[#F6F5FA] transition-colors"
-          >
-            {user?.name ?? "관리자"}님
-            <svg className={`w-4 h-4 transition-transform ${showAdminMenu ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          {showAdminMenu && (
-            <div className="absolute right-0 mt-2 w-[260px] bg-white rounded-2xl shadow-xl z-50 p-4">
-              {/* 프로필 카드 */}
-              <div className="bg-[#F6F5FA] rounded-xl px-4 py-4 mb-4">
-                <p className="text-[15px] font-bold text-[#0A0A0A]">{user?.name ?? "관리자"}</p>
-                <p className="text-[13px] text-[#623FB5] underline mt-1 break-all">{user?.email ?? ""}</p>
-              </div>
-              {/* 구분선 */}
-              <div className="h-px bg-[#E5E5E5] mb-3" />
-              {/* 비밀번호 변경 */}
-              <button
-                onClick={() => { setShowAdminMenu(false); navigate("/change-password"); }}
-                className="flex items-center gap-3 w-full px-2 py-2 text-[14px] text-[#0A0A0A] hover:bg-[#F6F5FA] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                비밀번호 변경
-              </button>
-              {/* 로그아웃 */}
-              <button
-                onClick={async () => { await logout(); navigate("/login"); }}
-                className="flex items-center gap-3 w-full px-2 py-2 text-[14px] text-[#0A0A0A] hover:bg-[#F6F5FA] rounded-lg transition-colors"
-              >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                로그아웃
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-
-      <div className="flex flex-1 p-4 max-w-[1680px] mx-auto w-full">
+      <div className="flex flex-1 p-4 w-full mx-auto w-full">
         <div className="flex-1 bg-[#FDFDFD] rounded-2xl flex gap-[14px] p-6 overflow-hidden">
 
         {/* 왼쪽: 사용자 목록 */}

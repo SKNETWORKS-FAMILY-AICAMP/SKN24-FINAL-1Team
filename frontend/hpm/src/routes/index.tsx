@@ -66,7 +66,6 @@ const router = createBrowserRouter([
       { path: "/admin/users", element: <UserManagementPage /> },
     ],
   },
-  { path: "/admin/users", element: <UserManagementPage /> },
 ]);
 
 export default router;

@@ -18,6 +18,7 @@ import HeaderProfilePopover from "./HeaderProfilePopover";
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const isAdmin = user?.role === "ADMIN";
   const [openPopover, setOpenPopover] = useState<HeaderPopover>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -37,7 +38,7 @@ export default function Header() {
   }, []);
 
   const loadNotifications = useCallback(async () => {
-    if (!user) {
+    if (!user || isAdmin) {
       setNotifications([]);
       setNotificationsLoading(false);
       return;
@@ -52,7 +53,7 @@ export default function Header() {
     } finally {
       setNotificationsLoading(false);
     }
-  }, [user]);
+  }, [isAdmin, user]);
 
   useEffect(() => {
     void loadNotifications();
@@ -64,7 +65,7 @@ export default function Header() {
   }, [user?.users_id]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || isAdmin) return;
 
     let accessToken = "";
     try {
@@ -95,7 +96,7 @@ export default function Header() {
       source.removeEventListener("notification", handleNotification);
       source.close();
     };
-  }, [addNotification, user]);
+  }, [addNotification, isAdmin, user]);
 
   const loadProfile = useCallback(async () => {
     if (!user?.users_id) {
@@ -116,7 +117,7 @@ export default function Header() {
   }, [user]);
 
   const loadJiraStatus = useCallback(async () => {
-    if (!user) {
+    if (!user || isAdmin) {
       setJiraConnected(null);
       setJiraStatusLoading(false);
       return null;
@@ -133,7 +134,7 @@ export default function Header() {
     } finally {
       setJiraStatusLoading(false);
     }
-  }, [user]);
+  }, [isAdmin, user]);
 
   const unreadNotificationCount = useMemo(
     () => notifications.filter((notification) => !notification.is_read).length,
@@ -149,8 +150,10 @@ export default function Header() {
         void loadNotifications();
       }
       if (popover === "profile" && next === "profile") {
-        void loadProfile();
-        void loadJiraStatus();
+        if (!isAdmin) {
+          void loadProfile();
+          void loadJiraStatus();
+        }
       }
       return next;
     });
@@ -181,32 +184,34 @@ export default function Header() {
     <header
       className={`w-full h-16 border-b border-[#E6E1E6] ${DESIGN.BACKGROUND_COLORS.white}`}
     >
-      <div className="flex h-16 w-full max-w-[1504px] items-center justify-end mx-auto px-6">
+      <div className={`flex h-16 w-full items-center justify-end px-6 ${isAdmin ? "" : "max-w-[1504px] mx-auto"}`}>
         <div className={`flex ${DESIGN.GAP_SIZES["xl"]}`}>
-          <div className={`relative flex ${DESIGN.BORDER_COLORS.lightGray} w-[40px] h-[40px] items-center justify-center border-rad rounded-full`}>
-            <button
-              type="button"
-              aria-label="알림"
-              onClick={() => togglePopover("notifications")}
-              className="relative flex size-full items-center justify-center"
-            >
-              <img src={bell} alt="" />
-              {unreadNotificationCount > 0 ? (
-                <span className="absolute -right-[4px] -top-[5px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#F04438] px-[4px] text-[10px] font-semibold leading-none text-[#FFFDFD]">
-                  {unreadNotificationLabel}
-                </span>
+          {!isAdmin ? (
+            <div className={`relative flex ${DESIGN.BORDER_COLORS.lightGray} w-[40px] h-[40px] items-center justify-center border-rad rounded-full`}>
+              <button
+                type="button"
+                aria-label="알림"
+                onClick={() => togglePopover("notifications")}
+                className="relative flex size-full items-center justify-center"
+              >
+                <img src={bell} alt="" />
+                {unreadNotificationCount > 0 ? (
+                  <span className="absolute -right-[4px] -top-[5px] flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#F04438] px-[4px] text-[10px] font-semibold leading-none text-[#FFFDFD]">
+                    {unreadNotificationLabel}
+                  </span>
+                ) : null}
+              </button>
+              {openPopover === "notifications" ? (
+                <HeaderNotificationPopover
+                  loading={notificationsLoading}
+                  notifications={notifications}
+                  setNotifications={setNotifications}
+                  onClose={() => setOpenPopover(null)}
+                />
               ) : null}
-            </button>
-            {openPopover === "notifications" ? (
-              <HeaderNotificationPopover
-                loading={notificationsLoading}
-                notifications={notifications}
-                setNotifications={setNotifications}
-                onClose={() => setOpenPopover(null)}
-              />
-            ) : null}
-          </div>
-          <div className={`relative flex items-center justify-center ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.GAP_SIZES["xl"]} rounded-full ${DESIGN.PADDING_X_SIZES.sm}`}>
+            </div>
+          ) : null}
+          <div className={`relative flex h-[40px] items-center justify-center ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.GAP_SIZES["xl"]} rounded-full ${DESIGN.PADDING_X_SIZES.sm}`}>
             <p>{user?.name ? `${user.name}님` : ""}</p>
             <button
               type="button"
@@ -226,6 +231,8 @@ export default function Header() {
                 loading={profileLoading}
                 jiraConnected={jiraConnected === true}
                 jiraStatusLoading={jiraStatusLoading}
+                showProfileInfo={!isAdmin}
+                showJiraConnect={!isAdmin}
                 onJiraConnect={handleJiraConnect}
                 onChangePassword={handleChangePassword}
                 onLogout={handleLogout}
