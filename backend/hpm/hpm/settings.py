@@ -113,10 +113,16 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ── 외부 서비스 URL (환경에 맞게 수정) ───────────────────────────
-RUNPOD_BASE_URL=os.getenv("RUNPOD_BASE_URL", "")
-RUNPOD_MINUTES_URL=f"{RUNPOD_BASE_URL}/generate"
-RAG_SERVER_URL=os.getenv("RAG_SERVER_URL", "http://127.0.0.1:8088/chat")
-RUNPOD_OCR_BASE_URL=os.getenv("RUNPOD_OCR_BASE_URL", "")
+RUNPOD_CORE_BASE_URL = os.getenv("RUNPOD_CORE_BASE_URL", os.getenv("RUNPOD_BASE_URL", ""))
+RUNPOD_STT_BASE_URL = os.getenv("RUNPOD_STT_BASE_URL", os.getenv("RUNPOD_BASE_URL", ""))
+RUNPOD_OCR_BASE_URL = os.getenv("RUNPOD_OCR_BASE_URL", "")
+
+RUNPOD_BASE_URL = RUNPOD_CORE_BASE_URL
+RUNPOD_MINUTES_URL = f"{RUNPOD_CORE_BASE_URL}/generate"
+RAG_SERVER_URL = os.getenv(
+    "RAG_SERVER_URL",
+    f"{RUNPOD_CORE_BASE_URL}/chat" if RUNPOD_CORE_BASE_URL else "http://127.0.0.1:8088/chat",
+)
 
 # Jira 연동 (옵션)
 JIRA_BASE_URL    = os.getenv("JIRA_BASE_URL", "")
