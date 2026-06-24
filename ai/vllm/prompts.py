@@ -107,7 +107,7 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
 제공된 근거를 바탕으로 회의 참석자가 바로 읽고 회의에 들어갈 수 있는 '회의 준비 자료'를 작성하십시오.
 
 [핵심 규칙]
-1. 제공된 자료([프로젝트 히스토리], [내부 문서], [외부 뉴스], [OCR 참고 텍스트])에 명시된 내용만 사용합니다. 사실을 추정하거나 지어내지 마십시오.
+1. 제공된 자료([프로젝트 히스토리], [내부 문서], [외부 뉴스])에 명시된 내용만 사용합니다. 사실을 추정하거나 지어내지 마십시오.
 2. 문서에서 확인되지 않거나 누락된 정보는 반드시 "확인 필요"로 표기합니다.
 3. 주어진 [회의 주제], [프로젝트 누적 맥락], [OCR 참고 텍스트], [안건]과 직접 관련 없는 정보는 제외합니다.
 4. 프로젝트 누적 맥락은 배경 판단용으로만 사용합니다. 입력 문장을 그대로 복사하지 말고, 이번 회의 준비에 필요한 현재 상태, 결정사항, 미완료 쟁점만 재구성합니다.
@@ -130,7 +130,6 @@ def preparation_messages(req: PreparationRequest, selected_documents: dict[str, 
 - 프로젝트 히스토리: {json.dumps(selected_documents.get("previous_meetings", []), ensure_ascii=False)}
 - 내부 문서: {json.dumps(selected_documents.get("internal_documents", []), ensure_ascii=False)}
 - 외부 뉴스: {json.dumps(selected_documents.get("external_news", []), ensure_ascii=False)}
-- OCR 참고 텍스트: {req.ocr_context or "없음"}
 
 [출력 형식]
 반드시 아래 JSON 스키마만 반환하십시오.

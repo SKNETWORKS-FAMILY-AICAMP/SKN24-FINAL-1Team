@@ -33,7 +33,6 @@ class PreparationRequest(BaseModel):
     participants: list[dict[str, str]] = Field(default_factory=list)
     agendas: list[str] = Field(default_factory=list)
     max_previous_meetings: int = 5
-    ocr_context: str = ""
 
 
 class ChatRequest(BaseModel):
