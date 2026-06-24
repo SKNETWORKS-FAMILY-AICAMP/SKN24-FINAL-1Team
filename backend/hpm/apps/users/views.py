@@ -1,6 +1,7 @@
 import hashlib
 import base64
 import json
+import re
 
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -261,8 +262,12 @@ def user_detail(request, users_id):
     # 비밀번호 변경
     new_pw = request.data.get("password")
     if new_pw:
-        if len(new_pw) < 6:
-            return Response({"error": "password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+        if not (8 <= len(new_pw) <= 16):
+            return Response({"error": "비밀번호는 8~16자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(re.findall(r'\d', new_pw)) < 2:
+            return Response({"error": "비밀번호에 숫자가 2개 이상 포함되어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if not re.search(r'[!@#$%^&*?~]', new_pw):
+            return Response({"error": "비밀번호에 특수문자(!@#$%^&*?~)가 1개 이상 포함되어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         if user.account_status != 0:
             current_pw = request.data.get("current_password", "")
@@ -274,8 +279,8 @@ def user_detail(request, users_id):
         user.password = _hash_pw(new_pw)
         user.account_status = 1
 
-    user.save()
-    return Response(UserSerializer(user).data)
+        user.save()
+        return Response(UserSerializer(user).data)
 
 # ── Step 1: Jira 로그인 시작 ───────────────────────────────────────────────
 # GET /api/jira/start/
@@ -676,10 +681,39 @@ def admin_user_list(request):
 
         if not all([emp_no, name, email, dept_name, rank_name, work]):
             return Response({"error": "모든 필수 항목을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not re.match(r'^\d{4}-[A-Z]+-\d+$', emp_no):
+            return Response({"error": "사원번호 형식이 올바르지 않습니다. (예: 2026-HR-3)"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(email) > 50:
+            return Response({"error": "이메일은 50자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        local, _, domain = email.partition("@")
+        if not re.match(r'^[a-zA-Z0-9]+$', local):
+            return Response({"error": "이메일 @ 앞은 영문과 숫자만 가능합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(name) > 30:
+            return Response({"error": "이름은 30자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(dept_name) > 50:
+            return Response({"error": "부서명은 50자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(rank_name) > 5:
+            return Response({"error": "직급은 5자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+       
+        if len(work) > 30:
+            return Response({"error": "직무는 30자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
         if Users.objects.filter(emp_no=emp_no).exists():
             return Response({"error": "이미 존재하는 사원번호입니다."}, status=status.HTTP_400_BAD_REQUEST)
         if Users.objects.filter(email=email).exists():
             return Response({"error": "이미 존재하는 이메일입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        
         
         dept, _ = Dept.objects.get_or_create(dept_name=dept_name)
         rank, _ = Rank.objects.get_or_create(rank_name=rank_name)
