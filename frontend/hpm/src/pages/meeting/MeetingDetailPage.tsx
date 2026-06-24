@@ -768,11 +768,11 @@ export default function MeetingDetailPage() {
                           />
                         </div>
 
-                        {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 && (
-                          <div>
-                            <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
-                            <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                              {prepMaterial.sources.map((src, i) => (
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                          <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                            {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 ? (
+                              prepMaterial.sources.map((src, i) => (
                                 <div key={i} className="flex items-center gap-2 text-[13px]">
                                   <span className="text-[#767676]">- {src.title}</span>
                                   {src.file_url ? (
@@ -788,10 +788,12 @@ export default function MeetingDetailPage() {
                                     <span className="text-gray-400 font-medium select-none">더보기 없음</span>
                                   )}
                                 </div>
-                              ))}
-                            </div>
+                              ))
+                            ) : (
+                              <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+                            )}
                           </div>
-                        )}
+                        </div>
 
                         <div className="flex justify-end gap-2 pt-2">
                           <button
@@ -843,11 +845,11 @@ export default function MeetingDetailPage() {
                               </div>
                             </div>
 
-                            {prepMaterial.sources && prepMaterial.sources.length > 0 && (
-                              <div>
-                                <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
-                                <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                                  {prepMaterial.sources.map((src, i) => (
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                                {prepMaterial.sources && prepMaterial.sources.length > 0 ? (
+                                  prepMaterial.sources.map((src, i) => (
                                     <div key={i} className="flex items-center gap-2 text-[13px]">
                                       <span className="text-[#141414]">- {src.title}</span>
                                       {src.file_url ? (
@@ -863,10 +865,12 @@ export default function MeetingDetailPage() {
                                         <span className="text-gray-400 font-medium select-none">더보기 없음</span>
                                       )}
                                     </div>
-                                  ))}
-                                </div>
+                                  ))
+                                ) : (
+                                  <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </>
                         ) : (
                           <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">

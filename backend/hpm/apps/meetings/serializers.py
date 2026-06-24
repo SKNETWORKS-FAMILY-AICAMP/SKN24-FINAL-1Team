@@ -132,44 +132,57 @@ from .models import MeetingPreparation
 
 class MeetingPreparationSerializer(serializers.ModelSerializer):
     sources = serializers.SerializerMethodField()
+    effect = serializers.SerializerMethodField()
 
     class Meta:
         model = MeetingPreparation
         fields = "__all__"
 
+    def get_effect(self, obj):
+        if not obj.effect:
+            return ""
+        if "\n\n__RAW_SOURCES__\n" in obj.effect:
+            return obj.effect.split("\n\n__RAW_SOURCES__\n", 1)[0]
+        return obj.effect
+
     def get_sources(self, obj):
-        from apps.documents.models import Document
         from apps.meetings.models import PreparationDocument
+        from apps.documents.models import Document
         from django.conf import settings
         import os
-        prep_docs = PreparationDocument.objects.filter(preparation=obj)
-        doc_ids = [pd.document_id for pd in prep_docs]
-        docs = Document.objects.filter(document_id__in=doc_ids)
-        
+
         sources_list = []
-        for doc in docs:
-            file_url = ""
-            if doc.path:
-                normalized_path = doc.path.replace('\\', '/')
-                if 'media/' in normalized_path:
-                    relative_path = normalized_path.split('media/', 1)[1]
-                else:
-                    try:
-                        relative_path = os.path.relpath(doc.path, settings.MEDIA_ROOT)
-                    except ValueError:
-                        relative_path = os.path.basename(doc.path)
-                
-                media_path = f"{settings.MEDIA_URL}{relative_path.replace(os.sep, '/')}"
-                if media_path.startswith('//'):
-                    media_path = media_path[1:]
-                
-                request = self.context.get("request")
-                file_url = request.build_absolute_uri(media_path) if request else media_path
-                
-            sources_list.append({
-                "document_id": doc.document_id,
-                "title": doc.title,
-                "file_url": file_url
-            })
-        return sources_list
+        try:
+            # Query preparation documents linked to this MeetingPreparation
+            prep_docs = PreparationDocument.objects.filter(preparation=obj)
+            for pd in prep_docs:
+                doc = Document.objects.filter(document_id=pd.document_id).first()
+                if doc:
+                    file_url = ""
+                    if doc.path:
+                        normalized_path = doc.path.replace('\\', '/')
+                        if 'media/' in normalized_path:
+                            relative_path = normalized_path.split('media/', 1)[1]
+                        else:
+                            try:
+                                relative_path = os.path.relpath(doc.path, settings.MEDIA_ROOT)
+                            except ValueError:
+                                relative_path = os.path.basename(doc.path)
+
+                        media_path = f"{settings.MEDIA_URL}{relative_path.replace(os.sep, '/')}"
+                        if media_path.startswith('//'):
+                            media_path = media_path[1:]
+
+                        request = self.context.get("request")
+                        file_url = request.build_absolute_uri(media_path) if request else media_path
+
+                    sources_list.append({
+                        "document_id": doc.document_id,
+                        "title": doc.title,
+                        "file_url": file_url
+                    })
+            return sources_list
+        except Exception as e:
+            print("Error in get_sources serializer:", e)
+            return []
 

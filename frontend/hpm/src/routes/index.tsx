@@ -23,6 +23,7 @@ import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 import UserManagementPage from "../pages/admins/UserManagementPage";
+import NotFoundPage from "../pages/error/NotFoundPage";
 
 
 
@@ -38,7 +39,7 @@ const router = createBrowserRouter([
       { path: "/change-password", element: <ChangePasswordPage /> },
       { path: "/projects", element: <ProjectSelectPage /> },
       { path: "/projects/create", element: <ProjectCreatePage /> },
-      { path: "/", element: <Navigate to="/dashboard" replace /> },
+      { path: "/", element: <Navigate to="/login" replace /> },
       { path: "/dashboard", element: <KanbanBoardPage /> },
       { path: "/meetings", element: <MeetingListPage /> },
       { path: "/meetings/create", element: <MeetingCreatePage /> },
@@ -66,6 +67,8 @@ const router = createBrowserRouter([
       { path: "/admin/users", element: <UserManagementPage /> },
     ],
   },
+  { path: "/admin/users", element: <UserManagementPage /> },
+  { path: "*", element: <NotFoundPage /> },
 ]);
 
 export default router;
