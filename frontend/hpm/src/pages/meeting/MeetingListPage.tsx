@@ -585,7 +585,7 @@ export default function MeetingListPage() {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={setPage}
-          className="mt-8"
+          className="mt-[35px]"
         />
       )}
     </div>

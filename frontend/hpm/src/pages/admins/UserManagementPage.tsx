@@ -4,6 +4,7 @@ import logo from "../../assets/login/logo.png";
 import { useAuth } from "../../context/AuthContext";
 import Dropdown from "../../components/ui/Dropdown";
 import Checkbox from "../../components/ui/Checkbox";
+import Pagination from "../../components/ui/Pagination";
 import {
   fetchAdminUsers, createAdminUser, deleteAdminUser,
   updateAdminUser, resetAdminUserPassword, getUserProjects,
@@ -63,6 +64,7 @@ const INIT_REGISTER: RegisterForm = {
 const INIT_ERRORS: RegisterErrors = {
   emp_no: "", name: "", email: "", dept: "", rank: "", work: "",
 };
+const USERS_PER_PAGE = 10;
 
 export default function UserManagementPage() {
   const { user, logout } = useAuth();
@@ -82,6 +84,7 @@ export default function UserManagementPage() {
   const [deptFilter, setDeptFilter] = useState("전체");
   const [rankFilter, setRankFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // ── 우측 편집 폼 ─────────────────────────────────────────────────
   const [editForm, setEditForm] = useState({
@@ -144,9 +147,30 @@ export default function UserManagementPage() {
     return matchSearch && matchDept && matchRank && matchStatus;
   });
 
+  const totalPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
+  const pagedUsers = filteredUsers.slice(
+    (currentPage - 1) * USERS_PER_PAGE,
+    currentPage * USERS_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [deptFilter, rankFilter, search, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(1, totalPages)));
+  }, [totalPages]);
+
   // ── 체크박스 ─────────────────────────────────────────────────────
   const handleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? filteredUsers.map((u) => u.users_id) : []);
+    const pageIds = pagedUsers.map((u) => u.users_id);
+
+    if (checked) {
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+      return;
+    }
+
+    setSelectedIds((prev) => prev.filter((id) => !pageIds.includes(id)));
   };
   const handleSelectOne = (id: number, checked: boolean) => {
     setSelectedIds((prev) => checked ? [...prev, id] : prev.filter((v) => v !== id));
@@ -256,6 +280,7 @@ export default function UserManagementPage() {
       work: created.work,
       status: created.status,
     }, ...prev]);
+    setCurrentPage(1);
     setRegisterForm(INIT_REGISTER);
     setRegisterErrors(INIT_ERRORS);
     setShowRegisterModal(false);
@@ -403,7 +428,7 @@ export default function UserManagementPage() {
                 <tr className="bg-[#F4F5F8] border border-[#969696]">
                   <th className="p-3 w-10">
                     <Checkbox
-                      checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
+                      checked={pagedUsers.length > 0 && pagedUsers.every((u) => selectedIds.includes(u.users_id))}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                     />
                   </th>
@@ -427,7 +452,7 @@ export default function UserManagementPage() {
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((u) => (
+                  pagedUsers.map((u) => (
                     <tr key={u.users_id} className="border-b border-[#E5E5E5] hover:bg-[#F6F5FA] transition-colors">
                       <td className="p-3">
                         <Checkbox
@@ -458,11 +483,12 @@ export default function UserManagementPage() {
           </div>
 
           {/* 페이지네이션 */}
-          <div className="flex justify-center items-center gap-1 mt-5">
-            {["◀", "1", "2", "3", "4", "5", "▶"].map((p) => (
-              <button key={p} className="w-8 h-8 flex items-center justify-center rounded text-[15px] hover:bg-[#F6F5FA] transition-colors">{p}</button>
-            ))}
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            className="mt-[35px]"
+          />
         </div>
 
         {/* 오른쪽: 상세 패널 */}

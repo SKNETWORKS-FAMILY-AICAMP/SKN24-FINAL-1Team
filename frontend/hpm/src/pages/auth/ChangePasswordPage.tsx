@@ -57,7 +57,7 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className={`${DESIGN.BACKGROUND_COLORS.background} min-h-screen flex justify-center items-center`}>
+    <div className="min-h-[calc(100vh-120px)] flex justify-center items-center">
       <div className="w-[480px]">
         <ServiceLogo/>
         <div className={`${DESIGN.PADDING_SIZES["2xl"]} ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.MARGIN_TOP_SIZES["5xl"]} ${DESIGN.RADIUS_SIZES["2xl"]} flex justify-center items-center flex-col`}>
