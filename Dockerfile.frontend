@@ -24,6 +24,9 @@ WORKDIR /app
 COPY frontend/hpm/ .
 RUN npm install
 
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 # React 코드를 빌드
 # → /app/dist 폴더에 HTML/CSS/JS 정적 파일 생성
 RUN npm run build
