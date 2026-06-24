@@ -17,8 +17,8 @@ export default function MeetingUploadPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false, showPrepMaterial = false, type = "agenda", projectId } =
-    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; type?: "agenda" | "prep"; projectId?: number }) ?? {};
+  const { showAgenda = false, showPrepMaterial = false, type = "agenda" } =
+    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; type?: "agenda" | "prep" }) ?? {};
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);

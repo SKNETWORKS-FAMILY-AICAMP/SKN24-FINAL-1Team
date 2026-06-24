@@ -10,6 +10,8 @@ import { useAuth } from "../../context/AuthContext";
 import { deleteDocument, getDocuments } from "../../services/documents";
 import type { DocumentRecord } from "../../types/documentManagement";
 
+const DOCUMENTS_PER_PAGE = 10;
+
 function downloadDocumentFile(item: DocumentRecord) {
   if (item.fileUrl) {
     const link = document.createElement("a");
@@ -38,7 +40,7 @@ function downloadDocumentFile(item: DocumentRecord) {
 
 export default function DocumentManagementPage() {
   const navigate = useNavigate();
-  const { projectId } = useAuth();
+  const { projectId, user } = useAuth();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [query, setQuery] = useState("");
@@ -47,6 +49,7 @@ export default function DocumentManagementPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortOrder, setSortOrder] = useState("전체");
+  const [currentPage, setCurrentPage] = useState(1);
   const [showDeletePermissionModal, setShowDeletePermissionModal] = useState(false);
 
   const loadDocuments = useCallback(async () => {
@@ -125,9 +128,23 @@ export default function DocumentManagementPage() {
     return filtered;
   }, [creatorFilter, documents, query, uploadPeriod, startDate, endDate, sortOrder]);
 
+  const totalPages = Math.ceil(filteredDocuments.length / DOCUMENTS_PER_PAGE);
+  const pagedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * DOCUMENTS_PER_PAGE;
+    return filteredDocuments.slice(startIndex, startIndex + DOCUMENTS_PER_PAGE);
+  }, [currentPage, filteredDocuments]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [creatorFilter, endDate, query, sortOrder, startDate, uploadPeriod]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(1, totalPages)));
+  }, [totalPages]);
+
   const allVisibleSelected =
-    filteredDocuments.length > 0 &&
-    filteredDocuments.every((item) => selectedIds.has(item.id));
+    pagedDocuments.length > 0 &&
+    pagedDocuments.every((item) => selectedIds.has(item.id));
 
   const toggleSelected = (documentId: number) => {
     setSelectedIds((current) => {
@@ -146,9 +163,9 @@ export default function DocumentManagementPage() {
       const next = new Set(current);
 
       if (allVisibleSelected) {
-        filteredDocuments.forEach((item) => next.delete(item.id));
+        pagedDocuments.forEach((item) => next.delete(item.id));
       } else {
-        filteredDocuments.forEach((item) => next.add(item.id));
+        pagedDocuments.forEach((item) => next.add(item.id));
       }
 
       return next;
@@ -194,18 +211,21 @@ export default function DocumentManagementPage() {
           allVisibleSelected={allVisibleSelected}
           creatorFilter={creatorFilter}
           creators={creators}
-          documents={filteredDocuments}
+          documents={pagedDocuments}
           query={query}
           selectedIds={selectedIds}
           uploadPeriod={uploadPeriod}
           startDate={startDate}
           endDate={endDate}
           sortOrder={sortOrder}
+          currentPage={currentPage}
+          totalPages={totalPages}
           onCreatorFilterChange={setCreatorFilter}
           onDeleteSelected={() => void deleteSelected()}
           onDownloadSelected={downloadSelected}
           onOpenUpload={() => navigate("/documents/upload")}
           onQueryChange={setQuery}
+          onPageChange={setCurrentPage}
           onToggleAllVisible={toggleAllVisible}
           onToggleSelected={toggleSelected}
           onUploadPeriodChange={setUploadPeriod}

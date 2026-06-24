@@ -1,22 +1,51 @@
-import * as DESIGN from "../../constants/design";
-
 interface PaginationProps {
-  /**
-   * 현재 선택된 페이지 번호 (1부터 시작)
-   */
   currentPage: number;
-  /**
-   * 전체 페이지 수
-   */
   totalPages: number;
-  /**
-   * 페이지 번호 클릭 이벤트 헨들러
-   */
   onPageChange: (page: number) => void;
-  /**
-   * 추가적인 스타일링을 위한 클래스네임
-   */
   className?: string;
+  maxVisiblePages?: number;
+}
+
+const cn = (...classes: Array<string | false | null | undefined>) =>
+  classes.filter(Boolean).join(" ");
+
+function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={cn("size-[14px]", direction === "left" && "rotate-180")}
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="m9 5 7 7-7 7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function getVisiblePages(currentPage: number, totalPages: number, maxVisiblePages: number) {
+  const safeTotal = Math.max(0, totalPages);
+  const windowSize = Math.max(1, maxVisiblePages);
+
+  if (safeTotal <= windowSize) {
+    return Array.from({ length: safeTotal }, (_, index) => index + 1);
+  }
+
+  const halfWindow = Math.floor(windowSize / 2);
+  let start = Math.max(1, currentPage - halfWindow);
+  let end = start + windowSize - 1;
+
+  if (end > safeTotal) {
+    end = safeTotal;
+    start = end - windowSize + 1;
+  }
+
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
 export default function Pagination({
@@ -24,60 +53,75 @@ export default function Pagination({
   totalPages,
   onPageChange,
   className = "",
+  maxVisiblePages = 5,
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
+  const visiblePages = getVisiblePages(safeCurrentPage, totalPages, maxVisiblePages);
+  const isFirstPage = safeCurrentPage === 1;
+  const isLastPage = safeCurrentPage === totalPages;
+
+  const changePage = (page: number) => {
+    if (page < 1 || page > totalPages || page === safeCurrentPage) return;
+    onPageChange(page);
+  };
+
   return (
-    <div className={`flex items-center justify-center gap-4 ${className}`}>
-      {/* 이전 페이지 버튼 */}
+    <nav
+      aria-label="페이지"
+      className={`flex items-center justify-center gap-[14px] text-[15px] text-[#969696] ${className}`}
+    >
       <button
-        onClick={() => currentPage > 1 && onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
-        className={`text-lg font-bold transition-colors ${
-          currentPage === 1
-            ? "text-gray-300 cursor-not-allowed"
-            : `${DESIGN.COLORS.gray} hover:text-black`
-        }`}
+        type="button"
         aria-label="이전 페이지"
+        disabled={isFirstPage}
+        onClick={() => changePage(safeCurrentPage - 1)}
+        className={cn(
+          "flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors",
+          isFirstPage
+            ? "cursor-not-allowed text-[#d8d8dc]"
+            : "hover:bg-[#f0edf6] hover:text-[#141414]",
+        )}
       >
-        &lt;
+        <ChevronIcon direction="left" />
       </button>
 
-      {/* 페이지 번호 버튼 배열 */}
-      {Array.from({ length: totalPages }).map((_, idx) => {
-        const pageNum = idx + 1;
-        const isActive = currentPage === pageNum;
+      {visiblePages.map((page) => {
+        const isActive = page === safeCurrentPage;
 
         return (
           <button
-            key={pageNum}
-            onClick={() => onPageChange(pageNum)}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ${
-              DESIGN.FONT_SIZES.sm
-            } ${
+            key={page}
+            type="button"
+            aria-current={isActive ? "page" : undefined}
+            onClick={() => changePage(page)}
+            className={cn(
+              "flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors hover:bg-[#f0edf6]",
               isActive
-                ? `${DESIGN.BACKGROUND_COLORS.purple} ${DESIGN.COLORS.white} font-bold`
-                : `${DESIGN.COLORS.gray} ${DESIGN.BACKGROUND_COLORS.grayLightHover}`
-            }`}
+                ? "text-[#141414]"
+                : "text-[#969696] hover:text-[#141414]",
+            )}
           >
-            {pageNum}
+            {page}
           </button>
         );
       })}
 
-      {/* 다음 페이지 버튼 */}
       <button
-        onClick={() => currentPage < totalPages && onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-        className={`text-lg font-bold transition-colors ${
-          currentPage === totalPages
-            ? "text-gray-300 cursor-not-allowed"
-            : `${DESIGN.COLORS.gray} hover:text-black`
-        }`}
+        type="button"
         aria-label="다음 페이지"
+        disabled={isLastPage}
+        onClick={() => changePage(safeCurrentPage + 1)}
+        className={cn(
+          "flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors",
+          isLastPage
+            ? "cursor-not-allowed text-[#d8d8dc]"
+            : "hover:bg-[#f0edf6] hover:text-[#141414]",
+        )}
       >
-        &gt;
+        <ChevronIcon direction="right" />
       </button>
-    </div>
+    </nav>
   );
 }

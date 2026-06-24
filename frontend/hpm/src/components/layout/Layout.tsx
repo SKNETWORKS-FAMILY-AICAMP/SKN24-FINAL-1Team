@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import * as DESIGN from "../../constants/design";
@@ -22,8 +22,18 @@ export default function Layout() {
     }
   }, [user, location.pathname, openLoginModal, closeLoginModal]);
 
-  const noLayoutPaths = ["/login", "/change-password", "/projects", "/projects/create"];
-  const isNoLayout = noLayoutPaths.includes(location.pathname);
+  const isChangePasswordPage = location.pathname === "/change-password";
+  const isLoginPage = location.pathname === "/login";
+  const requiresInitialPasswordChange = user?.account_status === 0;
+
+  if (requiresInitialPasswordChange && !isChangePasswordPage && !isLoginPage) {
+    return <Navigate to="/change-password" replace />;
+  }
+
+  const noLayoutPaths = ["/login", "/projects", "/projects/create"];
+  const isNoLayout =
+    noLayoutPaths.includes(location.pathname) ||
+    (isChangePasswordPage && (requiresInitialPasswordChange || !user));
 
   if (isNoLayout) {
       const showHeader = location.pathname === "/projects";

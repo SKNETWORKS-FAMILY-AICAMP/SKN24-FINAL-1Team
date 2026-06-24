@@ -2,6 +2,7 @@ import type { MemberAuthority, MemberRecord } from "../../types/memberManagement
 import Table from "../ui/Table";
 import type { TableColumn } from "../ui/Table";
 import Button from "../ui/Button";
+import Pagination from "../ui/Pagination";
 
 function PlusIcon() {
   return (
@@ -33,13 +34,19 @@ function AuthorityBadge({ authority }: { authority: MemberAuthority }) {
 interface MemberManagementPanelProps {
   members: MemberRecord[];
   canInvite?: boolean;
+  currentPage: number;
+  totalPages: number;
   onInviteClick: () => void;
+  onPageChange: (page: number) => void;
 }
 
 export default function MemberManagementPanel({
   members,
   canInvite = false,
+  currentPage,
+  totalPages,
   onInviteClick,
+  onPageChange,
 }: MemberManagementPanelProps) {
   const columns: TableColumn<MemberRecord>[] = [
     {
@@ -103,6 +110,13 @@ export default function MemberManagementPanel({
       <section className="mt-[31px] w-full">
         <Table data={members} columns={columns} emptyMessage="등록된 구성원이 없습니다." />
       </section>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        className="mt-[35px]"
+      />
     </section>
   );
 }

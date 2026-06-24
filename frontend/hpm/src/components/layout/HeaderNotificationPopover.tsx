@@ -244,7 +244,7 @@ export default function HeaderNotificationPopover({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute left-[289px] top-[25px] flex size-[20px] items-center justify-center rounded-full border",
+                      "absolute left-[265px] top-[25px] flex size-[20px] items-center justify-center rounded-full border",
                       selected
                         ? "border-[#623FB5] bg-[#623FB5]"
                         : "border-[#969696] bg-[#FFFDFD]",

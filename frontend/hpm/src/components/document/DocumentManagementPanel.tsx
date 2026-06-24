@@ -1,5 +1,4 @@
 import {
-  ALL_DOCUMENT_FILTER,
   UPLOAD_PERIOD_OPTIONS,
   SORT_OPTIONS,
 } from "../../constants/documentManagement";
@@ -8,6 +7,7 @@ import Table from "../ui/Table";
 import type { TableColumn } from "../ui/Table";
 import * as DESIGN from "../../constants/design";
 import Button from "../ui/Button";
+import Pagination from "../ui/Pagination";
 import searchIcon from "../../assets/meeting/search.png";
 import downloadIcon from "../../assets/document/download.png";
 
@@ -22,11 +22,14 @@ interface DocumentManagementPanelProps {
   startDate: string;
   endDate: string;
   sortOrder: string;
+  currentPage: number;
+  totalPages: number;
   onCreatorFilterChange: (creator: string) => void;
   onDeleteSelected: () => void;
   onDownloadSelected: () => void;
   onOpenUpload: () => void;
   onQueryChange: (query: string) => void;
+  onPageChange: (page: number) => void;
   onToggleAllVisible: () => void;
   onToggleSelected: (documentId: number) => void;
   onUploadPeriodChange: (period: string) => void;
@@ -49,25 +52,6 @@ function DownloadIcon({ className = "size-[20px]" }: { className?: string }) {
     >
       <path
         d="M12 4v10m0 0 4-4m-4 4-4-4M5 19h14"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function ChevronIcon({ direction }: { direction: "left" | "right" }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={cn("size-[14px]", direction === "left" && "rotate-180")}
-      fill="none"
-      viewBox="0 0 24 24"
-    >
-      <path
-        d="m9 5 7 7-7 7"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -160,11 +144,14 @@ export default function DocumentManagementPanel({
   startDate,
   endDate,
   sortOrder,
+  currentPage,
+  totalPages,
   onCreatorFilterChange,
   onDeleteSelected,
   onDownloadSelected,
   onOpenUpload,
   onQueryChange,
+  onPageChange,
   onToggleAllVisible,
   onToggleSelected,
   onUploadPeriodChange,
@@ -339,37 +326,12 @@ export default function DocumentManagementPanel({
         </div>
       </div>
 
-      <nav
-        aria-label="문서 목록 페이지"
-        className="mt-[35px] flex items-center justify-center gap-[14px] text-[15px] text-[#969696]"
-      >
-        <button
-          type="button"
-          aria-label="이전 페이지"
-          className="flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors hover:bg-[#f0edf6] hover:text-[#141414]"
-        >
-          <ChevronIcon direction="left" />
-        </button>
-        {[1, 2, 3, 4, 5].map((page) => (
-          <button
-            key={page}
-            type="button"
-            className={cn(
-              "flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors hover:bg-[#f0edf6]",
-              page === 1 ? "text-[#141414]" : "text-[#969696]",
-            )}
-          >
-            {page}
-          </button>
-        ))}
-        <button
-          type="button"
-          aria-label="다음 페이지"
-          className="flex size-[24px] items-center justify-center rounded-[4px] border-0 bg-transparent p-0 transition-colors hover:bg-[#f0edf6] hover:text-[#141414]"
-        >
-          <ChevronIcon direction="right" />
-        </button>
-      </nav>
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        className="mt-[35px]"
+      />
     </section>
   );
 }

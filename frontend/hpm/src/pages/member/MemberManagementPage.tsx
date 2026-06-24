@@ -14,6 +14,8 @@ import type {
   MemberRecord,
 } from "../../types/memberManagement";
 
+const MEMBERS_PER_PAGE = 10;
+
 const toMemberRecord = (project: ProjectDetail, member: ProjectDetail["members"][number]): MemberRecord => ({
   id: member.user_id,
   name: member.name,
@@ -41,6 +43,7 @@ export default function MemberManagementPage() {
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [addingMembers, setAddingMembers] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const loadProjectMembers = useCallback(async () => {
     if (!projectId) {
@@ -79,6 +82,10 @@ export default function MemberManagementPage() {
   }, [loadProjectMembers]);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [projectId]);
+
+  useEffect(() => {
     void loadCandidates();
   }, [loadCandidates]);
 
@@ -86,6 +93,16 @@ export default function MemberManagementPage() {
     const memberIds = new Set(members.map((member) => member.id));
     return candidates.filter((candidate) => !memberIds.has(candidate.id));
   }, [candidates, members]);
+
+  const totalPages = Math.ceil(members.length / MEMBERS_PER_PAGE);
+  const pagedMembers = useMemo(() => {
+    const startIndex = (currentPage - 1) * MEMBERS_PER_PAGE;
+    return members.slice(startIndex, startIndex + MEMBERS_PER_PAGE);
+  }, [currentPage, members]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(1, totalPages)));
+  }, [totalPages]);
 
   const addMembers = async (selectedCandidates: MemberInviteCandidate[]) => {
     if (!projectId || selectedCandidates.length === 0) return;
@@ -107,11 +124,14 @@ export default function MemberManagementPage() {
     <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
       <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[64px]">
         <MemberManagementPanel
-          members={members}
+          members={pagedMembers}
           canInvite={canInvite}
+          currentPage={currentPage}
+          totalPages={totalPages}
           onInviteClick={() => {
             if (projectId && canInvite && !loadingMembers) setInviteModalOpen(true);
           }}
+          onPageChange={setCurrentPage}
         />
       </section>
       {inviteModalOpen ? (
