@@ -84,7 +84,7 @@ export default function MemberInviteModal({
         .toLowerCase()
         .includes(normalizedQuery);
     })
-    .slice(0, 4);
+    ;
 
   const selectMember = (candidate: MemberInviteCandidate) => {
     setSelectedMembers((current) => {
@@ -160,27 +160,29 @@ export default function MemberInviteModal({
           </div>
         </div>
 
-        <div className="mt-[7px] h-[152px] rounded-[7px] border border-[#969696] bg-[#fffdfd] p-[7px]">
-          {loading ? (
-            <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
-              구성원을 불러오는 중입니다.
-            </p>
-          ) : matchingMembers.length > 0 ? (
-            <div className="flex flex-col gap-[3px]">
-              {matchingMembers.map((candidate) => (
-                <CandidateOption
-                  key={candidate.id}
-                  active={false}
-                  candidate={candidate}
-                  onSelect={selectMember}
-                />
-              ))}
-            </div>
-          ) : (
-            <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
-              검색 결과가 없습니다.
-            </p>
-          )}
+        <div className="mt-[7px] rounded-[7px] border border-[#969696] bg-[#fffdfd] overflow-hidden" style={{ height: "164px" }}>
+          <div className="h-full overflow-y-auto p-[7px]">
+            {loading ? (
+              <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
+                구성원을 불러오는 중입니다.
+              </p>
+            ) : matchingMembers.length > 0 ? (
+              <div className="flex flex-col gap-[3px]">
+                {matchingMembers.map((candidate) => (
+                  <CandidateOption
+                    key={candidate.id}
+                    active={false}
+                    candidate={candidate}
+                    onSelect={selectMember}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
+                검색 결과가 없습니다.
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="mt-[24px] flex justify-end">
