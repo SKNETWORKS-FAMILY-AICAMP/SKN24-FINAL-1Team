@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Document
-
+from django.core.files.storage import default_storage
 
 class DocumentSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="document_id", read_only=True)
@@ -51,25 +51,17 @@ class DocumentSerializer(serializers.ModelSerializer):
         return timezone.localtime(obj.uploaded_at).date().isoformat()
 
     def get_size(self, obj):
-        if obj.path and os.path.exists(obj.path):
-            return os.path.getsize(obj.path)
-        return 0
+        if not obj.path :
+            return 0
+        try : 
+            return default_storage.size(obj.path)
+        except Exception:
+            return 0
 
     def get_fileUrl(self, obj):
         if not obj.path:
             return ""
-
-        normalized_path = obj.path.replace('\\', '/')
-        if 'media/' in normalized_path:
-            relative_path = normalized_path.split('media/', 1)[1]
-        else:
-            try:
-                relative_path = os.path.relpath(obj.path, settings.MEDIA_ROOT)
-            except ValueError:
-                relative_path = os.path.basename(obj.path)
-
-        media_path = f"{settings.MEDIA_URL}{relative_path.replace(os.sep, '/')}"
-        if media_path.startswith('//'):
-            media_path = media_path[1:]
-        request = self.context.get("request")
-        return request.build_absolute_uri(media_path) if request else media_path
+        try:
+            return default_storage.url(obj.path)  # S3 presigned URL (1시간 유효)
+        except Exception:
+            return ""

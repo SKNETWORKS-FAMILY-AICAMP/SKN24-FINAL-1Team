@@ -2,6 +2,8 @@ import os
 import json
 import mimetypes
 
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
 from django.conf import settings
 import requests
 from rest_framework import status
@@ -166,8 +168,10 @@ def document_list(request, project_id):
         return Response({"error": "한 번에 최대 10개까지 업로드할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     created = []
-    created_docs = []
     errors = []
+    created_docs = []
+
+    use_s3 = bool(getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""))
 
     for file in files:
         ext = os.path.splitext(file.name)[1].lower()
@@ -178,25 +182,15 @@ def document_list(request, project_id):
             errors.append({"file": file.name, "error": "파일 크기가 20MB를 초과합니다."})
             continue
 
-        save_dir = os.path.join(settings.MEDIA_ROOT, "documents", str(project_id))
-        os.makedirs(save_dir, exist_ok=True)
-        file_path = os.path.join(save_dir, file.name)
-
-        base, extension = os.path.splitext(file.name)
-        counter = 1
-        while os.path.exists(file_path):
-            file_path = os.path.join(save_dir, f"{base}({counter}){extension}")
-            counter += 1
-
-        with open(file_path, "wb+") as f:
-            for chunk in file.chunks():
-                f.write(chunk)
+        # S3에 저장
+        s3_key = f"documents/{project_id}/{file.name}"
+        saved_path = default_storage.save(s3_key, ContentFile(file.read()))
 
         doc = Document.objects.create(
             project_id=project_id,
             uploader=uploader,
-            title=os.path.basename(file_path),
-            path=file_path,
+            title=file.name,
+            path=saved_path,
         )
         created_docs.append(doc)
         created.append(DocumentSerializer(doc, context={"request": request}).data)
@@ -289,7 +283,11 @@ def document_delete(request, project_id, document_id):
     if doc.uploader_id != project_user.id:
         return Response({"error": "문서를 업로드한 사용자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
-    if os.path.exists(doc.path):
-        os.remove(doc.path)
+    try :
+        if default_storage.exists(doc.path):
+            default_storage.delete(doc.path)
+    except Exception :
+        pass
+    
     doc.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
