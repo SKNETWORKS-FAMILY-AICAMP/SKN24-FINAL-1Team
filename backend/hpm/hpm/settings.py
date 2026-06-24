@@ -151,3 +151,37 @@ DEFAULT_USER_PASSWORD = os.getenv('DEFAULT_USER_PASSWORD')
 # AWS SES
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 DEFAULT_FROM_EMAIL = os.environ.get("SES_FROM_EMAIL")
+
+# AWS S3
+# -------------------------------설명---------------------------------
+# 문서 관리 페이지 접속
+# → 백엔드가 S3에서 1시간짜리 presigned URL 새로 발급
+# → 화면에 파일 목록 표시
+# 1시간 안에 다운로드 클릭 → 성공
+# 1시간 지난 후 다운로드 클릭 → 실패
+#     → F5 새로고침 하면 새 URL 발급 → 다운로드 성공
+# --------------------------------------------------------------------
+
+# 어느 S3 버킷에 저장할지
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_STORAGE_BUCKET_NAME", "")
+
+# 버킷이 있는 리전 (ap-northeast-2 = 서울)
+AWS_S3_REGION_NAME = os.environ.get("AWS_S3_REGION_NAME", "ap-northeast-2")
+
+# 같은 이름 파일 업로드 시 덮어쓰지 않고 자동으로 이름 변경
+AWS_S3_FILE_OVERWRITE = False
+
+# 버킷을 비공개로 유지 (URL만 알면 누구나 접근 가능한 퍼블릭 아님)
+AWS_DEFAULT_ACL = None
+
+# 파일 다운로드 시 presigned URL 방식 사용
+AWS_QUERYSTRING_AUTH = True
+
+# presigned URL 유효시간 (3600초 = 1시간)
+AWS_QUERYSTRING_EXPIRE = 3600
+
+if AWS_STORAGE_BUCKET_NAME:   # .env에 버킷 이름이 있으면
+    STORAGES = {
+        # 파일 저장 기본값 → S3에 저장
+        "default": {"BACKEND": "storages.backends.s3.S3Storage"}
+    }
