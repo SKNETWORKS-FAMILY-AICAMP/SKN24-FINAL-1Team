@@ -196,8 +196,10 @@ def user_list(request):
             "email": user.email,
             "name": user.name,
             "work": user.work,
-            "dept": user.dept.dept_name,
-            "rank": user.rank.rank_name,
+            "dept": user.dept_id,
+            "rank": user.rank_id,
+            "dept_name": user.dept.dept_name,
+            "rank_name": user.rank.rank_name,
             "status": user.status,
         }
         for user in users

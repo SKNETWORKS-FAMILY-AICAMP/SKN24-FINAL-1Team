@@ -325,6 +325,59 @@ def _search_args(
     )
 
 
+def _is_meeting_id_filter_error(exc: Exception) -> bool:
+    text = f"{type(exc).__name__}: {exc}"
+    return "metadata.meeting_id" in text and (
+        "Index required" in text
+        or "index" in text.lower()
+        or "Bad request" in text
+    )
+
+
+def _meeting_filter_requested(args: Any) -> bool:
+    return bool(
+        getattr(args, "where_meeting_id", None)
+        or getattr(args, "exclude_meeting_id", None)
+    )
+
+
+def _meeting_filter_fallback_args(module: Any, args: Any) -> Any:
+    fallback = module.argparse.Namespace(**vars(args))
+    fallback.where_meeting_id = None
+    fallback.exclude_meeting_id = None
+
+    source_types = [
+        item.strip()
+        for item in str(getattr(args, "source_types", "") or "").split(",")
+        if item.strip()
+    ]
+    if "internal_document" in source_types and "meeting_minutes" in source_types:
+        fallback.source_types = "internal_document"
+        fallback.max_previous_meetings = 0
+    return fallback
+
+
+def _retrieve_with_meeting_filter_fallback(
+    module: Any,
+    args: Any,
+    bundle: FeatureChatRagBundle,
+) -> list[Any]:
+    try:
+        return module.retrieve(args, bundle.embedder, bundle.client, bundle.collection, bundle.records, bundle.bm25)
+    except Exception as exc:
+        if not _meeting_filter_requested(args) or not _is_meeting_id_filter_error(exc):
+            raise
+        fallback_args = _meeting_filter_fallback_args(module, args)
+        return module.retrieve(
+            fallback_args,
+            bundle.embedder,
+            bundle.client,
+            bundle.collection,
+            bundle.records,
+            bundle.bm25,
+        )
+
+
 def feature_chat_retrieve(
     question: str,
     *,
@@ -353,7 +406,7 @@ def feature_chat_retrieve(
         return {"context": "", "sources": [], "hit_count": 0, "collection": bundle.collection}
     if not bundle.records:
         return {"context": "", "sources": [], "hit_count": 0, "collection": bundle.collection}
-    hits = module.retrieve(args, bundle.embedder, bundle.client, bundle.collection, bundle.records, bundle.bm25)
+    hits = _retrieve_with_meeting_filter_fallback(module, args, bundle)
     return {
         "context": module.build_context(hits, int(os.getenv("CHAT_RAG_MAX_CONTEXT_CHARS", "9000"))),
         "sources": module.answer_source_references(hits),
@@ -412,7 +465,7 @@ def feature_chat_search_hits(
     )
     if not bundle.records:
         return []
-    return module.retrieve(args, bundle.embedder, bundle.client, bundle.collection, bundle.records, bundle.bm25)
+    return _retrieve_with_meeting_filter_fallback(module, args, bundle)
 
 
 def hit_document_type(hit: Any) -> str:

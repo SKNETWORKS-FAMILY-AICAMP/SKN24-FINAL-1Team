@@ -15,20 +15,5 @@ python-dotenv>=1.0.0
 # torchvision==0.23.0
 # torchaudio==2.8.0
 
-# Internal document ingest: MinerU -> chunks -> embeddings -> Qdrant.
-mineru[all]
-hf_transfer>=0.1.8
-PyMuPDF>=1.24.0
-tiktoken>=0.7.0
-tqdm>=4.66.0
-qdrant-client>=1.9.0
-sentence-transformers>=3.0.1,<4.0.0
-transformers>=4.43
-openai>=1.0.0
-
-# DOCX ingest converts DOCX to PDF before MinerU parsing.
-# Install LibreOffice on the host image and ensure `soffice` is on PATH,
-# or set LIBREOFFICE_BIN to the executable path.
-
 # If the PaddleOCR-VL wrapper reports that doc-parser is missing:
 # python -m pip install "paddleocr[doc-parser]"

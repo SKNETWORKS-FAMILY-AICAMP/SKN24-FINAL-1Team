@@ -420,7 +420,7 @@ export default function MeetingDetailPage() {
 
   const isScheduled = meeting.status === "scheduled";
   const isInProgress = meeting.status === "in_progress";
-  const isChatEnabled = isInProgress || !isCreator;
+  const isChatEnabled = true;
   const hasAgenda = Boolean(meeting.agenda && meeting.agenda.length > 0);
   const hasPrepMaterial = Boolean(meeting.meeting_document);
 
@@ -483,7 +483,7 @@ export default function MeetingDetailPage() {
                     disabled={endLoading}
                     className="rounded-[8px] bg-[#623FB5] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
                   >
-                    {endLoading ? "종료 중..." : "회의 종료"}
+                    회의 종료
                   </button>
                 ) : null}
               </>
@@ -834,7 +834,7 @@ export default function MeetingDetailPage() {
                   }`}
                 >
                   <p className="whitespace-pre-wrap">{msg.content}</p>
-                  {msg.source && <p className="text-[10px] text-gray-400 mt-1 break-all">📎 {msg.source}</p>}
+            
                 </div>
               </div>
             ))
@@ -863,10 +863,10 @@ export default function MeetingDetailPage() {
             <button
               onClick={sendChat}
               disabled={!isChatEnabled}
-              className="absolute right-2.5 w-7 h-7 rounded-full bg-[#623FB5] flex items-center justify-center text-white hover:opacity-90 active:scale-95 disabled:opacity-30 transition"
+              className="absolute right-2.5 w-7 h-7 flex items-center justify-center hover:opacity-70 active:scale-95 disabled:opacity-30 transition"
               aria-label="전송"
             >
-              <img src={sendImg} alt="전송" className="w-4 h-4" />
+              <img src={sendImg} alt="전송" className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

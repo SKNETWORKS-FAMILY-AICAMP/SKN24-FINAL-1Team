@@ -2,6 +2,8 @@ export interface DocumentRecord {
   id: number;
   name: string;
   creator: string;
+  creatorRank?: string;
+  uploaderId?: number;
   department: string;
   uploadedAt: string;
   size: number;
@@ -15,4 +17,3 @@ export interface UploadedDocument {
 }
 
 export type DocumentCreatorFilter = string;
-export type DocumentUploadDateFilter = string;

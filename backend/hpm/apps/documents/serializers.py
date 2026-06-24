@@ -11,6 +11,8 @@ class DocumentSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(source="document_id", read_only=True)
     name = serializers.CharField(source="title", read_only=True)
     creator = serializers.SerializerMethodField()
+    creatorRank = serializers.SerializerMethodField()
+    uploaderId = serializers.SerializerMethodField()
     department = serializers.SerializerMethodField()
     uploadedAt = serializers.SerializerMethodField()
     size = serializers.SerializerMethodField()
@@ -23,6 +25,8 @@ class DocumentSerializer(serializers.ModelSerializer):
             "document_id",
             "name",
             "creator",
+            "creatorRank",
+            "uploaderId",
             "department",
             "uploadedAt",
             "size",
@@ -31,6 +35,13 @@ class DocumentSerializer(serializers.ModelSerializer):
 
     def get_creator(self, obj):
         return getattr(obj.uploader.user, "name", "")
+
+    def get_uploaderId(self, obj):
+        return getattr(obj.uploader.user, "pk", None)
+
+    def get_creatorRank(self, obj):
+        rank = getattr(obj.uploader.user, "rank", None)
+        return getattr(rank, "rank_name", "") if rank else ""
 
     def get_department(self, obj):
         dept = getattr(obj.uploader.user, "dept", None)

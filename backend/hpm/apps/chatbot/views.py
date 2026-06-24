@@ -25,7 +25,10 @@ def chat(request, meeting_id):
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     # 챗봇 세션 가져오기 / 생성
-    meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
+    meeting_user, _ = MeetingUsers.objects.get_or_create(
+        meeting=meeting,
+        user_id=user_id
+    )
 
     chatbot, _ = Chatbot.objects.get_or_create(
         meeting=meeting,
@@ -57,6 +60,7 @@ def chat(request, meeting_id):
             timeout=30,
         )
         resp.raise_for_status()
+        resp.encoding = "utf-8"
         resp_json = resp.json()
         result = resp_json.get("result", {})
         answer = result.get("answer", "답변을 불러오지 못했습니다.")

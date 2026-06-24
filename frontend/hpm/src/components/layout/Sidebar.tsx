@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../../assets/sidebar/logo.png";
 import dashboard from "../../assets/sidebar/dashboard.png";
@@ -8,6 +9,7 @@ import hamburgerIcon from "../../assets/sidebar/hamburger.png";
 import * as DESIGN from "../../constants/design";
 import ProjectDropdown from "./ProjectDropdown";
 import MeetingDropdown from "./MeetingDropdown";
+import { useRecording } from "../../context/RecordingContext";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -17,8 +19,31 @@ interface SidebarProps {
 export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { meetingId: recMeetingId, startTime } = useRecording();
+  const isRecording = recMeetingId !== null && startTime !== null;
+
+  const [elapsed, setElapsed] = useState(() =>
+    startTime !== null ? Math.floor((Date.now() - startTime) / 1000) : 0
+  );
+
+  useEffect(() => {
+    if (!isRecording || startTime === null) {
+      setElapsed(0);
+      return;
+    }
+    setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isRecording, startTime]);
+
+  const fmt = (s: number) =>
+    `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   const isActive = (path: string) => location.pathname.startsWith(path);
+  const isOnMeetingPage = recMeetingId !== null && location.pathname === `/meetings/${recMeetingId}`;
+  const [timerHovered, setTimerHovered] = useState(false);
 
   return (
     <aside
@@ -108,6 +133,24 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
             <span>구성원 관리</span>
           </button>
         </nav>
+      )}
+
+      {/* 녹음 중 타이머 */}
+      {isRecording && !isCollapsed && !isOnMeetingPage && (
+        <button
+          onClick={() => navigate(`/meetings/${recMeetingId}`)}
+          onMouseEnter={() => setTimerHovered(true)}
+          onMouseLeave={() => setTimerHovered(false)}
+          className="w-full flex justify-center bg-transparent border-none cursor-pointer"
+          style={{ padding: "0 16px 20px" }}
+        >
+          <span
+            className="font-bold tabular-nums transition-colors duration-200"
+            style={{ color: timerHovered ? "#623FB5" : "#ffffff", fontSize: "28px", letterSpacing: "0.04em" }}
+          >
+            {fmt(elapsed)}
+          </span>
+        </button>
       )}
     </aside>
   );

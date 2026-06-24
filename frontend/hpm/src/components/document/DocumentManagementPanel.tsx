@@ -1,13 +1,15 @@
 import {
   ALL_DOCUMENT_FILTER,
-  DOCUMENT_UPLOAD_DATE_LABEL,
-  EMPTY_UPLOAD_DATE_FILTER,
+  UPLOAD_PERIOD_OPTIONS,
+  SORT_OPTIONS,
 } from "../../constants/documentManagement";
 import type { DocumentRecord } from "../../types/documentManagement";
 import Table from "../ui/Table";
 import type { TableColumn } from "../ui/Table";
 import * as DESIGN from "../../constants/design";
 import Button from "../ui/Button";
+import searchIcon from "../../assets/meeting/search.png";
+import downloadIcon from "../../assets/document/download.png";
 
 interface DocumentManagementPanelProps {
   allVisibleSelected: boolean;
@@ -16,8 +18,10 @@ interface DocumentManagementPanelProps {
   documents: DocumentRecord[];
   query: string;
   selectedIds: Set<number>;
-  uploadDateFilter: string;
-  uploadDates: string[];
+  uploadPeriod: string;
+  startDate: string;
+  endDate: string;
+  sortOrder: string;
   onCreatorFilterChange: (creator: string) => void;
   onDeleteSelected: () => void;
   onDownloadSelected: () => void;
@@ -25,7 +29,11 @@ interface DocumentManagementPanelProps {
   onQueryChange: (query: string) => void;
   onToggleAllVisible: () => void;
   onToggleSelected: (documentId: number) => void;
-  onUploadDateFilterChange: (date: string) => void;
+  onUploadPeriodChange: (period: string) => void;
+  onStartDateChange: (date: string) => void;
+  onEndDateChange: (date: string) => void;
+  onSortOrderChange: (order: string) => void;
+  onDownloadDocument: (doc: DocumentRecord) => void;
 }
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
@@ -106,6 +114,41 @@ function DocumentCheckButton({
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg aria-hidden="true" className="size-[16px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="4" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const BOX_WIDTH = "w-[100px]";
+const selectStyle = `${BOX_WIDTH} py-2 px-3 bg-white border border-gray-300 rounded-md text-[12px] outline-none cursor-pointer focus:border-[#623FB5] appearance-none`;
+
+function DatePickerBox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div
+      className={`${BOX_WIDTH} relative flex items-center justify-between py-2 px-3 bg-white border border-gray-300 rounded-md text-[12px] text-[#141414] cursor-pointer hover:border-[#623FB5] transition overflow-hidden`}
+    >
+      {value && <span className="flex-1 truncate">{value}</span>}
+      <span className="ml-auto pointer-events-none"><CalendarIcon /></span>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+      />
+    </div>
+  );
+}
+
 export default function DocumentManagementPanel({
   allVisibleSelected,
   creatorFilter,
@@ -113,8 +156,10 @@ export default function DocumentManagementPanel({
   documents,
   query,
   selectedIds,
-  uploadDateFilter,
-  uploadDates,
+  uploadPeriod,
+  startDate,
+  endDate,
+  sortOrder,
   onCreatorFilterChange,
   onDeleteSelected,
   onDownloadSelected,
@@ -122,7 +167,11 @@ export default function DocumentManagementPanel({
   onQueryChange,
   onToggleAllVisible,
   onToggleSelected,
-  onUploadDateFilterChange,
+  onUploadPeriodChange,
+  onStartDateChange,
+  onEndDateChange,
+  onSortOrderChange,
+  onDownloadDocument,
 }: DocumentManagementPanelProps) {
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
@@ -174,6 +223,22 @@ export default function DocumentManagementPanel({
       align: "center",
       render: (row) => <span>{row.uploadedAt}</span>,
     },
+    {
+      key: "download",
+      header: "다운로드",
+      width: "100px",
+      align: "center",
+      render: (row) => (
+        <button
+          type="button"
+          aria-label={`${row.name} 다운로드`}
+          onClick={() => onDownloadDocument(row)}
+          className="mx-auto flex items-center justify-center hover:opacity-70 active:scale-95 transition"
+        >
+          <img src={downloadIcon} alt="다운로드" className="w-5 h-5" />
+        </button>
+      ),
+    },
   ];
 
   return (
@@ -197,8 +262,8 @@ export default function DocumentManagementPanel({
               placeholder="문서명, 파일명, 작성자로 검색하세요"
               className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-10 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-              🔍
+            <span className="absolute right-3 top-1/2 -translate-y-1/2">
+              <img src={searchIcon} alt="검색" className="w-5 h-5" />
             </span>
           </div>
 
@@ -209,49 +274,61 @@ export default function DocumentManagementPanel({
           </div>
         </div>
 
-        <div className="flex flex-col gap-[16px] xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {/* 업로더 */}
+          <div className="flex items-center gap-2">
+            <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>업로더</span>
             <select
-              aria-label="생성자 필터"
+              aria-label="업로더 필터"
               value={creatorFilter}
-              onChange={(event) => onCreatorFilterChange(event.target.value)}
-              className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none cursor-pointer focus:border-[#623FB5]`}
+              onChange={(e) => onCreatorFilterChange(e.target.value)}
+              className={selectStyle}
             >
-              {creators.map((creator) => (
-                <option key={creator} value={creator}>
-                  {creator === ALL_DOCUMENT_FILTER ? "생성자" : creator}
-                </option>
-              ))}
-            </select>
-
-            <select
-              aria-label="업로드 날짜 필터"
-              value={uploadDateFilter}
-              onChange={(event) => onUploadDateFilterChange(event.target.value)}
-              className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.sm} outline-none cursor-pointer focus:border-[#623FB5]`}
-            >
-              <option value={EMPTY_UPLOAD_DATE_FILTER}>{DOCUMENT_UPLOAD_DATE_LABEL}</option>
-              {uploadDates.map((date) => (
-                <option key={date} value={date}>
-                  {date}
-                </option>
+              {creators.map((c) => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              disabled={!hasSelection}
-              onClick={onDownloadSelected}
+          {/* 업로드 날짜 */}
+          <div className="flex items-center gap-2">
+            <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>업로드 날짜</span>
+            <select
+              aria-label="업로드 기간 필터"
+              value={uploadPeriod}
+              onChange={(e) => onUploadPeriodChange(e.target.value)}
+              className={selectStyle}
             >
+              {UPLOAD_PERIOD_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <DatePickerBox value={startDate} onChange={onStartDateChange} />
+            <span className="text-[12px] text-gray-400">-</span>
+            <DatePickerBox value={endDate} onChange={onEndDateChange} />
+          </div>
+
+          {/* 정렬 */}
+          <div className="flex items-center gap-2">
+            <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>정렬</span>
+            <select
+              aria-label="정렬"
+              value={sortOrder}
+              onChange={(e) => onSortOrderChange(e.target.value)}
+              className={selectStyle}
+            >
+              {SORT_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Button disabled={!hasSelection} onClick={onDownloadSelected}>
               <DownloadIcon className="size-[16px]" />
               다운로드
             </Button>
-            <Button
-              disabled={!hasSelection}
-              onClick={onDeleteSelected}
-              className="px-6"
-            >
+            <Button disabled={!hasSelection} onClick={onDeleteSelected} className="px-6">
               삭제
             </Button>
           </div>
