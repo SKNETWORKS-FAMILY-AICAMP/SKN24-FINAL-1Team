@@ -303,9 +303,16 @@ export default function MeetingListPage() {
   };
 
   // 이메일 발송 목(mock) 처리
-  const handleSendEmail = (e: React.MouseEvent, meetingTitle: string) => {
+  const handleSendEmail = (e: React.MouseEvent, meetingId:number, status : string) => {
     e.stopPropagation();
-    alert(`[${meetingTitle}] 회의 정보 및 결과 메일을 성공적으로 발송했습니다.`);
+    if(status == "scheduled")
+    {
+      navigate(`/meetings/${meetingId}/invite-email`)     // 예정 -> 초대 이메일 페이지
+    }
+    else if(status == "finished")
+    {
+      navigate(`/meetings/${meetingId}/email`)           // 종료 -> 요약 이메일 페이지
+    }
   };
 
   // 테이블 컬럼 스키마 정의 (mockup 시안 일치)
@@ -442,7 +449,10 @@ export default function MeetingListPage() {
       width: "170px",
       align: "center",
       render: (row) => (
-        <Button className={`${DESIGN.FONT_SIZES.md} whitespace-nowrap`} onClick={(e) => handleSendEmail(e, row.title)}>
+        <Button
+          onClick={(e) => handleSendEmail(e, row.meeting_id, row.status)}
+          disabled={row.status === "in_progress"}
+          >
           이메일 발송
         </Button>
       ),
@@ -585,7 +595,7 @@ export default function MeetingListPage() {
           currentPage={page}
           totalPages={totalPages}
           onPageChange={setPage}
-          className="mt-[35px]"
+          className="mt-8"
         />
       )}
     </div>
