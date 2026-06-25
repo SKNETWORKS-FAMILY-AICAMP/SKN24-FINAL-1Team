@@ -230,7 +230,7 @@ export default function HeaderNotificationPopover({
         ))}
       </div>
 
-      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] w-[324px] flex-col gap-[10px] overflow-y-auto pr-1">
+      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] w-[324px] flex-col gap-[10px] overflow-x-hidden overflow-y-auto pr-1">
         {loading ? (
           <div className="flex h-[70px] w-full items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
             알림을 불러오는 중입니다.
@@ -279,7 +279,7 @@ export default function HeaderNotificationPopover({
             );
           })
         ) : (
-          <div className="flex h-[70px] w-[324px] items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
+          <div className="flex h-[70px] w-full items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
             표시할 알림이 없습니다.
           </div>
         )}

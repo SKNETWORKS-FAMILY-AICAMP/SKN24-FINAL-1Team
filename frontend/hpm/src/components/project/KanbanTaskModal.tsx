@@ -1,5 +1,6 @@
-import { type ChangeEvent } from "react";
+import { useEffect, type ChangeEvent } from "react";
 import closeIcon from "../../assets/kanban/close.png";
+import * as DESIGN from "../../constants/design";
 import { KANBAN_PRIORITIES } from "../../constants/kanban";
 import type {
   KanbanModalState,
@@ -9,6 +10,9 @@ import type {
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
+
+const TASK_TITLE_MAX_LENGTH = 255;
+const TASK_DESCRIPTION_MAX_LENGTH = 1000;
 
 function PriorityChip({
   priority,
@@ -89,12 +93,32 @@ export default function KanbanTaskModal({
   const { values } = modal;
   const canSubmit = Boolean(values.title.trim()) && Boolean(values.priority);
   const isEdit = modal.mode === "edit";
+  const titleValue = values.title.slice(0, TASK_TITLE_MAX_LENGTH);
+  const descriptionValue = values.description.slice(0, TASK_DESCRIPTION_MAX_LENGTH);
+
+  useEffect(() => {
+    if (titleValue === values.title && descriptionValue === values.description) return;
+
+    onChange({
+      ...values,
+      title: titleValue,
+      description: descriptionValue,
+    });
+  }, [descriptionValue, onChange, titleValue, values]);
 
   const update = <Key extends keyof KanbanTaskFormValues>(
     key: Key,
     value: KanbanTaskFormValues[Key],
   ) => {
-    onChange({ ...values, [key]: value });
+    let nextValue = value;
+    if (key === "title" && typeof value === "string") {
+      nextValue = value.slice(0, TASK_TITLE_MAX_LENGTH) as KanbanTaskFormValues[Key];
+    }
+    if (key === "description" && typeof value === "string") {
+      nextValue = value.slice(0, TASK_DESCRIPTION_MAX_LENGTH) as KanbanTaskFormValues[Key];
+    }
+
+    onChange({ ...values, [key]: nextValue });
   };
 
   return (
@@ -127,25 +151,33 @@ export default function KanbanTaskModal({
           업무 명 <span className="text-[#E52E2E]">*</span>
         </label>
         <input
-          value={values.title}
+          value={titleValue}
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
             update("title", event.target.value)
           }
+          maxLength={TASK_TITLE_MAX_LENGTH}
           placeholder="업무 명을 작성해 주세요"
           className="absolute left-[32px] top-[129px] h-[36px] w-[414px] rounded-[7px] border border-[#969696] bg-transparent px-[11px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none placeholder:text-[#969696]"
         />
+        <p className={`absolute left-[32px] top-[170px] m-0 w-[414px] text-right ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>
+          {titleValue.length}/{TASK_TITLE_MAX_LENGTH}
+        </p>
 
         <label className="absolute left-[32px] top-[191px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           설명
         </label>
         <textarea
-          value={values.description}
+          value={descriptionValue}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             update("description", event.target.value)
           }
+          maxLength={TASK_DESCRIPTION_MAX_LENGTH}
           placeholder="업무에 대한 설명을 작성해 주세요"
           className="absolute left-[32px] top-[216px] h-[108px] w-[414px] resize-none rounded-[7px] border border-[#969696] bg-transparent px-[11px] py-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none placeholder:text-[#969696]"
         />
+        <p className={`absolute left-[32px] top-[329px] m-0 w-[414px] text-right ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>
+          {descriptionValue.length}/{TASK_DESCRIPTION_MAX_LENGTH}
+        </p>
 
         <label className="absolute left-[33px] top-[350px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           담당자
