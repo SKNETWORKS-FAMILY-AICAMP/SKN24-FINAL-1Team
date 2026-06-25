@@ -47,8 +47,28 @@ DEFAULT_JIRA_COLUMNS = [
 
 def _request_user_id(request):
     if isinstance(request.auth, dict) and request.auth.get("user_id") is not None:
-        return request.auth["user_id"]
-    return getattr(request.user, "users_id", None)
+        user_id = request.auth["user_id"]
+    else:
+        user_id = getattr(request.user, "users_id", None)
+
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return user_id
+
+
+def _jira_context_for_user(user):
+    access_token = get_valid_access_token(user)
+    return access_token, user.jira_cloud_id
+
+
+def _user_has_jira_project_access(user, project_key):
+    access_token, cloud_id = _jira_context_for_user(user)
+    if not access_token or not cloud_id:
+        return False, access_token, cloud_id
+
+    jira_access_error = _check_jira_project_access(access_token, cloud_id, project_key)
+    return jira_access_error is None, access_token, cloud_id
 
 
 RANK_PRIORITY = [
@@ -290,24 +310,24 @@ def project_jira_board(request, project_id):
     except Users.DoesNotExist:
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if not user.jira_cloud_id:
-        return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    jira_access_error = _check_jira_project_access(
-        access_token,
-        user.jira_cloud_id,
-        project.jira_project_key,
-    )
-    if jira_access_error:
-        return jira_access_error
-
-    jira_columns = _get_jira_board_columns(access_token, user.jira_cloud_id, project.jira_project_key)
-
     if request.method == "POST":
+        access_token, cloud_id = _jira_context_for_user(user)
+        if not access_token:
+            return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not cloud_id:
+            return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        jira_access_error = _check_jira_project_access(
+            access_token,
+            cloud_id,
+            project.jira_project_key,
+        )
+        if jira_access_error:
+            return jira_access_error
+
+        jira_columns = _get_jira_board_columns(access_token, cloud_id, project.jira_project_key)
+
         title = (request.data.get("title") or "").strip()
         if not title:
             return Response({"error": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -324,7 +344,7 @@ def project_jira_board(request, project_id):
         result = create_jira_issue_for_board(
             title,
             access_token,
-            user.jira_cloud_id,
+            cloud_id,
             project.jira_project_key,
             description=request.data.get("description", ""),
             due_date=request.data.get("due_date"),
@@ -342,17 +362,46 @@ def project_jira_board(request, project_id):
                 result["issue_key"],
                 column_id,
                 access_token,
-                user.jira_cloud_id,
+                cloud_id,
                 target_status_names=target_status_names,
             )
         result["column_id"] = column_id or jira_columns[0]["id"]
 
         return Response(result, status=status.HTTP_201_CREATED)
 
+    can_manage_jira, access_token, cloud_id = _user_has_jira_project_access(
+        user,
+        project.jira_project_key,
+    )
+    if not can_manage_jira:
+        owner = project.project_owner
+        access_token, cloud_id = _jira_context_for_user(owner)
+        if not access_token:
+            return Response(
+                {"error": "프로젝트 생성자의 Jira 연동이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not cloud_id:
+            return Response(
+                {"error": "프로젝트 생성자의 Jira 클라우드 ID가 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        jira_access_error = _check_jira_project_access(
+            access_token,
+            cloud_id,
+            project.jira_project_key,
+        )
+        if jira_access_error:
+            return jira_access_error
+
+    jira_columns = _get_jira_board_columns(access_token, cloud_id, project.jira_project_key)
+
     # 1) Agile 보드 이슈 조회 시도
     raw_issues = []
     board_res = requests.get(
-        f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/agile/1.0/board",
+        f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board",
         headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
         params={"projectKeyOrId": project.jira_project_key, "type": "kanban"},
         timeout=10,
@@ -361,7 +410,7 @@ def project_jira_board(request, project_id):
     if board_res.ok and board_res.json().get("values"):
         board_id = board_res.json()["values"][0]["id"]
         agile_res = requests.get(
-            f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/agile/1.0/board/{board_id}/issue",
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board/{board_id}/issue",
             headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
             params={"maxResults": 100, "fields": "summary,description,status,assignee,priority,duedate,created,parent,issuetype"},
             timeout=10,
@@ -373,7 +422,7 @@ def project_jira_board(request, project_id):
     if not raw_issues:
         try:
             res = requests.post(
-                f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/search/jql",
+                f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/search/jql",
                 headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "Content-Type": "application/json"},
                 json={"jql": f"project = {project.jira_project_key} ORDER BY created DESC", "maxResults": 100, "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"]},
                 timeout=10,
@@ -415,6 +464,8 @@ def project_jira_board(request, project_id):
     return Response({
         "columns": jira_columns,
         "issues": issues_by_column,
+        "can_manage": can_manage_jira,
+        "read_only": not can_manage_jira,
     })
 
 

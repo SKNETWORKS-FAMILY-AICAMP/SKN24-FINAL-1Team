@@ -13,7 +13,6 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import {
   createProjectJiraIssue,
-  getJiraStatus,
   getProjectDetail,
   getProjectJiraBoard,
   updateProjectJiraIssueStatus,
@@ -112,29 +111,10 @@ export default function KanbanBoardPage() {
   const [canManageJira, setCanManageJira] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      setCanManageJira(false);
-      return;
-    }
-
-    let active = true;
-    getJiraStatus()
-      .then((status) => {
-        if (active) setCanManageJira(status.connected);
-      })
-      .catch(() => {
-        if (active) setCanManageJira(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [user]);
-
-  useEffect(() => {
-    if (!projectId) {
+    if (!user || !projectId) {
       setTasks([]);
       setBoardColumns(KANBAN_COLUMNS);
+      setCanManageJira(false);
       setLoading(false);
       setError(null);
       return;
@@ -153,17 +133,19 @@ export default function KanbanBoardPage() {
         console.log("[KANBAN] tasks 수:", nextTasks.length);
         setBoardColumns(nextColumns);
         setTasks(nextTasks);
+        setCanManageJira(Boolean(board.can_manage));
       })
       .catch((error) => {
         console.error("Jira 칸반 조회 실패:", error);
         setBoardColumns(KANBAN_COLUMNS);
         setTasks([]);
+        setCanManageJira(false);
         setError(getApiErrorMessage(error));
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [projectId]);
+  }, [projectId, user]);
 
   useEffect(() => {
     if (!projectId) {
@@ -369,6 +351,7 @@ export default function KanbanBoardPage() {
       }
       setBoardColumns(nextColumns);
       setTasks(nextTasks);
+      setCanManageJira(Boolean(board.can_manage));
       closeModal();
     } catch (error) {
       console.error("Jira 업무 생성 실패:", error);
@@ -404,7 +387,7 @@ export default function KanbanBoardPage() {
         ) : null}
         {!canManageJira && !loading && !error ? (
           <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#969696]">
-            Jira 연동 또는 Jira 프로젝트 접근 권한이 필요합니다.
+            Jira 미연동 계정은 조회만 가능합니다. 업무 추가와 이동은 Jira 연동 및 프로젝트 접근 권한이 필요합니다.
           </div>
         ) : null}
         {!loading && !error ? boardColumns.map((column) => (

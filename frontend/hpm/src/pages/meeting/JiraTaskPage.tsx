@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getTaskList, registerJiraTasks, type Task } from "../../services/meeting";
 import StepBar from "../../components/meeting/StepBar";
-import useMeetingReviewNavigationGuard from "../../hooks/useMeetingReviewNavigationGuard";
 
 const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
@@ -31,7 +30,6 @@ export default function JiraTaskPage() {
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
   const [showRetryModal, setShowRetryModal] = useState(false);
-  const allowReviewNavigation = useMeetingReviewNavigationGuard(!loading);
 
   useEffect(() => {
     setLoading(true);
@@ -78,7 +76,6 @@ export default function JiraTaskPage() {
         return;
       }
 
-      allowReviewNavigation();
       navigate(`/meetings/${meetingId}/archive`);
     } catch (error) {
       console.error("Jira 등록 실패:", error);
@@ -89,6 +86,7 @@ export default function JiraTaskPage() {
   };
 
   return (
+    <>
     <div className="mx-auto max-w-[960px] p-8">
       <StepBar steps={STEP_LABELS} activeStep={3} />
 
@@ -157,7 +155,6 @@ export default function JiraTaskPage() {
         <button
           type="button"
           onClick={() => {
-            allowReviewNavigation();
             navigate(`/meetings/${meetingId}/archive`);
           }}
           className="text-sm text-[#969696] underline hover:text-[#555]"
@@ -188,7 +185,6 @@ export default function JiraTaskPage() {
                 type="button"
                 onClick={() => {
                   setShowRetryModal(false);
-                  allowReviewNavigation();
                   navigate(`/meetings/${meetingId}/archive`);
                 }}
                 className="flex-1 py-4 text-sm text-gray-700 transition hover:bg-gray-50"
@@ -200,5 +196,6 @@ export default function JiraTaskPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

@@ -12,6 +12,7 @@ urlpatterns = [
     # 회의 일시중지 / 재개
     path("<int:meeting_id>/pause/", views.pause_meeting),
     path("<int:meeting_id>/resume/", views.resume_meeting),
+    path("<int:meeting_id>/reset-recording/", views.reset_meeting_recording),
     # 회의 종료 (STT + 회의록 생성)
     path("<int:meeting_id>/end/", views.end_meeting),
     # 회의록 생성 (RunPod 별도 호출)
@@ -34,6 +35,8 @@ urlpatterns = [
     path("<int:meeting_id>/agenda/status/", views.check_agenda_status),
     # speaker_mapping_list
     path("<int:meeting_id>/speaker-mapping/", views.speaker_mapping_list),
+    path("<int:meeting_id>/raw-transcript-only/", views.complete_raw_transcript_only),
+    path("<int:meeting_id>/mapped-transcript-only/", views.complete_mapped_transcript_only),
     # 회의 준비 자료
     path("<int:meeting_id>/prep/", views.prep_material_detail),
     path("<int:meeting_id>/prep/generate/", views.generate_prep_material),

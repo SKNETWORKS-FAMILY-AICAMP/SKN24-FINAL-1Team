@@ -89,7 +89,7 @@ export default function MeetingCreatePage() {
       participants,
     });
 
-    navigate(`/meetings/${meeting.meeting_id}`);
+    navigate(`/meetings/${meeting.meeting_id}`, { replace: true });
   } catch (e) {
     console.error(e);
 
@@ -192,15 +192,6 @@ export default function MeetingCreatePage() {
         </div>
       )}
   <div className="mb-6 justify-center w-full ">
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={() => navigate("/meetings")}
-            className="text-[14px] font-medium text-[#623FB5] hover:underline"
-          >
-            뒤로가기
-          </button>
-        </div>
         <div className="flex items-baseline gap-2 flex-wrap">
           <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold`}>회의 기본 정보 입력</h1>
           <span className={`${DESIGN.FONT_SIZES.sm} text-red-500 font-medium`}>* 회의 생성 후 회의 정보는 수정 불가합니다.</span>

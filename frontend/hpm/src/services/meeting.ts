@@ -182,6 +182,11 @@ export const startMeeting = async (meetingId: number): Promise<void> => {
   await api.post(`/meetings/${meetingId}/start/`);
 };
 
+export const resetMeetingRecording = async (meetingId: number): Promise<Meeting> => {
+  const res = await api.post(`/meetings/${meetingId}/reset-recording/`);
+  return res.data;
+};
+
 export const endMeeting = async (meetingId: number, audio?: File): Promise<{ minutes_data: { content: string; todo_list: Task[] } }> => {
   const formData = new FormData();
   if (audio) formData.append("audio", audio);
@@ -195,6 +200,14 @@ export const endMeeting = async (meetingId: number, audio?: File): Promise<{ min
 export const generateMinutes = async (meetingId: number): Promise<{ content: string; todo_list: Task[] }> => {
   const res = await api.post(`/meetings/${meetingId}/minutes/`);
   return res.data;
+};
+
+export const completeMeetingRawTranscriptOnly = async (meetingId: number): Promise<void> => {
+  await api.post(`/meetings/${meetingId}/raw-transcript-only/`);
+};
+
+export const completeMeetingMappedTranscriptOnly = async (meetingId: number): Promise<void> => {
+  await api.post(`/meetings/${meetingId}/mapped-transcript-only/`);
 };
 
 export const pauseMeeting = async (meetingId: number): Promise<void> => {
@@ -383,6 +396,8 @@ export interface JiraBoardColumn {
 export interface ProjectJiraBoard {
   columns: JiraBoardColumn[];
   issues: Record<string, JiraBoardIssue[]>;
+  can_manage?: boolean;
+  read_only?: boolean;
 }
 
 export const getProjectJiraBoard = async (projectId: number): Promise<ProjectJiraBoard> => {
