@@ -6,7 +6,6 @@ import {
   type MouseEvent,
 } from "react";
 import * as DESIGN from "../../constants/design";
-import moreIcon from "../../assets/kanban/more.png";
 import folder from "../../assets/project/folder.png";
 import trash from "../../assets/project/trash.png";
 
