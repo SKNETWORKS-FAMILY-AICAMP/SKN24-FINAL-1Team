@@ -597,3 +597,11 @@ export const getUserProjects = async (userId: number) => {
   const res = await api.get(`/projects/user/${userId}/`);
   return res.data;
 };
+
+export const sendProjectChatMessage = async (
+  projectId: number,
+  query: string
+): Promise<{ answer: string; sources?: string[] }> => {
+  const res = await api.post(`/chat/project/${projectId}/`, { question: query });
+  return res.data;
+};
