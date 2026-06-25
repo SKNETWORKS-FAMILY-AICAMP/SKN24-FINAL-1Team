@@ -608,18 +608,14 @@ def end_meeting(request, meeting_id):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    meeting.meeting_status = Meeting.MeetingStatus.FINISHED
-    meeting.is_meeting_approve = False
-    
+    final_during_time = meeting.during_time
     if not meeting.is_paused and meeting.meeting_at:
         delta = timezone.now() - meeting.meeting_at
         try:
             curr_sec = int(meeting.during_time or "0")
         except ValueError:
             curr_sec = 0
-        meeting.during_time = str(curr_sec + int(delta.total_seconds()))
-    meeting.is_paused = False
-    meeting.save(update_fields=["meeting_status", "is_meeting_approve", "during_time", "is_paused"])
+        final_during_time = str(curr_sec + int(delta.total_seconds()))
 
     minutes_data = {"content": "", "todo_list": []}
     if audio_file:
@@ -687,6 +683,12 @@ def end_meeting(request, meeting_id):
                 {"error": f"STT 처리 실패: {str(e)}", "meeting_id": meeting_id},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    meeting.meeting_status = Meeting.MeetingStatus.FINISHED
+    meeting.is_meeting_approve = False
+    meeting.during_time = final_during_time
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "is_meeting_approve", "during_time", "is_paused"])
 
     return Response({
         "message": "회의가 종료되었습니다. STT 변환이 완료되었습니다.",
