@@ -4,8 +4,10 @@ import {
   getMeetingDetail,
   getTaskList,
   sendMeetingSummaryEmail,
+  getUserList,
   type Meeting,
   type Task,
+  type UserListItem
 } from "../../services/meeting";
 
 const PRIORITY_LABEL: Record<string, string> = {
@@ -15,6 +17,11 @@ const PRIORITY_LABEL: Record<string, string> = {
   Low: "낮음",
   Lowest: "매우 낮음",
 };
+
+interface Recipient{
+  id : string;
+  label : string;
+}
 
 const formatDate = (value?: string | null) => {
   if (!value) return "-";
@@ -33,6 +40,10 @@ export default function MeetingEmailPage() {
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [allUsers, setAllUsers] = useState<UserListItem[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -42,32 +53,53 @@ export default function MeetingEmailPage() {
     Promise.all([getMeetingDetail(meetingId), getTaskList(meetingId)])
       .then(([meetingDetail, taskList]) => {
         setMeeting(meetingDetail);
-        setTasks(taskList || []);
+        setTasks(Array.isArray(taskList) ? taskList : []);
+        if (meetingDetail.participants?.length)
+        {
+          setRecipients(meetingDetail.participants.map((p) => ({ id : String(p.user_id), label : p.name})));
+        }
       })
-      .catch(error => {
-        console.error("요약 메일 화면 로드 실패:", error);
-        setMeeting(null);
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
+
+      getUserList()
+      .then((data) => setAllUsers(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [meetingId]);
 
-  const recipients = meeting?.participants || [];
-  const participantNames = recipients.map(participant => participant.name).join(", ") || "-";
+  const removeRecipient = (id: string) =>
+    setRecipients((prev) => prev.filter((r) => r.id !== id));
+
+  const addRecipient = (user: UserListItem) => {
+    const id = String(user.users_id);
+    if (recipients.some((r) => r.id === id)) return;
+    setRecipients((prev) => [...prev, { id, label: user.name }]);
+    setSearchInput("");
+    setShowDropdown(false);
+  };
+
+  const filteredUsers = allUsers.filter(
+    (u) =>
+      u.name.includes(searchInput) &&
+      !recipients.some((r) => r.id === String(u.users_id))
+  );
 
   const handleSend = async () => {
-    if (sending || recipients.length === 0) return;
-
-    setSending(true);
-    try {
-      await sendMeetingSummaryEmail(meetingId);
-      setSent(true);
-    } catch (error) {
-      console.error("요약 이메일 발송 실패:", error);
-      alert("요약 이메일 발송에 실패했습니다.");
-    } finally {
-      setSending(false);
-    }
-  };
+  if (sending || recipients.length === 0) return;
+  setSending(true);
+  try {
+    const recipientIds = recipients.map((r) => Number(r.id));
+    await sendMeetingSummaryEmail(meetingId, recipientIds);
+    setSent(true);
+  } catch (error) {
+    const message =
+      (error as { response?: { data?: { error?: string; failed?: unknown[] } } }).response?.data?.error ||
+      "요약 이메일 발송에 실패했습니다. 이메일 발송 설정 또는 수신자 정보를 확인해주세요.";
+    alert(message);
+  } finally {
+    setSending(false);
+  }
+};
 
   if (loading) {
     return <div className="p-8 text-gray-400">메일 발송 정보를 불러오는 중...</div>;
@@ -122,7 +154,9 @@ export default function MeetingEmailPage() {
                   </div>
                   <div className="flex gap-3">
                     <span className="min-w-[70px] text-[#969696]">회의 참석자</span>
-                    <span className="text-[#141414]">{participantNames}</span>
+                    <span className="text-[#141414]">
+                      {recipients.map((r) => r.label).join(", ") || "-"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -160,18 +194,50 @@ export default function MeetingEmailPage() {
               </div>
 
               <div className="rounded-xl border border-[#E6E1E6] bg-white p-4">
-                <p className="mb-3 text-[13px] font-bold text-[#141414]">이메일 수신자</p>
-                <div className="flex flex-wrap gap-2">
-                  {recipients.map(recipient => (
-                    <span
-                      key={recipient.user_id}
-                      className="rounded-lg border border-[#E6E1E6] bg-[#F4F5F8] px-3 py-1.5 text-[12px] text-[#141414]"
-                    >
-                      {recipient.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
+        <p className="mb-3 text-[13px] font-bold text-[#141414]">이메일 수신자</p>
+        <div className="min-h-[48px] border border-[#E6E1E6] rounded-xl px-3 py-2.5 flex flex-wrap gap-2 mb-2">
+          {recipients.map((r) => (
+            <span
+              key={r.id}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg text-[12px] text-[#141414] bg-[#F4F5F8] border border-[#E6E1E6]"
+            >
+              {r.label}
+              <button
+                type="button"
+                onClick={() => removeRecipient(r.id)}
+                className="text-[#969696] hover:text-[#141414] leading-none"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+        {/* 수신자 추가 입력창 */}
+        <div className="relative">
+          <input
+            type="text"
+            value={searchInput}
+            onChange={(e) => { setSearchInput(e.target.value); setShowDropdown(true); }}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+            placeholder="이름으로 수신자 추가"
+            className="w-full border border-[#E6E1E6] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#623FB5] transition"
+          />
+          {showDropdown && filteredUsers.length > 0 && (
+            <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-[#E6E1E6] rounded-xl shadow-md max-h-40 overflow-y-auto">
+              {filteredUsers.map((u) => (
+                <li
+                  key={u.users_id}
+                  onMouseDown={() => addRecipient(u)}
+                  className="px-4 py-2 text-[13px] text-[#141414] hover:bg-[#F4F5F8] cursor-pointer"
+                >
+                  {u.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
             </div>
 
             <div className="w-[440px] shrink-0">

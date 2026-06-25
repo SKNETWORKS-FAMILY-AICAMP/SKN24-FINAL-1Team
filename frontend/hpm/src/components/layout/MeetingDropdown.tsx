@@ -30,7 +30,8 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
   useEffect(() => {
     if (projectId) {
       api.get(`/meetings/?project_id=${projectId}`).then(res => {
-        setRecentMeetings(res.data.slice(0, 4));
+        const data = Array.isArray(res.data) ? res.data : [];
+        setRecentMeetings(data.slice(0, 4));
       }).catch(() => {});
     } else {
       setRecentMeetings([]);
@@ -136,7 +137,6 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
               }`}
             >
               <span className="truncate max-w-[110px]">{m.title}</span>
-              <span className="opacity-0 group-hover:opacity-100 text-gray-500">⋮</span>
             </button>
           ))}
           <button

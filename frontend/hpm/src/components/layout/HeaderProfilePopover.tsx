@@ -12,6 +12,8 @@ interface HeaderProfilePopoverProps {
   loading?: boolean;
   jiraConnected?: boolean;
   jiraStatusLoading?: boolean;
+  showProfileInfo?: boolean;
+  showJiraConnect?: boolean;
   onJiraConnect?: () => void;
   onChangePassword?: () => void;
   onLogout?: () => void;
@@ -32,6 +34,8 @@ export default function HeaderProfilePopover({
   loading,
   jiraConnected,
   jiraStatusLoading,
+  showProfileInfo = true,
+  showJiraConnect = true,
   onJiraConnect,
   onChangePassword,
   onLogout,
@@ -44,52 +48,58 @@ export default function HeaderProfilePopover({
       className="absolute right-0 top-[50px] z-50 w-[384px] overflow-hidden rounded-[12px] border border-[#E6E1E6] bg-[#FFFDFD] shadow-[1px_1px_14px_4px_rgba(230,228,228,0.25)]"
       data-name="user-profile"
     >
-      <div className="px-[26px] pb-[24px] pt-[26px]">
-        <div className="h-[96px] rounded-[10px] bg-[#F6F5FA] px-[18px] py-[20px]">
-          <p className="m-0 text-[17px] font-medium leading-[1.2] text-[#141414]">
-            {loading ? "..." : name ? `${name}님` : "-"}
-          </p>
-          <a
-            className="mt-[14px] block text-[15px] font-normal leading-[1.2] text-[#623FB5] underline"
-            href={email ? `mailto:${email}` : undefined}
-          >
-            {displayValue(email, loading)}
-          </a>
-        </div>
+      {showProfileInfo ? (
+        <>
+          <div className="px-[26px] pb-[24px] pt-[26px]">
+            <div className="h-[96px] rounded-[10px] bg-[#F6F5FA] px-[18px] py-[20px]">
+              <p className="m-0 text-[17px] font-medium leading-[1.2] text-[#141414]">
+                {loading ? "..." : name ? `${name}님` : "-"}
+              </p>
+              <a
+                className="mt-[14px] block text-[15px] font-normal leading-[1.2] text-[#623FB5] underline"
+                href={email ? `mailto:${email}` : undefined}
+              >
+                {displayValue(email, loading)}
+              </a>
+            </div>
 
-        <dl className="mt-[26px] grid grid-cols-[1fr_auto] gap-y-[20px] text-[15px] font-normal leading-[1.2]">
-          <dt className="text-[#969696]">사번</dt>
-          <dd className="m-0 text-right text-[#141414]">{displayValue(empNo, loading)}</dd>
-          <dt className="text-[#969696]">부서</dt>
-          <dd className="m-0 text-right text-[#141414]">{displayValue(deptName, loading)}</dd>
-          <dt className="text-[#969696]">직급</dt>
-          <dd className="m-0 text-right text-[#141414]">{displayValue(rankName, loading)}</dd>
-          <dt className="text-[#969696]">직무</dt>
-          <dd className="m-0 text-right text-[#141414]">{displayValue(work, loading)}</dd>
-        </dl>
-      </div>
+            <dl className="mt-[26px] grid grid-cols-[1fr_auto] gap-y-[20px] text-[15px] font-normal leading-[1.2]">
+              <dt className="text-[#969696]">사번</dt>
+              <dd className="m-0 text-right text-[#141414]">{displayValue(empNo, loading)}</dd>
+              <dt className="text-[#969696]">부서</dt>
+              <dd className="m-0 text-right text-[#141414]">{displayValue(deptName, loading)}</dd>
+              <dt className="text-[#969696]">직급</dt>
+              <dd className="m-0 text-right text-[#141414]">{displayValue(rankName, loading)}</dd>
+              <dt className="text-[#969696]">직무</dt>
+              <dd className="m-0 text-right text-[#141414]">{displayValue(work, loading)}</dd>
+            </dl>
+          </div>
 
-      <div className="h-px w-full bg-[#E6E1E6]" />
+          <div className="h-px w-full bg-[#E6E1E6]" />
+        </>
+      ) : null}
       <div className="flex flex-col gap-[15px] px-[26px] py-[22px]">
-        <button
-          type="button"
-          onClick={jiraDisabled ? undefined : onJiraConnect}
-          disabled={jiraDisabled}
-          className={`flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] transition-all duration-150 ease-out ${
-            jiraDisabled
-              ? "cursor-default text-[#969696]"
-              : "text-[#141414] hover:text-[#623FB5] active:scale-[0.98]"
-          }`}
-        >
-          <img src={jiraIcon} alt="" className="size-[20px] shrink-0 object-contain" />
-          <span>
-            {jiraStatusLoading
-              ? "Jira 연동 확인 중"
-              : jiraConnected
-                ? "Jira 연동됨"
-                : "Jira 연동하기"}
-          </span>
-        </button>
+        {showJiraConnect ? (
+          <button
+            type="button"
+            onClick={jiraDisabled ? undefined : onJiraConnect}
+            disabled={jiraDisabled}
+            className={`flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] transition-all duration-150 ease-out ${
+              jiraDisabled
+                ? "cursor-default text-[#969696]"
+                : "text-[#141414] hover:text-[#623FB5] active:scale-[0.98]"
+            }`}
+          >
+            <img src={jiraIcon} alt="" className="size-[20px] shrink-0 object-contain" />
+            <span>
+              {jiraStatusLoading
+                ? "Jira 연동 확인 중"
+                : jiraConnected
+                  ? "Jira 연동됨"
+                  : "Jira 연동하기"}
+            </span>
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onChangePassword}

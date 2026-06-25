@@ -9,6 +9,24 @@ export interface DocumentUploadError {
 export interface DocumentUploadResponse {
   created: DocumentRecord[];
   errors: DocumentUploadError[];
+  ingest_job_id?: string;
+  ingest_status?: string;
+  ingest_error?: string;
+}
+
+export interface DocumentIngestStartResponse {
+  document_ids: number[];
+  ingest_job_id: string;
+  ingest_status?: string;
+}
+
+export interface DocumentIngestStatusResponse {
+  status: "processing" | "completed" | "failed";
+  job_id: string;
+  error?: string;
+  result?: unknown;
+  raw_status?: string;
+  step?: string;
 }
 
 export interface UploadConfig {
@@ -41,6 +59,30 @@ export const uploadDocuments = async (
 
   const res = await api.post(`/documents/${projectId}/`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 300000,
+  });
+  return res.data;
+};
+
+export const startDocumentIngest = async (
+  projectId: number,
+  documentIds: number[],
+): Promise<DocumentIngestStartResponse> => {
+  const res = await api.post(
+    `/documents/${projectId}/ingest/`,
+    { document_ids: documentIds },
+    { timeout: 300000 },
+  );
+  return res.data;
+};
+
+export const getDocumentIngestStatus = async (
+  projectId: number,
+  jobId: string,
+): Promise<DocumentIngestStatusResponse> => {
+  const res = await api.get(`/documents/${projectId}/ingest/status/`, {
+    params: { job_id: jobId },
+    timeout: 120000,
   });
   return res.data;
 };

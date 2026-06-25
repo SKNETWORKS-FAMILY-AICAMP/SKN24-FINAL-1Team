@@ -65,6 +65,8 @@ services:
     build:
       context: .       # 소스코드 위치
       dockerfile: Dockerfile.frontend  # 사용할 Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
     container_name: hpm_frontend
     restart: unless-stopped
     ports:

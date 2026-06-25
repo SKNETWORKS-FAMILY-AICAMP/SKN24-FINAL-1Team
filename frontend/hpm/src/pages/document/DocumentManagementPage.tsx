@@ -10,14 +10,21 @@ import { useAuth } from "../../context/AuthContext";
 import { deleteDocument, getDocuments } from "../../services/documents";
 import type { DocumentRecord } from "../../types/documentManagement";
 
+const DOCUMENTS_PER_PAGE = 10;
+
+function openInNewTab(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function downloadDocumentFile(item: DocumentRecord) {
   if (item.fileUrl) {
-    const link = document.createElement("a");
-    link.href = item.fileUrl;
-    link.download = item.name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    openInNewTab(item.fileUrl);
     return;
   }
 
@@ -27,18 +34,13 @@ function downloadDocumentFile(item: DocumentRecord) {
       type: "text/plain;charset=utf-8",
     });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = item.name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  openInNewTab(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export default function DocumentManagementPage() {
   const navigate = useNavigate();
-  const { projectId } = useAuth();
+  const { projectId, user } = useAuth();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
   const [query, setQuery] = useState("");
@@ -47,6 +49,7 @@ export default function DocumentManagementPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [sortOrder, setSortOrder] = useState("전체");
+  const [currentPage, setCurrentPage] = useState(1);
   const [showDeletePermissionModal, setShowDeletePermissionModal] = useState(false);
 
   const loadDocuments = useCallback(async () => {
@@ -125,9 +128,23 @@ export default function DocumentManagementPage() {
     return filtered;
   }, [creatorFilter, documents, query, uploadPeriod, startDate, endDate, sortOrder]);
 
+  const totalPages = Math.ceil(filteredDocuments.length / DOCUMENTS_PER_PAGE);
+  const pagedDocuments = useMemo(() => {
+    const startIndex = (currentPage - 1) * DOCUMENTS_PER_PAGE;
+    return filteredDocuments.slice(startIndex, startIndex + DOCUMENTS_PER_PAGE);
+  }, [currentPage, filteredDocuments]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [creatorFilter, endDate, query, sortOrder, startDate, uploadPeriod]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(1, totalPages)));
+  }, [totalPages]);
+
   const allVisibleSelected =
-    filteredDocuments.length > 0 &&
-    filteredDocuments.every((item) => selectedIds.has(item.id));
+    pagedDocuments.length > 0 &&
+    pagedDocuments.every((item) => selectedIds.has(item.id));
 
   const toggleSelected = (documentId: number) => {
     setSelectedIds((current) => {
@@ -146,9 +163,9 @@ export default function DocumentManagementPage() {
       const next = new Set(current);
 
       if (allVisibleSelected) {
-        filteredDocuments.forEach((item) => next.delete(item.id));
+        pagedDocuments.forEach((item) => next.delete(item.id));
       } else {
-        filteredDocuments.forEach((item) => next.add(item.id));
+        pagedDocuments.forEach((item) => next.add(item.id));
       }
 
       return next;
@@ -159,20 +176,27 @@ export default function DocumentManagementPage() {
     if (!projectId || selectedIds.size === 0) return;
 
     const selectedDocs = documents.filter((item) => selectedIds.has(item.id));
-    const currentUserId = user?.users_id ?? user?.user_id;
+    const currentUserId = Number(user?.users_id ?? user?.user_id);
     const hasUnauthorized = selectedDocs.some(
-      (doc) => doc.uploaderId !== undefined && doc.uploaderId !== currentUserId,
+      (doc) => doc.uploaderId === undefined || Number(doc.uploaderId) !== currentUserId,
     );
     if (hasUnauthorized) {
       setShowDeletePermissionModal(true);
       return;
     }
 
-    await Promise.all(
-      Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
-    );
-    setSelectedIds(new Set());
-    await loadDocuments();
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
+      );
+      setSelectedIds(new Set());
+      await loadDocuments();
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+        "문서 삭제에 실패했습니다.";
+      alert(message);
+    }
   };
 
   const downloadSelected = () => {
@@ -194,18 +218,21 @@ export default function DocumentManagementPage() {
           allVisibleSelected={allVisibleSelected}
           creatorFilter={creatorFilter}
           creators={creators}
-          documents={filteredDocuments}
+          documents={pagedDocuments}
           query={query}
           selectedIds={selectedIds}
           uploadPeriod={uploadPeriod}
           startDate={startDate}
           endDate={endDate}
           sortOrder={sortOrder}
+          currentPage={currentPage}
+          totalPages={totalPages}
           onCreatorFilterChange={setCreatorFilter}
           onDeleteSelected={() => void deleteSelected()}
           onDownloadSelected={downloadSelected}
           onOpenUpload={() => navigate("/documents/upload")}
           onQueryChange={setQuery}
+          onPageChange={setCurrentPage}
           onToggleAllVisible={toggleAllVisible}
           onToggleSelected={toggleSelected}
           onUploadPeriodChange={setUploadPeriod}

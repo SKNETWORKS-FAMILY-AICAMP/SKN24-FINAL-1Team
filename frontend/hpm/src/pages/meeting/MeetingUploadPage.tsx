@@ -17,8 +17,8 @@ export default function MeetingUploadPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const meetingId = Number(id);
-  const { showAgenda = false, showPrepMaterial = false, type = "agenda", projectId } =
-    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; type?: "agenda" | "prep"; projectId?: number }) ?? {};
+  const { showAgenda = false, showPrepMaterial = false, type = "agenda" } =
+    (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; type?: "agenda" | "prep" }) ?? {};
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -78,7 +78,7 @@ export default function MeetingUploadPage() {
         await generatePrepMaterial(meetingId, null);
       }
     } catch (e) {
-      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "업로드 중 오류가 발생했습니다.";
+      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "자료 처리에 실패했습니다. OCR/AI 서버 상태를 확인해주세요.";
       setErrorMessage(msg);
       setShowErrorModal(true);
       setUploading(false);
@@ -102,7 +102,11 @@ export default function MeetingUploadPage() {
         await generateAgendaWithOcr(meetingId, null);
       }
     } catch (e) {
-      console.error("동작 처리 실패:", e);
+      const msg = (e as { response?: { data?: { error?: string } } }).response?.data?.error ?? "자료 생성에 실패했습니다. OCR/AI 서버 상태를 확인해주세요.";
+      setErrorMessage(msg);
+      setShowErrorModal(true);
+      setUploading(false);
+      return;
     } finally {
       setUploading(false);
     }

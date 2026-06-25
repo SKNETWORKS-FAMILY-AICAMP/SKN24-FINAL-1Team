@@ -622,6 +622,7 @@ def hit_to_preparation_document(hit: Any, category: str, *, project_id: Any = No
                 "meeting_id",
                 "meeting_topic",
                 "meeting_datetime",
+                "doc_id",
                 "document_id",
                 "viewer_type",
                 "viewer_id",
@@ -630,6 +631,9 @@ def hit_to_preparation_document(hit: Any, category: str, *, project_id: Any = No
                 "s3_url",
                 "file_name",
                 "source_filename",
+                "source_sha256",
+                "source_path",
+                "title",
                 "page",
                 "page_idx",
                 "page_no",
@@ -678,19 +682,41 @@ def select_preparation_documents(req: PreparationRequest) -> dict[str, Any]:
 
     docs: dict[str, list[dict[str, Any]]] = {"previous_meetings": [], "internal_documents": []}
     seen = {"previous_meetings": set(), "internal_documents": set()}
+
+    def append_preparation_hit(hit: Any, output_key: str, category: str) -> bool:
+        hit_type = hit_document_type(hit)
+        if hit_type and hit_type != category:
+            return False
+        limit = previous_top_k if output_key == "previous_meetings" else internal_top_k
+        chunk_id = str(getattr(hit, "chunk_id", ""))
+        if chunk_id in seen[output_key] or len(docs[output_key]) >= limit:
+            return False
+        seen[output_key].add(chunk_id)
+        docs[output_key].append(hit_to_preparation_document(hit, category, project_id=project_id))
+        return True
+
     previous_hits = prioritize_meeting_hits(filter_previous_meeting_hits(req, previous_hits))
     for hit, output_key, category in [
         *[(hit, "previous_meetings", "previous_meeting") for hit in previous_hits],
         *[(hit, "internal_documents", "internal_document") for hit in internal_hits],
     ]:
-        hit_type = hit_document_type(hit)
-        if hit_type and hit_type != category:
-            continue
-        limit = previous_top_k if output_key == "previous_meetings" else internal_top_k
-        chunk_id = str(getattr(hit, "chunk_id", ""))
-        if chunk_id in seen[output_key] or len(docs[output_key]) >= limit:
-            continue
-        seen[output_key].add(chunk_id)
-        docs[output_key].append(hit_to_preparation_document(hit, category, project_id=project_id))
+        append_preparation_hit(hit, output_key, category)
+
+    fallback_enabled = os.getenv("PREPARATION_PROJECT_FALLBACK_ENABLED", "true").lower() == "true"
+    if base_query and fallback_enabled and not docs["internal_documents"]:
+        fallback_hits = feature_chat_search_hits(
+            base_query,
+            top_k=fetch_k,
+            project_id=project_id,
+            meeting_id=meeting_id,
+            source_scope="project",
+            max_previous_meetings=max_previous_meetings,
+        )
+        for hit in fallback_hits:
+            hit_type = hit_document_type(hit)
+            if hit_type == "previous_meeting":
+                append_preparation_hit(hit, "previous_meetings", "previous_meeting")
+            else:
+                append_preparation_hit(hit, "internal_documents", "internal_document")
 
     return {"query": base_query, "news_query": preparation_news_query(req), **docs}

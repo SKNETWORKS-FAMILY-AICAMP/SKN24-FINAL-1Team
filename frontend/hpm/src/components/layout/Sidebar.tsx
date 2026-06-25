@@ -10,6 +10,7 @@ import * as DESIGN from "../../constants/design";
 import ProjectDropdown from "./ProjectDropdown";
 import MeetingDropdown from "./MeetingDropdown";
 import { useRecording } from "../../context/RecordingContext";
+import { getMeetingDetail } from "../../services/meeting";
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -19,7 +20,15 @@ interface SidebarProps {
 export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { meetingId: recMeetingId, startTime, isPaused, pausedElapsed } = useRecording();
+  const {
+    meetingId: recMeetingId,
+    startTime,
+    isPaused,
+    pausedElapsed,
+    startRecording,
+    stopRecording,
+    pauseRecording,
+  } = useRecording();
   const isRecording = recMeetingId !== null && (startTime !== null || pausedElapsed !== null);
 
   const [elapsed, setElapsed] = useState(() =>
@@ -42,6 +51,44 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
     }, 1000);
     return () => clearInterval(id);
   }, [isRecording, startTime, isPaused, pausedElapsed]);
+
+  useEffect(() => {
+    if (recMeetingId === null) return;
+
+    const syncMeetingTimer = async () => {
+      try {
+        const data = await getMeetingDetail(recMeetingId);
+        if (!data || data.status !== "in_progress") {
+          stopRecording();
+          return;
+        }
+
+        const serverElapsed = data.elapsed_seconds ?? 0;
+        if (data.is_paused) {
+          pauseRecording(serverElapsed);
+          return;
+        }
+
+        if (isPaused) {
+          startRecording(recMeetingId, serverElapsed);
+          return;
+        }
+
+        if (startTime !== null) {
+          const localElapsed = Math.floor((Date.now() - startTime) / 1000);
+          if (Math.abs(serverElapsed - localElapsed) > 3) {
+            startRecording(recMeetingId, serverElapsed);
+          }
+        }
+      } catch (error) {
+        console.error("회의 타이머 동기화 실패:", error);
+      }
+    };
+
+    void syncMeetingTimer();
+    const id = setInterval(syncMeetingTimer, 3000);
+    return () => clearInterval(id);
+  }, [recMeetingId, isPaused, startTime, startRecording, stopRecording, pauseRecording]);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -91,7 +138,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       {/* 네비게이션 */}
       {!isCollapsed && (
         <nav
-          className={`flex-1 flex flex-col py-3 px-[10px] overflow-y-auto ${DESIGN.GAP_SIZES.lg} transition-all duration-300`}
+          className={`flex-1 flex flex-col py-3 px-[10px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${DESIGN.GAP_SIZES.lg} transition-all duration-300`}
         >
           <ProjectDropdown isCollapsed={isCollapsed} toggleCollapse={toggleCollapse} />
 
@@ -105,7 +152,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
             }`}
           >
             <span>
-              <img src={dashboard} alt="" />
+              <img src={dashboard} alt="" className="h-[18px] w-[18px] object-contain" />
             </span>
             <span>대시보드</span>
           </button>

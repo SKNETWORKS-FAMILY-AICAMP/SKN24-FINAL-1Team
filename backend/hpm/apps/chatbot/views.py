@@ -8,6 +8,14 @@ from .models import Chatbot, ChatHistory
 from .serializers import ChatHistorySerializer
 
 
+def _can_access_meeting(request, meeting):
+    user_id = request.auth["user_id"]
+    return meeting.creator_id == user_id or MeetingUsers.objects.filter(
+        meeting=meeting,
+        user_id=user_id,
+    ).exists()
+
+
 @api_view(["POST"])
 def chat(request, meeting_id):
     """실시간 챗봇 질의"""
@@ -23,6 +31,9 @@ def chat(request, meeting_id):
         meeting = Meeting.objects.get(meeting_id=meeting_id)
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not _can_access_meeting(request, meeting):
+        return Response({"error": "회의 접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     # 챗봇 세션 가져오기 / 생성
     meeting_user, _ = MeetingUsers.objects.get_or_create(
@@ -63,7 +74,7 @@ def chat(request, meeting_id):
         resp.encoding = "utf-8"
         resp_json = resp.json()
         result = resp_json.get("result", {})
-        answer = result.get("answer", "답변을 불러오지 못했습니다.")
+        answer = result.get("answer", "관련 문서에서 확인할 수 있는 내용이 없습니다.")
         citations = result.get("citations", [])
     except Exception as e:
         answer = f"챗봇 요청 중 오류가 발생했습니다: {str(e)}"
@@ -87,6 +98,9 @@ def chat_history(request, meeting_id):
         meeting = Meeting.objects.get(meeting_id=meeting_id)
     except Meeting.DoesNotExist:
         return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not _can_access_meeting(request, meeting):
+        return Response({"error": "회의 접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     meeting_user = MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).first()
 

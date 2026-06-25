@@ -8,6 +8,7 @@ import {
 import * as DESIGN from "../../constants/design";
 import moreIcon from "../../assets/kanban/more.png";
 import folder from "../../assets/project/folder.png";
+import trash from "../../assets/project/trash.png";
 
 const VISIBLE_MEMBER_COUNT = 3;
 
@@ -80,25 +81,14 @@ export default function ProjectCard({
             onClick={handleMenuClick}
             className="flex size-[28px] items-center justify-center rounded-full transition hover:bg-[#E6E1E6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]"
           >
-            <img alt="" aria-hidden="true" src={moreIcon} className="h-[16px] w-[3px] object-contain" />
-          </button>
-
-          {menuOpen ? (
-            <div
-              role="menu"
-              className="absolute right-0 top-[34px] w-[126px] rounded-[14px] border border-[#F1EAF5] bg-white px-[10px] py-[8px] shadow-[0_6px_18px_rgba(20,20,20,0.12)]"
-              onClick={(event) => event.stopPropagation()}
-            >
               <button
                 type="button"
                 role="menuitem"
                 onClick={handleDeleteClick}
-                className="h-[32px] w-full rounded-[8px] text-center text-[13px] font-medium text-[#FF2B2B] transition hover:bg-[#FFF1F1]"
               >
-                프로젝트 삭제
+                <img src={trash} alt="" className="w-4" />
               </button>
-            </div>
-          ) : null}
+          </button>
         </div>
       ) : null}
 

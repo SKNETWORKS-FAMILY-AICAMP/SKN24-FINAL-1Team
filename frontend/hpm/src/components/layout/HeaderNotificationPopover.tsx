@@ -23,6 +23,7 @@ interface HeaderNotificationPopoverProps {
 }
 
 const TYPE_META: Record<Notification["notification_type"], { category: Exclude<NotificationTab, "전체">; kind: string }> = {
+  document_uploaded: { category: "프로젝트", kind: "문서 적재" },
   project_member_added: { category: "프로젝트", kind: "프로젝트 추가" },
   meeting_invited: { category: "회의", kind: "회의 초대" },
   meeting_started: { category: "회의", kind: "회의 시작" },
@@ -54,6 +55,8 @@ const getNotificationPath = (notification: Notification) => {
       return notification.target_id ? `/meetings/${notification.target_id}/minutes` : null;
     case "task_assigned":
       return "/dashboard";
+    case "document_uploaded":
+      return "/documents";
     case "project_member_added":
     default:
       return null;
@@ -244,7 +247,7 @@ export default function HeaderNotificationPopover({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "absolute left-[289px] top-[25px] flex size-[20px] items-center justify-center rounded-full border",
+                      "absolute left-[265px] top-[25px] flex size-[20px] items-center justify-center rounded-full border",
                       selected
                         ? "border-[#623FB5] bg-[#623FB5]"
                         : "border-[#969696] bg-[#FFFDFD]",

@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import type { ReactNode } from "react";
 import Layout from "../components/layout/Layout";
+import { useAuth } from "../context/AuthContext";
 import LoginPage from "../pages/auth/LoginPage";
 import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import ProjectSelectPage from "../pages/project/ProjectSelectPage";
@@ -23,11 +25,30 @@ import DocumentManagementPage from "../pages/document/DocumentManagementPage";
 import DocumentUploadPage from "../pages/document/DocumentUploadPage";
 import MemberManagementPage from "../pages/member/MemberManagementPage";
 import UserManagementPage from "../pages/admins/UserManagementPage";
+import NotFoundPage from "../pages/error/NotFoundPage";
 
 
 
 function DocumentRoutes() {
   return <Outlet />;
+}
+
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="p-8 text-gray-400">권한을 확인하는 중...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== "ADMIN") {
+    return <Navigate to="/projects" replace />;
+  }
+
+  return children;
 }
 
 const router = createBrowserRouter([
@@ -38,7 +59,7 @@ const router = createBrowserRouter([
       { path: "/change-password", element: <ChangePasswordPage /> },
       { path: "/projects", element: <ProjectSelectPage /> },
       { path: "/projects/create", element: <ProjectCreatePage /> },
-      { path: "/", element: <Navigate to="/dashboard" replace /> },
+      { path: "/", element: <Navigate to="/login" replace /> },
       { path: "/dashboard", element: <KanbanBoardPage /> },
       { path: "/meetings", element: <MeetingListPage /> },
       { path: "/meetings/create", element: <MeetingCreatePage /> },
@@ -63,10 +84,17 @@ const router = createBrowserRouter([
         ],
       },
       { path: "/members", element: <MemberManagementPage /> },
-      { path: "/admin/users", element: <UserManagementPage /> },
+      {
+        path: "/admin/users",
+        element: (
+          <RequireAdmin>
+            <UserManagementPage />
+          </RequireAdmin>
+        ),
+      },
     ],
   },
-  { path: "/admin/users", element: <UserManagementPage /> },
+  { path: "*", element: <NotFoundPage /> },
 ]);
 
 export default router;

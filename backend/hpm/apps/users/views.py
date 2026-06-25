@@ -1,6 +1,7 @@
 import hashlib
 import base64
 import json
+import re
 
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -16,12 +17,14 @@ from django.utils import timezone
 from datetime import timedelta
 from django.http import HttpResponse
 from django.core.cache import cache
+from django.contrib.auth.hashers import check_password, make_password
 
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import permission_classes
 from django.conf import settings
+from django.middleware.csrf import get_token
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.exceptions import TokenError, InvalidToken
 
@@ -38,7 +41,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 JIRA_CLIENT_ID = os.getenv("JIRA_CLIENT_ID", "")
 JIRA_CLIENT_SECRET = os.getenv("JIRA_CLIENT_SECRET", "")
 JIRA_REDIRECT_URI = os.getenv("JIRA_REDIRECT_URI", "http://localhost:8000/api/jira/callback/")
-JIRA_SCOPES = "read:jira-work write:jira-work offline_access"
+JIRA_SCOPES = "read:jira-work write:jira-work read:board-scope:jira-software read:board-scope.admin:jira-software offline_access"
 
 
 def _hash_pw(raw: str) -> str:
@@ -86,9 +89,39 @@ def _jira_redirect(next_path: str = "", result: str = "success"):
 
 
 def _password_matches(user: Users, raw: str) -> bool:
-    return (
+    if check_password(raw, user.password):
+        return True
+
+    legacy_plain = (
         raw == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD
-    ) or user.password == _hash_pw(raw)
+    )
+    legacy_sha = user.password == _hash_pw(raw)
+    if legacy_plain or legacy_sha:
+        user.password = make_password(raw)
+        user.save(update_fields=["password"])
+        return True
+
+    return False
+
+
+def _cookie_secure():
+    return not settings.DEBUG
+
+
+def _set_csrf_cookie(request, response):
+    response.set_cookie(
+        key="csrftoken",
+        value=get_token(request),
+        secure=_cookie_secure(),
+        samesite="Lax",
+    )
+    return response
+
+
+def _require_admin(request):
+    if getattr(request.user, "role", None) == "ADMIN":
+        return None
+    return Response({"error": "관리자 권한이 필요합니다."}, status=status.HTTP_403_FORBIDDEN)
 
 def get_tokens_for_user(user):
     refresh = RefreshToken()
@@ -112,16 +145,13 @@ def login(request):
         return Response({"error": "이메일 또는 비밀번호가 올바르지 않습니다."}, 
         status=status.HTTP_401_UNAUTHORIZED)
 
-    raw_match = (password == settings.DEFAULT_USER_PASSWORD and user.password == settings.DEFAULT_USER_PASSWORD)
-    hash_match = (user.password == _hash_pw(password))
-
     if user.account_status == 2:
         return Response({"error": "잠금 처리된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
 
     if user.status != 0:
         return Response({"error": "비활성화된 계정입니다."}, status=status.HTTP_403_FORBIDDEN)
 
-    if not (raw_match or hash_match):
+    if not _password_matches(user, password):
         fail_key = f"login_fail_{user.users_id}"
         fail_count = cache.get(fail_key, 0) + 1
         cache.set(fail_key, fail_count, timeout=None)
@@ -156,7 +186,7 @@ def login(request):
         key="access",
         value=tokens["access"],
         httponly=True,
-        secure=False,
+        secure=_cookie_secure(),
         samesite="Lax",
     )
 
@@ -164,10 +194,21 @@ def login(request):
         key="refresh",
         value=tokens["refresh"],
         httponly=True,
-        secure=False,
+        secure=_cookie_secure(),
         samesite="Lax",
     )
 
+    _set_csrf_cookie(request, response)
+    return response
+
+# 로그아웃
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def logout(request):
+    response = Response({"message": "로그아웃 성공"})
+    response.delete_cookie("access", path="/")
+    response.delete_cookie("refresh", path="/")
+    response.delete_cookie("csrftoken", path="/")
     return response
 
 # 로그인 유지
@@ -176,13 +217,14 @@ def login(request):
 def get_me(request):
     user = request.user
 
-    return Response({
+    response = Response({
         "users_id": user.users_id,
         "email": user.email,
         "name": user.name,
         "role": user.role,
         "account_status": user.account_status,
     })
+    return _set_csrf_cookie(request, response)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -252,8 +294,12 @@ def user_detail(request, users_id):
     # 비밀번호 변경
     new_pw = request.data.get("password")
     if new_pw:
-        if len(new_pw) < 6:
-            return Response({"error": "password must be at least 6 characters."}, status=status.HTTP_400_BAD_REQUEST)
+        if not (8 <= len(new_pw) <= 16):
+            return Response({"error": "비밀번호는 8~16자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(re.findall(r'\d', new_pw)) < 2:
+            return Response({"error": "비밀번호에 숫자가 2개 이상 포함되어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if not re.search(r'[!@#$%^&*?~]', new_pw):
+            return Response({"error": "비밀번호에 특수문자(!@#$%^&*?~)가 1개 이상 포함되어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         if user.account_status != 0:
             current_pw = request.data.get("current_password", "")
@@ -262,11 +308,11 @@ def user_detail(request, users_id):
             if not _password_matches(user, current_pw):
                 return Response({"error": "current_password is incorrect."}, status=status.HTTP_400_BAD_REQUEST)
 
-        user.password = _hash_pw(new_pw)
+        user.password = make_password(new_pw)
         user.account_status = 1
 
-    user.save()
-    return Response(UserSerializer(user).data)
+        user.save()
+        return Response(UserSerializer(user).data)
 
 # ── Step 1: Jira 로그인 시작 ───────────────────────────────────────────────
 # GET /api/jira/start/
@@ -657,6 +703,10 @@ def jira_issue_types(request):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def admin_user_list(request):
+    admin_error = _require_admin(request)
+    if admin_error:
+        return admin_error
+
     if request.method == "POST":
         emp_no    = request.data.get("emp_no", "").strip()
         name      = request.data.get("name", "").strip()
@@ -667,10 +717,39 @@ def admin_user_list(request):
 
         if not all([emp_no, name, email, dept_name, rank_name, work]):
             return Response({"error": "모든 필수 항목을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not re.match(r'^\d{4}-[A-Z]+-\d+$', emp_no):
+            return Response({"error": "사원번호 형식이 올바르지 않습니다. (예: 2026-HR-3)"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(email) > 50:
+            return Response({"error": "이메일은 50자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        local, _, domain = email.partition("@")
+        if not re.match(r'^[a-zA-Z0-9]+$', local):
+            return Response({"error": "이메일 @ 앞은 영문과 숫자만 가능합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(name) > 30:
+            return Response({"error": "이름은 30자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(dept_name) > 50:
+            return Response({"error": "부서명은 50자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if len(rank_name) > 5:
+            return Response({"error": "직급은 5자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+       
+        if len(work) > 30:
+            return Response({"error": "직무는 30자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
         if Users.objects.filter(emp_no=emp_no).exists():
             return Response({"error": "이미 존재하는 사원번호입니다."}, status=status.HTTP_400_BAD_REQUEST)
         if Users.objects.filter(email=email).exists():
             return Response({"error": "이미 존재하는 이메일입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        
         
         dept, _ = Dept.objects.get_or_create(dept_name=dept_name)
         rank, _ = Rank.objects.get_or_create(rank_name=rank_name)
@@ -678,7 +757,7 @@ def admin_user_list(request):
         user = Users.objects.create(
             emp_no=emp_no, name=name, email=email,
             dept=dept, rank=rank, work=work,
-            password=settings.DEFAULT_USER_PASSWORD,
+            password=make_password(settings.DEFAULT_USER_PASSWORD),
             status=0, account_status=0,
         )
 
@@ -703,6 +782,10 @@ def admin_user_list(request):
 @api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def admin_user_detail(request, users_id):
+    admin_error = _require_admin(request)
+    if admin_error:
+        return admin_error
+
     try:
         user = Users.objects.select_related("dept", "rank").get(users_id=users_id)
     except Users.DoesNotExist:
@@ -739,7 +822,7 @@ def admin_user_detail(request, users_id):
         user.account_status = request.data["account_status"]
 
     if request.data.get("reset_password"):
-        user.password = settings.DEFAULT_USER_PASSWORD
+        user.password = make_password(settings.DEFAULT_USER_PASSWORD)
         user.account_status = 0
 
     user.save()
@@ -753,11 +836,19 @@ def admin_user_detail(request, users_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def dept_list(request):
+    admin_error = _require_admin(request)
+    if admin_error:
+        return admin_error
+
     depts = Dept.objects.all().order_by("dept_id")
     return Response([{"dept_id": d.dept_id, "dept_name": d.dept_name} for d in depts])
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def rank_list(request):
+    admin_error = _require_admin(request)
+    if admin_error:
+        return admin_error
+
     ranks = Rank.objects.all().order_by("rank_id")
     return Response([{"rank_id": r.rank_id, "rank_name": r.rank_name} for r in ranks])

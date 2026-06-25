@@ -45,6 +45,32 @@ DEFAULT_JIRA_COLUMNS = [
 ]
 
 
+def _request_user_id(request):
+    if isinstance(request.auth, dict) and request.auth.get("user_id") is not None:
+        user_id = request.auth["user_id"]
+    else:
+        user_id = getattr(request.user, "users_id", None)
+
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return user_id
+
+
+def _jira_context_for_user(user):
+    access_token = get_valid_access_token(user)
+    return access_token, user.jira_cloud_id
+
+
+def _user_has_jira_project_access(user, project_key):
+    access_token, cloud_id = _jira_context_for_user(user)
+    if not access_token or not cloud_id:
+        return False, access_token, cloud_id
+
+    jira_access_error = _check_jira_project_access(access_token, cloud_id, project_key)
+    return jira_access_error is None, access_token, cloud_id
+
+
 RANK_PRIORITY = [
     "회장",
     "대표",
@@ -84,7 +110,11 @@ def _project_card_data(project):
     )
     users_by_id = {member.user_id: member.user for member in project_members}
     users_by_id.setdefault(project.project_owner_id, project.project_owner)
-    members = sorted(users_by_id.values(), key=_user_rank_sort_key)
+    owner = project.project_owner
+    members = [owner] + sorted(
+        [user for user in users_by_id.values() if user.users_id != project.project_owner_id],
+        key=_user_rank_sort_key,
+    )
 
     return {
         **ProjectSerializer(project).data,
@@ -96,6 +126,25 @@ def _project_card_data(project):
             for member in members
         ],
     }
+
+
+def _check_jira_project_access(access_token, cloud_id, project_key):
+    try:
+        res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project/{project_key}",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        return Response({"error": "Jira 프로젝트 접근 권한 확인에 실패했습니다."}, status=status.HTTP_502_BAD_GATEWAY)
+
+    if res.status_code in (401, 403, 404):
+        return Response({"error": "Jira 프로젝트 접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    if not res.ok:
+        return Response({"error": "Jira 프로젝트 조회에 실패했습니다."}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return None
 
 
 def _status_name_map(access_token, cloud_id):
@@ -115,10 +164,6 @@ def _status_name_map(access_token, cloud_id):
 
 
 def _get_jira_board_columns(access_token, cloud_id, project_key):
-    """
-    /rest/api/3/project/{key}/statuses 로 status category별 컬럼을 동적 생성.
-    read:jira-work 스코프만으로 동작.
-    """
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
 
     try:
@@ -135,50 +180,36 @@ def _get_jira_board_columns(access_token, cloud_id, project_key):
         print(f"[BOARD] statuses 응답 오류: {res.status_code} {res.text[:200]}")
         return DEFAULT_JIRA_COLUMNS
 
-    # status category별로 status_name / status_id 수집
-    # statusCategory.key: "new"(할 일) / "indeterminate"(진행중) / "done"(완료) / 기타
-    cat_data: dict[str, dict] = {}
+    # statusCategory 순서: new(할 일) → indeterminate(진행) → done(완료)
+    CATEGORY_ORDER = {"new": 0, "indeterminate": 1, "done": 2}
+
+    seen_ids = set()
+    statuses = []
+
     for issue_type in res.json():
         for st in issue_type.get("statuses", []):
-            cat = st.get("statusCategory", {})
-            cat_key = cat.get("key", "undefined")
-            cat_name = cat.get("name", cat_key)
-            if cat_key not in cat_data:
-                cat_data[cat_key] = {
-                    "category_name": cat_name,
-                    "status_names": [],
-                    "status_ids": [],
-                }
-            name = st.get("name", "")
             sid = str(st.get("id", ""))
-            if name and name not in cat_data[cat_key]["status_names"]:
-                cat_data[cat_key]["status_names"].append(name)
-            if sid and sid not in cat_data[cat_key]["status_ids"]:
-                cat_data[cat_key]["status_ids"].append(sid)
+            if not sid or sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            cat_key = st.get("statusCategory", {}).get("key", "undefined")
+            sort_key = CATEGORY_ORDER.get(cat_key, 3)
+            statuses.append((sort_key, st.get("name", ""), sid))
 
-    # 고정 순서: new → indeterminate → done → 기타
-    CATEGORY_ORDER = ["new", "indeterminate", "done"]
-    CATEGORY_LABELS = {"new": "할 일", "indeterminate": "진행중", "done": "완료"}
+    statuses.sort(key=lambda x: x[0])
 
-    columns = []
-    for cat_key in CATEGORY_ORDER:
-        if cat_key in cat_data:
-            columns.append({
-                "id": f"jira-{cat_key}",
-                "label": CATEGORY_LABELS.get(cat_key, cat_data[cat_key]["category_name"]),
-                "status_ids": cat_data[cat_key]["status_ids"],
-                "status_names": cat_data[cat_key]["status_names"],
-            })
-    for cat_key, data in cat_data.items():
-        if cat_key not in CATEGORY_ORDER:
-            columns.append({
-                "id": f"jira-{cat_key}",
-                "label": data["category_name"],
-                "status_ids": data["status_ids"],
-                "status_names": data["status_names"],
-            })
+    columns = [
+        {
+            "id": f"status-{sid}",
+            "label": name,
+            "status_ids": [sid],
+            "status_names": [name],
+        }
+        for sort_key, name, sid in statuses
+        if name
+    ]
 
-    print(f"[BOARD] 동적 컬럼: {[(c['label'], c['status_names']) for c in columns]}")
+    print(f"[BOARD] 동적 컬럼: {[c['label'] for c in columns]}")
     return columns or DEFAULT_JIRA_COLUMNS
 
 
@@ -199,7 +230,7 @@ def _match_jira_column(columns, jira_status):
 
 @api_view(["GET", "POST"])
 def project_list(request):
-    user_id = request.auth['user_id']
+    user_id = _request_user_id(request)
     if request.method == "GET":
         owned = Project.objects.filter(project_owner_id = user_id)
         joined = Project.objects.filter(projectusers__user_id=user_id)
@@ -212,8 +243,11 @@ def project_list(request):
 
         return Response([_project_card_data(project) for project in qs])
 
-    # POST - 프로젝트 생성
+
     data = request.data
+    member_ids = data.get("member_ids", [])
+    if not member_ids:
+        return Response({"error": "구성원을 최소 1명 이상 추가해야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
     jira_project_key = data.get("jira_project_key") or None
     if jira_project_key and Project.objects.filter(jira_project_key=jira_project_key).exists():
         return Response(
@@ -230,10 +264,10 @@ def project_list(request):
         project_name=data.get("project_name", ""),
         jira_project_key=jira_project_key,
     )
-    # 생성자를 구성원으로 자동 추가
+    
     ProjectUsers.objects.get_or_create(project=project, user=owner)
-
-    # 초대 구성원 추가
+    
+    
     for uid in data.get("member_ids", []):
         try:
             if uid == owner.users_id:
@@ -257,7 +291,7 @@ def project_list(request):
 
 @api_view(["GET", "POST"])
 def project_jira_board(request, project_id):
-    user_id = request.auth["user_id"]
+    user_id = _request_user_id(request)
 
     try:
         project = Project.objects.get(project_id=project_id)
@@ -271,29 +305,28 @@ def project_jira_board(request, project_id):
     if not project.jira_project_key:
         return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    user = project.project_owner
-
-    access_token = get_valid_access_token(user)
-    if not access_token:
-        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if not user.jira_cloud_id:
-        return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
-
-    jira_columns = _get_jira_board_columns(access_token, user.jira_cloud_id, project.jira_project_key)
+    try:
+        user = Users.objects.get(users_id=user_id)
+    except Users.DoesNotExist:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == "POST":
-        try:
-            requester = Users.objects.get(users_id=user_id)
-        except Users.DoesNotExist:
-            return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        access_token, cloud_id = _jira_context_for_user(user)
+        if not access_token:
+            return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        requester_token = get_valid_access_token(requester)
-        if not requester_token or not requester.jira_cloud_id:
-            return Response({"error": "Jira connection is required to manage board tasks."}, status=status.HTTP_403_FORBIDDEN)
+        if not cloud_id:
+            return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-        access_token = requester_token
-        user = requester
+        jira_access_error = _check_jira_project_access(
+            access_token,
+            cloud_id,
+            project.jira_project_key,
+        )
+        if jira_access_error:
+            return jira_access_error
+
+        jira_columns = _get_jira_board_columns(access_token, cloud_id, project.jira_project_key)
 
         title = (request.data.get("title") or "").strip()
         if not title:
@@ -311,7 +344,7 @@ def project_jira_board(request, project_id):
         result = create_jira_issue_for_board(
             title,
             access_token,
-            user.jira_cloud_id,
+            cloud_id,
             project.jira_project_key,
             description=request.data.get("description", ""),
             due_date=request.data.get("due_date"),
@@ -329,41 +362,76 @@ def project_jira_board(request, project_id):
                 result["issue_key"],
                 column_id,
                 access_token,
-                user.jira_cloud_id,
+                cloud_id,
                 target_status_names=target_status_names,
             )
         result["column_id"] = column_id or jira_columns[0]["id"]
 
         return Response(result, status=status.HTTP_201_CREATED)
 
-    try:
-        res = requests.post(
-            f"https://api.atlassian.com/ex/jira/{user.jira_cloud_id}/rest/api/3/search/jql",
-            headers={
-                "Authorization": f"Bearer {access_token}",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            },
-            json={
-                "jql": f"project = {project.jira_project_key} ORDER BY created DESC",
-                "maxResults": 100,
-                "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"],
-            },
+    can_manage_jira, access_token, cloud_id = _user_has_jira_project_access(
+        user,
+        project.jira_project_key,
+    )
+    if not can_manage_jira:
+        owner = project.project_owner
+        access_token, cloud_id = _jira_context_for_user(owner)
+        if not access_token:
+            return Response(
+                {"error": "프로젝트 생성자의 Jira 연동이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        if not cloud_id:
+            return Response(
+                {"error": "프로젝트 생성자의 Jira 클라우드 ID가 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        jira_access_error = _check_jira_project_access(
+            access_token,
+            cloud_id,
+            project.jira_project_key,
+        )
+        if jira_access_error:
+            return jira_access_error
+
+    jira_columns = _get_jira_board_columns(access_token, cloud_id, project.jira_project_key)
+
+    # 1) Agile 보드 이슈 조회 시도
+    raw_issues = []
+    board_res = requests.get(
+        f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board",
+        headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+        params={"projectKeyOrId": project.jira_project_key, "type": "kanban"},
+        timeout=10,
+    )
+
+    if board_res.ok and board_res.json().get("values"):
+        board_id = board_res.json()["values"][0]["id"]
+        agile_res = requests.get(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/board/{board_id}/issue",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
+            params={"maxResults": 100, "fields": "summary,description,status,assignee,priority,duedate,created,parent,issuetype"},
             timeout=10,
         )
-    except requests.RequestException as exc:
-        return Response(
-            {"error": "Jira 업무 조회에 실패했습니다.", "detail": str(exc)},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
+        if agile_res.ok:
+            raw_issues = agile_res.json().get("issues", [])
 
-    if not res.ok:
-        return Response(
-            {"error": "Jira 업무 조회에 실패했습니다.", "detail": res.text},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
-
-    raw_issues = res.json().get("issues", [])
+    # 2) Agile API 실패 시 JQL 폴백
+    if not raw_issues:
+        try:
+            res = requests.post(
+                f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/search/jql",
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "Content-Type": "application/json"},
+                json={"jql": f"project = {project.jira_project_key} ORDER BY created DESC", "maxResults": 100, "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"]},
+                timeout=10,
+            )
+            if res.ok:
+                raw_issues = res.json().get("issues", [])
+        except requests.RequestException:
+            pass
+    
     print(f"[BOARD] JQL 결과 이슈 수: {len(raw_issues)}")
     issues_by_column = {column["id"]: [] for column in jira_columns}
     for issue in raw_issues:
@@ -396,12 +464,14 @@ def project_jira_board(request, project_id):
     return Response({
         "columns": jira_columns,
         "issues": issues_by_column,
+        "can_manage": can_manage_jira,
+        "read_only": not can_manage_jira,
     })
 
 
 @api_view(["PATCH"])
 def project_jira_board_issue_status(request, project_id, issue_key):
-    user_id = request.auth["user_id"]
+    user_id = _request_user_id(request)
 
     # 1) 프로젝트 존재 확인
     try:
@@ -426,6 +496,14 @@ def project_jira_board_issue_status(request, project_id, issue_key):
 
     if not user.jira_cloud_id:
         return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    jira_access_error = _check_jira_project_access(
+        access_token,
+        user.jira_cloud_id,
+        project.jira_project_key,
+    )
+    if jira_access_error:
+        return jira_access_error
 
     # 4) 요청 본문 파싱
     column_id = request.data.get("column_id")
@@ -457,6 +535,12 @@ def project_detail(request, project_id):
     except Project.DoesNotExist:
         return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
+    user_id = _request_user_id(request)
+    is_admin = getattr(request.user, "role", None) == "ADMIN"
+    is_member = ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
+    if not is_admin and project.project_owner_id != user_id and not is_member:
+        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
+
     if request.method == "GET":
         data = ProjectSerializer(project).data
         members = ProjectUsers.objects.filter(project=project).select_related("user", "user__dept", "user__rank")
@@ -477,7 +561,7 @@ def project_detail(request, project_id):
         return Response(data)
 
     if request.method == "PATCH":
-        if project.project_owner_id != request.auth["user_id"]:
+        if project.project_owner_id != user_id and not is_admin:
             return Response({"error": "프로젝트 생성자만 구성원을 추가할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
         # 구성원 추가 / 삭제
@@ -508,7 +592,7 @@ def project_detail(request, project_id):
 
         return Response(ProjectSerializer(project).data)
 
-    if project.project_owner_id != request.auth["user_id"]:
+    if project.project_owner_id != user_id and not is_admin:
         return Response({"error": "프로젝트 생성자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     project.delete()

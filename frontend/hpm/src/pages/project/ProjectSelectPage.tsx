@@ -126,13 +126,13 @@ export default function ProjectSelectPage() {
         </div>
       ) : null}
 
-      <div className="flex-1 p-10 pt-24 max-w-[1504px] mx-auto w-full">
+      <div className="flex-1 px-10 pb-10 pt-24 max-w-[1584px] mx-auto w-full">
         <h1 className={`${DESIGN.FONT_SIZES.h2} ${DESIGN.MARGIN_BOTTOM_SIZES.sm}`}>프로젝트</h1>
         <p className={`${DESIGN.FONT_SIZES.lg} ${DESIGN.MARGIN_BOTTOM_SIZES["3xl"]} ${DESIGN.COLORS.gray}`}>회의를 생성할 프로젝트를 선택해주세요.</p>
         {loading ? (
           <div className="text-sm text-gray-400">불러오는 중...</div>
         ) : (
-          <div className={`flex flex-wrap ${DESIGN.GAP_SIZES["4xl"]} justify-start`}>
+          <div className={`grid grid-cols-[repeat(auto-fit,352px)] ${DESIGN.GAP_SIZES["4xl"]} justify-start`}>
           {projects.map(p => (
             <ProjectCard 
               key={p.project_id}

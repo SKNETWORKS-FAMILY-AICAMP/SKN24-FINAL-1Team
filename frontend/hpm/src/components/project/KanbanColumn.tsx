@@ -68,6 +68,7 @@ interface KanbanColumnProps {
   draggingTaskId?: number | null;
   isDragActive?: boolean;
   canManage?: boolean;
+  minHeight?: number;
 }
 
 export default function KanbanColumn({
@@ -81,10 +82,14 @@ export default function KanbanColumn({
   draggingTaskId = null,
   isDragActive = false,
   canManage = true,
+  minHeight,
 }: KanbanColumnProps) {
   const [isOver, setIsOver] = useState(false);
   const hasTasks = tasks.length > 0;
-  const columnHeight = getKanbanColumnHeight(tasks.length);
+  const naturalColumnHeight = Math.max(getKanbanColumnHeight(tasks.length), minHeight ?? 0);
+  const columnHeight = naturalColumnHeight;
+  const bodyHeight = columnHeight - KANBAN_COLUMN_BODY_TOP - 12;
+  const contentHeight = Math.max(naturalColumnHeight - KANBAN_COLUMN_BODY_TOP, bodyHeight);
   const columnBackground = isOver ? "#E3DAFB" : hasTasks ? "#ECECF2" : "#EFECEF";
   const addButtonTop = KANBAN_FIRST_CARD_TOP + tasks.length * KANBAN_CARD_GAP;
 
@@ -122,10 +127,10 @@ export default function KanbanColumn({
         {column.label}
       </h2>
       <div
-        className="absolute left-0 w-full overflow-visible"
-        style={{ top: KANBAN_COLUMN_BODY_TOP }}
+        className="absolute left-0 w-full"
+        style={{ top: KANBAN_COLUMN_BODY_TOP, height: bodyHeight }}
       >
-        <div className="relative w-full">
+        <div className="relative w-full" style={{ height: contentHeight }}>
           {hasTasks ? (
             <>
               {tasks.map((task, index) => (

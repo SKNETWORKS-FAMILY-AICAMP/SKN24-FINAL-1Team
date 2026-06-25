@@ -143,7 +143,15 @@ export default function MeetingArchivePage() {
       card.appendChild(cardHeader);
 
       const table = document.createElement("table");
-      table.style.cssText = `width:100%; border-collapse:collapse; font-size:13px;`;
+      table.style.cssText = `width:100%; border-collapse:collapse; table-layout:fixed; font-size:13px;`;
+
+      const colgroup = document.createElement("colgroup");
+      ["120px", "calc((100% - 240px) / 2)", "120px", "calc((100% - 240px) / 2)"].forEach(width => {
+        const col = document.createElement("col");
+        col.style.width = width;
+        colgroup.appendChild(col);
+      });
+      table.appendChild(colgroup);
 
     
       const mkTd = (text: string, isLabel: boolean, opts: { colSpan?: number; borderRight?: boolean; borderBottom?: boolean } = {}) => {
@@ -161,7 +169,7 @@ export default function MeetingArchivePage() {
       // 회의 주제
       const r1 = document.createElement("tr");
       r1.appendChild(mkTd("회의 주제", true, { borderBottom: true }));
-      r1.appendChild(mkTd(meeting.title, false, { borderBottom: true }));
+      r1.appendChild(mkTd(meeting.title, false, { colSpan: 3, borderBottom: true }));
       table.appendChild(r1);
 
       // 회의 일시 + 작성자
@@ -175,29 +183,27 @@ export default function MeetingArchivePage() {
       // 회의 장소
       const r3 = document.createElement("tr");
       r3.appendChild(mkTd("회의 장소", true, { borderBottom: true }));
-      r3.appendChild(mkTd(meeting.location || "-", false, { borderBottom: true }));
+      r3.appendChild(mkTd(meeting.location || "-", false, { colSpan: 3, borderBottom: true }));
       table.appendChild(r3);
 
       // 참석자 
       const r4 = document.createElement("tr");
       r4.appendChild(mkTd("참석자", true, { borderBottom: false }));
-      r4.appendChild(mkTd(participantNames, false, { borderBottom: false }));
+      r4.appendChild(mkTd(participantNames, false, { colSpan: 3, borderBottom: false }));
       table.appendChild(r4);
 
       card.appendChild(table);
 
       // 회의 내용
-      if (meeting.meeting_document) {
-        const secHeader = document.createElement("div");
-        secHeader.style.cssText = `padding:12px 20px; text-align:center; font-size:13px; font-weight:600; color:#141414; background:#F4F5F8; border-top:1px solid #D0D0D0; border-bottom:1px solid #D0D0D0;`;
-        secHeader.textContent = "회의 내용";
-        card.appendChild(secHeader);
+      const secHeader = document.createElement("div");
+      secHeader.style.cssText = `padding:12px 20px; text-align:center; font-size:13px; font-weight:600; color:#141414; background:#F4F5F8; border-top:1px solid #D0D0D0; border-bottom:1px solid #D0D0D0;`;
+      secHeader.textContent = "회의 내용";
+      card.appendChild(secHeader);
 
-        const docBox = document.createElement("div");
-        docBox.style.cssText = `padding:16px 20px; font-size:13px; line-height:1.9; white-space:pre-wrap; color:#333;`;
-        docBox.textContent = meeting.meeting_document;
-        card.appendChild(docBox);
-      }
+      const docBox = document.createElement("div");
+      docBox.style.cssText = `padding:16px 20px; font-size:13px; line-height:1.9; white-space:pre-wrap; color:#333; min-height:96px;`;
+      docBox.textContent = meeting.meeting_document?.trim() || "회의록 내용이 없습니다.";
+      card.appendChild(docBox);
 
       wrapper.appendChild(card);
 
@@ -207,7 +213,7 @@ export default function MeetingArchivePage() {
 
       const taskHeader = document.createElement("div");
       taskHeader.style.cssText = `padding:12px 20px; text-align:center; font-size:13px; font-weight:600; color:#141414; background:#F4F5F8; border-bottom:1px solid #D0D0D0;`;
-      taskHeader.textContent = "업무";
+      taskHeader.textContent = "업무 내용";
       taskCard.appendChild(taskHeader);
 
       // 컬럼 헤더
@@ -220,6 +226,13 @@ export default function MeetingArchivePage() {
         taskColHeader.appendChild(span);
       });
       taskCard.appendChild(taskColHeader);
+
+      if (tasks.length === 0) {
+        const emptyRow = document.createElement("div");
+        emptyRow.style.cssText = `padding:18px 20px; font-size:13px; color:#666; text-align:center;`;
+        emptyRow.textContent = "등록된 업무가 없습니다.";
+        taskCard.appendChild(emptyRow);
+      }
 
       tasks.forEach((t) => {
         // 업무 메인 행
@@ -238,7 +251,7 @@ export default function MeetingArchivePage() {
         if (t.content) {
           const contentRow = document.createElement("div");
           contentRow.style.cssText = `padding:12px 20px 12px 36px; font-size:12px; color:#666; line-height:1.7; background:#F8F8F8; border-bottom:1px solid #D0D0D0;`;
-          contentRow.textContent = t.content;
+          contentRow.textContent = `내용: ${t.content}`;
           taskCard.appendChild(contentRow);
         }
       });
@@ -253,11 +266,27 @@ export default function MeetingArchivePage() {
       document.body.removeChild(wrapper);
 
       const imgData = canvas.toDataURL("image/png");
-      const pageW = 210;
-      const pageH = Math.ceil(canvas.height * pageW / canvas.width);
-      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: [pageW, pageH] });
-      pdf.addImage(imgData, "PNG", 0, 0, pageW, pageH);
-      pdf.save("회의록.pdf");
+      const pdf = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const imgH = (canvas.height * pageW) / canvas.width;
+      let y = 0;
+      let remainingH = imgH;
+
+      pdf.addImage(imgData, "PNG", 0, y, pageW, imgH);
+      remainingH -= pageH;
+
+      while (remainingH > 0) {
+        y -= pageH;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, y, pageW, imgH);
+        remainingH -= pageH;
+      }
+
+      const safeTitle = (meeting.title || "회의")
+        .replace(/[\\/:*?"<>|]/g, "_")
+        .trim();
+      pdf.save(`${safeTitle || "회의"}_회의록.pdf`);
     } catch {
       alert("PDF 생성에 실패했습니다.");
     } finally {
@@ -275,7 +304,10 @@ export default function MeetingArchivePage() {
     } catch (error) {
       console.error("요약 이메일 발송 실패:", error);
       setEmailSending(false);
-      alert("요약 이메일 발송에 실패했습니다.");
+      const message =
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+        "요약 이메일 발송에 실패했습니다. 이메일 발송 설정 또는 수신자 정보를 확인해주세요.";
+      alert(message);
     }
   };
 
@@ -322,8 +354,7 @@ export default function MeetingArchivePage() {
             <button
               onClick={handlePdfDownload}
               disabled={downloading}
-              className="px-5 py-2 text-[13px] text-white rounded-lg disabled:opacity-60"
-              style={{ backgroundColor: "#623FB5" }}
+              className="px-5 py-2 text-[13px] text-white rounded-lg bg-[#623FB5] transition-colors duration-150 hover:bg-[#5635A8] active:bg-[#4B2F93] disabled:cursor-not-allowed disabled:bg-[#969696] disabled:opacity-60"
             >
               {downloading ? "생성 중..." : "PDF 다운로드"}
             </button>
@@ -504,8 +535,11 @@ export default function MeetingArchivePage() {
                 pdf.save("회의_준비_자료.pdf");
               }}
               disabled={!hasMeetingMaterial}
-              className="px-5 py-2 text-[13px] text-white rounded-lg disabled:cursor-not-allowed disabled:opacity-60"
-              style={{ backgroundColor: hasMeetingMaterial ? "#623FB5" : "#969696" }}
+              className={`px-5 py-2 text-[13px] text-white rounded-lg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
+                hasMeetingMaterial
+                  ? "bg-[#623FB5] hover:bg-[#5635A8] active:bg-[#4B2F93]"
+                  : "bg-[#969696]"
+              }`}
             >
               PDF 다운로드
             </button>

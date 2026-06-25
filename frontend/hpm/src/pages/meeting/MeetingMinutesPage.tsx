@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useBlocker, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   createTask,
   deleteTask,
@@ -9,11 +9,13 @@ import {
   updateMeeting,
   approveMinutes,
   rejectMinutes,
+  completeMeetingMappedTranscriptOnly,
   type Meeting,
   type Task,
 } from "../../services/meeting";
 import warningIcon from "../../assets/table/warning2.png";
 import StepBar from "../../components/meeting/StepBar";
+import useMeetingReviewNavigationGuard from "../../hooks/useMeetingReviewNavigationGuard";
 
 const PRIORITY_LABEL: Record<string, string> = {
   Highest: "매우 높음", High: "높음", Medium: "중간", Low: "낮음", Lowest: "매우 낮음",
@@ -50,8 +52,12 @@ export default function MeetingMinutesPage() {
   const [openAssigneeDropdown, setOpenAssigneeDropdown] = useState<number | null>(null);
   const [requested, setRequested] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
-  const allowNavigationRef = useRef(false);
-  const reviewPath = `/meetings/${meetingId}/minutes`;
+  const completedNavigationRef = useRef(false);
+  const { allowReviewNavigation, reviewExitModal } = useMeetingReviewNavigationGuard({
+    enabled: Boolean(meeting && !meeting.is_meeting_approve),
+    meetingId,
+    onConfirmExit: () => completeMeetingMappedTranscriptOnly(meetingId),
+  });
 
   const toggleCollapse = (taskId: number) => {
     setCollapsedTasks(prev => {
@@ -94,48 +100,12 @@ export default function MeetingMinutesPage() {
     }
   }, [meeting, meetingId]);
 
-  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
-    Boolean(
-      meeting &&
-      !meeting.is_meeting_approve &&
-      !allowNavigationRef.current &&
-      currentLocation.pathname === reviewPath &&
-      nextLocation.pathname !== currentLocation.pathname,
-    ),
-  );
-
   useEffect(() => {
-    if (blocker.state !== "blocked") return;
-
-    let cancelled = false;
-    const proceedBlockedNavigation = blocker.proceed;
-    const resetBlockedNavigation = blocker.reset;
-
-    const finalizeAndProceed = async () => {
-      const finalized = await finalizeMinutesReview();
-      if (cancelled) return;
-
-      if (finalized) {
-        allowNavigationRef.current = true;
-        proceedBlockedNavigation();
-        return;
-      }
-
-      resetBlockedNavigation();
-    };
-
-    finalizeAndProceed();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [blocker, finalizeMinutesReview]);
-
-  useEffect(() => {
-    if (meeting?.is_meeting_approve && !allowNavigationRef.current) {
+    if (meeting?.is_meeting_approve && !completedNavigationRef.current) {
+      allowReviewNavigation();
       navigate(`/meetings/${meetingId}/archive`, { replace: true });
     }
-  }, [meeting?.is_meeting_approve, meetingId, navigate]);
+  }, [allowReviewNavigation, meeting?.is_meeting_approve, meetingId, navigate]);
 
   if (loading) return <div className="p-8 text-gray-400">불러오는 중...</div>;
   if (!meeting) return <div className="p-8 text-gray-400">회의를 찾을 수 없습니다.</div>;
@@ -145,14 +115,16 @@ export default function MeetingMinutesPage() {
   const handleReviewComplete = async () => {
     const finalized = await finalizeMinutesReview();
     if (!finalized) return;
-    allowNavigationRef.current = true;
+    completedNavigationRef.current = true;
+    allowReviewNavigation();
     navigate(`/meetings/${meetingId}/jira`);
   };
 
   const handleApprove = async () => {
     const finalized = await finalizeMinutesReview();
     if (!finalized) return;
-    allowNavigationRef.current = true;
+    completedNavigationRef.current = true;
+    allowReviewNavigation();
     navigate(`/meetings/${meetingId}/jira`);
   };
 
@@ -226,6 +198,7 @@ export default function MeetingMinutesPage() {
   };
 
   return (
+    <>
     <div className="p-8 max-w-5xl mx-auto">
 
       <StepBar steps={STEP_LABELS} activeStep={2} />
@@ -493,21 +466,14 @@ export default function MeetingMinutesPage() {
       </div>
 
       {/* 하단 버튼 */}
-      <div className="flex justify-between items-center mt-5">
-        <button
-          onClick={async () => {
-            const finalized = await finalizeMinutesReview();
-            if (!finalized) return;
-            allowNavigationRef.current = true;
-            navigate(`/meetings`);
-          }}
-          className="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
-        >
-          ← 회의 목록
-        </button>
+      <div className="flex justify-end items-center mt-5">
         {minutesStatus === "approved" && (
           <button
-            onClick={() => navigate(`/meetings/${meetingId}/jira`)}
+            onClick={() => {
+              completedNavigationRef.current = true;
+              allowReviewNavigation();
+              navigate(`/meetings/${meetingId}/jira`);
+            }}
             className="px-5 py-2 text-white rounded-lg text-sm font-semibold"
             style={{ backgroundColor: "#623FB5" }}
           >
@@ -516,5 +482,7 @@ export default function MeetingMinutesPage() {
         )}
       </div>
     </div>
+    {reviewExitModal}
+    </>
   );
 }

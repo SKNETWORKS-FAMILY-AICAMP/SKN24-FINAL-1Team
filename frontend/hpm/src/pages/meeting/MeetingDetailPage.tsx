@@ -9,9 +9,11 @@ import sendImg from "../../assets/meeting/send.png";
 import {
   getMeetingDetail,
   startMeeting,
+  resetMeetingRecording,
   pauseMeeting,
   resumeMeeting,
   endMeeting,
+  completeMeetingRawTranscriptOnly,
   sendChatMessage,
   saveAgendaList,
   getPrepMaterial,
@@ -22,6 +24,7 @@ import {
 import * as DESIGN from "../../constants/design";
 
 type ChatMsg = { role: "user" | "bot"; content: string; source?: string };
+const MISSING_AUDIO_MESSAGE = "녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.";
 
 export default function MeetingDetailPage() {
   const { id } = useParams();
@@ -32,14 +35,15 @@ export default function MeetingDetailPage() {
   const { showAgenda = true, showPrepMaterial = true, status: navStatus } =
     (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; status?: string }) ?? {};
 
-  const { meetingId: ctxMeetingId, startTime: ctxStartTime, isPaused: ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording } = useRecording();
+  const { meetingId: ctxMeetingId, startTime: ctxStartTime, isPaused: ctxIsPaused, startRecording, finishRecording, stopRecording, pauseRecording, resumeRecording } = useRecording();
 
   const isReturningToRecording = ctxMeetingId === meetingId && ctxStartTime !== null;
   const initialStatus = isReturningToRecording || navStatus === "in_progress" ? "in_progress" : "scheduled";
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const { user } = useAuth();
-  const isCreator = Boolean(meeting && user && meeting.creator === user.users_id);
+  const currentUserId = user?.users_id;
+  const isCreator = Boolean(meeting && currentUserId && meeting.creator === currentUserId);
   const [elapsed, setElapsed] = useState(() =>
     isReturningToRecording && ctxStartTime !== null
       ? Math.floor((Date.now() - ctxStartTime) / 1000)
@@ -71,8 +75,6 @@ export default function MeetingDetailPage() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const tenMinWarnedRef = useRef(false);
   const maxTimeTriggeredRef = useRef(false);
 
@@ -93,7 +95,13 @@ export default function MeetingDetailPage() {
         }
 
         if (data.status !== "scheduled" && data.status !== "in_progress") {
-          navigate(`/meetings/${meetingId}/archive`, { replace: true });
+          stopRecording();
+          navigate(
+            data.status === "finished" && data.creator === currentUserId
+              ? `/meetings/${meetingId}/speaker-mapping`
+              : `/meetings/${meetingId}/archive`,
+            { replace: true },
+          );
           return;
         }
 
@@ -119,7 +127,7 @@ export default function MeetingDetailPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [meetingId, navigate]);
+  }, [meetingId, navigate, stopRecording, currentUserId]);
 
   useEffect(() => {
     if (meeting?.status === "in_progress" && !isPaused) {
@@ -151,7 +159,6 @@ export default function MeetingDetailPage() {
   }, [elapsed, meeting?.status, isPaused]);
 
   useEffect(() => {
-    if (isCreator) return;
     if (!meeting || meeting.status === "finished") return;
 
     const interval = setInterval(async () => {
@@ -164,7 +171,13 @@ export default function MeetingDetailPage() {
           if (statusChanged || pauseChanged) {
             setMeeting(data);
             if (data.status === "finished") {
-              navigate(`/meetings/${meetingId}/speaker-mapping`, { replace: true });
+              stopRecording();
+              navigate(
+                data.creator === currentUserId
+                  ? `/meetings/${meetingId}/speaker-mapping`
+                  : `/meetings/${meetingId}/archive`,
+                { replace: true },
+              );
             }
           }
 
@@ -196,7 +209,7 @@ export default function MeetingDetailPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [meeting?.status, meeting?.is_paused, meetingId, isCreator, ctxMeetingId, ctxIsPaused, startRecording, pauseRecording, resumeRecording]);
+  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording, navigate, currentUserId]);
 
   useEffect(() => {
     if (meeting) {
@@ -214,7 +227,13 @@ export default function MeetingDetailPage() {
             setElapsed(data.elapsed_seconds);
           }
           if (data.status !== "scheduled" && data.status !== "in_progress") {
-            navigate(`/meetings/${meetingId}/archive`, { replace: true });
+            stopRecording();
+            navigate(
+              data.status === "finished" && data.creator === currentUserId
+                ? `/meetings/${meetingId}/speaker-mapping`
+                : `/meetings/${meetingId}/archive`,
+              { replace: true },
+            );
           }
         }
       } catch (err) {
@@ -239,7 +258,7 @@ export default function MeetingDetailPage() {
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [meetingId, navigate]);
+  }, [meetingId, navigate, stopRecording, currentUserId]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -256,35 +275,39 @@ export default function MeetingDetailPage() {
   const fmt = (s: number) =>
     `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-  const handleStart = async () => {
-    try {
-      await startMeeting(meetingId);
+  const clearLocalRecordingState = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    tenMinWarnedRef.current = false;
+    maxTimeTriggeredRef.current = false;
+    setIsPaused(false);
+    setElapsed(0);
+    stopRecording();
+  };
+
+  const handleStart = async () => {
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
 
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
+      await startMeeting(meetingId);
+      startRecording(meetingId, 0, recorder);
       recorder.start();
 
-      mediaRef.current = recorder;
-      startRecording(meetingId);
       setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
       setElapsed(0);
     } catch (err) {
       console.error("회의 시작 중 에러 발생:", err);
-      alert("회의 시작에 실패했습니다. (데모 환경에서는 가상으로 회의를 시작합니다.)");
-      startRecording(meetingId);
-      setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
-      setElapsed(0);
+      stream?.getTracks().forEach((track) => track.stop());
+      alert("마이크 권한이 필요합니다. 브라우저에서 마이크 권한을 허용한 뒤 다시 시작해주세요.");
     }
   };
 
   const handlePause = async () => {
-    if (mediaRef.current && mediaRef.current.state === "recording") {
-      mediaRef.current.pause();
-    }
-
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPaused(true);
     pauseRecording(elapsed);
@@ -297,10 +320,6 @@ export default function MeetingDetailPage() {
   };
 
   const handleResume = async () => {
-    if (mediaRef.current && mediaRef.current.state === "paused") {
-      mediaRef.current.resume();
-    }
-
     timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     setIsPaused(false);
     resumeRecording();
@@ -316,27 +335,48 @@ export default function MeetingDetailPage() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     setEndLoading(true);
-    stopRecording();
 
     try {
-      let audioFile: File | undefined;
+      const audioFile = await finishRecording(`meeting-${meetingId}.webm`);
 
-      if (mediaRef.current && mediaRef.current.state !== "inactive") {
-        await new Promise<void>((resolve) => {
-          mediaRef.current!.onstop = () => resolve();
-          mediaRef.current!.stop();
-        });
-
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        audioFile = new File([blob], `meeting-${meetingId}.webm`, { type: "audio/webm" });
+      if (!audioFile || audioFile.size === 0) {
+        throw new Error(MISSING_AUDIO_MESSAGE);
       }
 
       await endMeeting(meetingId, audioFile);
+      stopRecording();
       navigate(`/meetings/${meetingId}/speaker-mapping`);
     } catch (err) {
       console.error("회의 종료 에러:", err);
-      alert("회의가 종료되었습니다. (발화자 매핑 화면으로 이동합니다.)");
-      navigate(`/meetings/${meetingId}/speaker-mapping`);
+      const message =
+        (err as { response?: { data?: { error?: string } }; message?: string }).response?.data?.error ||
+        (err as Error).message ||
+        "회의 종료 또는 STT 처리에 실패했습니다.";
+      alert(message);
+      if (message === MISSING_AUDIO_MESSAGE) {
+        try {
+          const resetMeeting = await resetMeetingRecording(meetingId);
+          clearLocalRecordingState();
+          setMeeting(resetMeeting);
+        } catch (resetError) {
+          console.error("녹음 상태 초기화 실패:", resetError);
+          alert("녹음 상태 초기화에 실패했습니다. 회의 목록으로 이동한 뒤 다시 시도해주세요.");
+        }
+      }
+    } finally {
+      setEndLoading(false);
+    }
+  };
+
+  const finishWithoutMinutes = async () => {
+    setEndLoading(true);
+    try {
+      clearLocalRecordingState();
+      await completeMeetingRawTranscriptOnly(meetingId);
+      navigate(`/meetings/${meetingId}/archive`, { replace: true });
+    } catch (error) {
+      console.error("회의 원문 저장 종료 실패:", error);
+      alert("회의 종료 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setEndLoading(false);
     }
@@ -478,7 +518,7 @@ export default function MeetingDetailPage() {
                 취소
               </button>
               <button
-                onClick={() => { setShowShortRecordingModal(false); doEndMeeting(); }}
+                onClick={() => { setShowShortRecordingModal(false); finishWithoutMinutes(); }}
                 className="flex-1 py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
               >
                 확인
@@ -768,11 +808,11 @@ export default function MeetingDetailPage() {
                           />
                         </div>
 
-                        {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 && (
-                          <div>
-                            <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
-                            <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                              {prepMaterial.sources.map((src, i) => (
+                        <div>
+                          <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                          <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                            {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 ? (
+                              prepMaterial.sources.map((src, i) => (
                                 <div key={i} className="flex items-center gap-2 text-[13px]">
                                   <span className="text-[#767676]">- {src.title}</span>
                                   {src.file_url ? (
@@ -788,10 +828,12 @@ export default function MeetingDetailPage() {
                                     <span className="text-gray-400 font-medium select-none">더보기 없음</span>
                                   )}
                                 </div>
-                              ))}
-                            </div>
+                              ))
+                            ) : (
+                              <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+                            )}
                           </div>
-                        )}
+                        </div>
 
                         <div className="flex justify-end gap-2 pt-2">
                           <button
@@ -843,11 +885,11 @@ export default function MeetingDetailPage() {
                               </div>
                             </div>
 
-                            {prepMaterial.sources && prepMaterial.sources.length > 0 && (
-                              <div>
-                                <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
-                                <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                                  {prepMaterial.sources.map((src, i) => (
+                            <div>
+                              <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                              <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
+                                {prepMaterial.sources && prepMaterial.sources.length > 0 ? (
+                                  prepMaterial.sources.map((src, i) => (
                                     <div key={i} className="flex items-center gap-2 text-[13px]">
                                       <span className="text-[#141414]">- {src.title}</span>
                                       {src.file_url ? (
@@ -863,10 +905,12 @@ export default function MeetingDetailPage() {
                                         <span className="text-gray-400 font-medium select-none">더보기 없음</span>
                                       )}
                                     </div>
-                                  ))}
-                                </div>
+                                  ))
+                                ) : (
+                                  <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+                                )}
                               </div>
-                            )}
+                            </div>
                           </>
                         ) : (
                           <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">

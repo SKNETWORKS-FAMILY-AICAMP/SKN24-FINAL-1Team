@@ -6,22 +6,6 @@ import { getPrepMaterial, savePrepMaterial, generatePrepMaterial } from "../../s
 
 const MAX = { purpose: 500, currentState: 1000, regulations: 1000, expected: 500 };
 
-// 더미 데이터 (에러 시 폴백용)
-const DUMMY = {
-  purpose:
-    "- 상반기 채용 진행 상황 공유\n- 신규 입사자 온보딩 현황 공유\n- 조직 개편 현황 공유\n- 직원 만족도 조사 결과 공유\n- 채용 프로세스 개선 방안 논의\n- 온보딩 자료 개선 방안 논의\n- 유연근무제 확대, 복지 포인트 확대 등 논의\n- 리더십 교육, 신규 입사자 멘토 제도 재운영 검토",
-  currentState:
-    "채용 현황\n- 현재 지원자 수는 전체 기준 130명이며, 개발팀 특히 백엔드 지원자가 많음.\n- 프로젝트 경험은 적게 있지만 협업 경험 설명이 부족한 지원자가 다수 존재.\n- 기술 면접 외에 협업 경험, 문제 해결 방식 등의 확인 필요.\n- 1차 온라인 면접, 최종 오프라인 면접 진행 방향으로 재정리.\n신규 입사자 온보딩\n- 기존 온보딩 자료가 막연하다는 피드백이 다수 존재.\n- 회사 분위기, 업무 흐름 등 신규 입사자의 궁금증 해소 필요.\n- 협업 툴(슬랙, 노션, 지라) 사용법 포함 및 FAQ 문서 별도 제작 검토.\n조직 개편\n- 데이터팀/서비스팀 재배치 등 기능 중심 조직으로 일부 변경 검토.\n- 디자인팀도 서비스 단위 조직 논의 중.\n- 중복 회의 감소를 위한 회의 체계 정리 필요 (회의 전 안건 정리 및 공유 문화 정착, 회의 목적 명확화).\n직원 만족도\n- 유연근무제 확대 요구 다수 (팀별 특성을 고려해 유연하게 운영 검토).\n- 복지 포인트 사용 항목 확대 (운동, 자기개발 지원).",
-  regulations:
-    "임금피크제 운영지침 (2025.12.04 개정)\n- 별도직무표에 따른 직무 수행 가능.\n- 경영지원관: 직원 채용 면접 진행.\n- 정책연구관: 신규사업 발굴 연구 수행.\n- 사내교수: 업무매뉴얼 작성 및 부서 간 협업 과제 추진.\n직제규칙 (2026.04.30 개정)\n- 인사총무팀에서 인력 채용 및 배치, 직원 역량 개발 및 교육 훈련 담당.\n직원 채용 지침 (2025.12.04 개정)\n- 지원자의 발표 자료 작성, 발표 및 질의응답으로 진행하며 평가.",
-  expected:
-    "- 채용 프로세스 개선 방안 확정\n- 온보딩 자료 개선 방향 결정\n- 유연근무제 확대 및 복지 개선 방안 합의\n- 리더십 교육 및 멘토 제도 재운영 계획 수립",
-  references: [
-    { label: "프로젝트 히스토리", link: "#" },
-    { label: "내부 문서 (임금피크제 운영지침, 직제규칙, 직원 채용 지침)", link: "#" },
-  ],
-};
-
 export default function PrepMaterialPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -35,14 +19,17 @@ export default function PrepMaterialPage() {
   const [currentState, setCurrentState] = useState("");
   const [regulations, setRegulations] = useState("");
   const [expected, setExpected] = useState("");
+  const [sources, setSources] = useState<{ document_id: number; title: string; file_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generationError, setGenerationError] = useState("");
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-
+ 
     const loadData = async () => {
       try {
+        setGenerationError("");
         const prep = await getPrepMaterial(meetingId);
         if (active) {
           if (prep.purpose || prep.project_status || prep.rule || prep.effect) {
@@ -50,6 +37,7 @@ export default function PrepMaterialPage() {
             setCurrentState(prep.project_status || "");
             setRegulations(prep.rule || "");
             setExpected(prep.effect || "");
+            setSources(prep.sources || []);
             setLoading(false);
           } else {
             const generated = await generatePrepMaterial(meetingId);
@@ -58,6 +46,7 @@ export default function PrepMaterialPage() {
               setCurrentState(generated.project_status || "");
               setRegulations(generated.rule || "");
               setExpected(generated.effect || "");
+              setSources(generated.sources || []);
               setLoading(false);
             }
           }
@@ -65,17 +54,22 @@ export default function PrepMaterialPage() {
       } catch (err) {
         console.error("준비자료 로드/생성 실패:", err);
         if (active) {
-          setPurpose(DUMMY.purpose);
-          setCurrentState(DUMMY.currentState);
-          setRegulations(DUMMY.regulations);
-          setExpected(DUMMY.expected);
+          const message =
+            (err as { response?: { data?: { error?: string } } }).response?.data?.error ||
+            "준비자료 생성에 실패했습니다. OCR/AI 서버 상태를 확인한 뒤 다시 시도해주세요.";
+          setGenerationError(message);
+          setPurpose("");
+          setCurrentState("");
+          setRegulations("");
+          setExpected("");
+          setSources([]);
           setLoading(false);
         }
       }
     };
-
+ 
     loadData();
-
+ 
     return () => {
       active = false;
     };
@@ -103,7 +97,7 @@ export default function PrepMaterialPage() {
         { label: "프로젝트 현재 상태", value: currentState },
         { label: "관련 규정 및 제약사항", value: regulations },
         { label: "회의 종료 후 기대 결과", value: expected },
-        { label: "참조 문서 목록", value: DUMMY.references.map(r => `- ${r.label}`).join("\n") },
+        { label: "출처", value: sources && sources.length > 0 ? sources.map(r => `- ${r.title}`).join("\n") : "- 출처가 없습니다." },
       ];
 
       const wrapper = document.createElement("div");
@@ -248,6 +242,12 @@ export default function PrepMaterialPage() {
         </div>
       </div>
 
+      {generationError ? (
+        <div className="mb-6 rounded-xl border border-[#F04438]/30 bg-[#FFF4F4] px-4 py-3 text-[13px] font-medium text-[#B42318]">
+          {generationError}
+        </div>
+      ) : null}
+
       {/* 편집 가능 섹션들 */}
       <div ref={contentRef} className="space-y-6">
         {sections.map(({ label, value, onChange, max }) => (
@@ -269,16 +269,31 @@ export default function PrepMaterialPage() {
           </div>
         ))}
 
-        {/* 참조 문서 목록*/}
+        {/* 출처 */}
         <div>
-          <p className="text-[14px] text-[#141414] font-bold mb-2">참조 문서 목록</p>
-          <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-1">
-            {DUMMY.references.map((ref, i) => (
-              <p key={i} className="text-[13px]">
-                <span className="text-[#141414]">- {ref.label} </span>
-                <span className="text-[#623FB5] hover:underline cursor-pointer">더보기</span>
-              </p>
-            ))}
+          <p className="text-[14px] text-[#141414] font-bold mb-2">출처</p>
+          <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-2">
+            {sources && sources.length > 0 ? (
+              sources.map((src, i) => (
+                <div key={i} className="flex items-center gap-2 text-[13px]">
+                  <span className="text-[#767676]">- {src.title}</span>
+                  {src.file_url ? (
+                    <a
+                      href={src.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                    >
+                      더보기
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 font-medium select-none text-[12px]">더보기 없음</span>
+                  )}
+                </div>
+              ))
+            ) : (
+              <p className="text-[13px] text-[#969696]">- 출처가 없습니다.</p>
+            )}
           </div>
         </div>
       </div>

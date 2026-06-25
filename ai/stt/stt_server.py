@@ -78,7 +78,7 @@ def transcribe_audio_bytes(
     diarize: bool,
     batch_size: int,
     participants: str,
-) -> str:
+) -> dict[str, Any]:
     suffix = os.path.splitext(filename or "")[1] or ".webm"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(file_bytes)
@@ -102,6 +102,7 @@ def transcribe_audio_bytes(
         ]
 
         full_text_lines: list[str] = []
+        normalized_segments: list[dict[str, Any]] = []
 
         if participant_list:
             full_text_lines.append("[참석자]")
@@ -132,8 +133,18 @@ def transcribe_audio_bytes(
                 continue
 
             full_text_lines.append(f"[{start_ts}] {speaker_id}: {text}")
+            normalized_segments.append({
+                "speaker": str(speaker_id),
+                "time": f"[{start_ts}]",
+                "start": start,
+                "end": seg.get("end"),
+                "text": text,
+            })
 
-        return "\n".join(full_text_lines)
+        return {
+            "text": "\n".join(full_text_lines),
+            "segments": normalized_segments,
+        }
     except Exception:
         cleanup_cuda()
         raise
@@ -144,16 +155,21 @@ def transcribe_audio_bytes(
             pass
 
 
-def _run_stt_job(job_id: str, file_bytes: bytes, filename: str, params: dict[str, Any]) -> None:
+def _run_stt_job(
+    job_id: str,
+    file_bytes: bytes,
+    filename: str,
+    params: dict[str, Any],
+) -> None:
     _update_stt_job(job_id, status="running", step="transcribe", started_at=_now_ts())
     started = time.perf_counter()
     try:
-        text = transcribe_audio_bytes(file_bytes, filename, **params)
+        payload = transcribe_audio_bytes(file_bytes, filename, **params)
         _update_stt_job(
             job_id,
             status="succeeded",
             step="done",
-            result={"text": text},
+            result=payload,
             elapsed_sec=round(time.perf_counter() - started, 3),
             model=STT_MODEL_ID,
             error=None,
@@ -258,7 +274,7 @@ async def stt(
     if not file_bytes:
         raise HTTPException(status_code=400, detail=f"Uploaded file is empty: {file.filename or ''}")
     try:
-        return transcribe_audio_bytes(
+        payload = transcribe_audio_bytes(
             file_bytes,
             file.filename or "",
             language=language,
@@ -267,5 +283,6 @@ async def stt(
             batch_size=batch_size,
             participants=participants,
         )
+        return str(payload.get("text") or "")
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

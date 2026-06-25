@@ -86,6 +86,7 @@ export default function JiraTaskPage() {
   };
 
   return (
+    <>
     <div className="mx-auto max-w-[960px] p-8">
       <StepBar steps={STEP_LABELS} activeStep={3} />
 
@@ -153,7 +154,9 @@ export default function JiraTaskPage() {
       <div className="mt-6 text-center">
         <button
           type="button"
-          onClick={() => navigate(`/meetings/${meetingId}/archive`)}
+          onClick={() => {
+            navigate(`/meetings/${meetingId}/archive`);
+          }}
           className="text-sm text-[#969696] underline hover:text-[#555]"
         >
           Jira 태스크 등록을 건너뛰시겠습니까? 이후 자동 등록은 불가합니다.
@@ -193,5 +196,6 @@ export default function JiraTaskPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

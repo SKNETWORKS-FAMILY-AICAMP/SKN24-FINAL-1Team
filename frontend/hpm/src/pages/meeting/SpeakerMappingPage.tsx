@@ -10,6 +10,8 @@ import {
   type Meeting,
   type TranscriptItem,
 } from "../../services/meeting";
+import { useAuth } from "../../context/AuthContext";
+import useMeetingReviewNavigationGuard from "../../hooks/useMeetingReviewNavigationGuard";
 import type { SpeakerParticipant, SpeakerSegment } from "../../types/speakerMapping";
 
 const STEP_LABELS = ["발화자 매핑", "회의록 검토 & 태스크 수정", "Jira 태스크 등록"];
@@ -76,6 +78,7 @@ const buildSegments = (transcript: TranscriptItem[]): SpeakerSegment[] => {
 export default function SpeakerMappingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const meetingId = Number(id);
 
   const [participants, setParticipants] = useState<SpeakerParticipant[]>([{ id: "", name: "선택 안 함", position: "" }]);
@@ -85,26 +88,49 @@ export default function SpeakerMappingPage() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const { allowReviewNavigation, reviewExitModal } = useMeetingReviewNavigationGuard({
+    enabled: !loading && !error,
+    meetingId,
+  });
 
   useEffect(() => {
+    let cancelled = false;
+
     setLoading(true);
     setError("");
 
-    Promise.all([getMeetingDetail(meetingId), getTranscript(meetingId)])
-      .then(([meeting, transcript]) => {
+    const loadSpeakerMapping = async () => {
+      try {
+        const meeting = await getMeetingDetail(meetingId);
+        if (meeting.creator !== user?.users_id) {
+          navigate(`/meetings/${meetingId}/archive`, { replace: true });
+          return;
+        }
+
+        const transcript = await getTranscript(meetingId);
+        if (cancelled) return;
+
         const nextParticipants = toSpeakerParticipants(meeting.participants || []);
         const nextSegments = buildSegments(transcript || []);
 
         setParticipants(nextParticipants);
         setSegments(nextSegments);
         setActiveSpeakerId(nextSegments[0]?.id || "");
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (cancelled) return;
         console.error("발화자 매핑 정보 로드 실패:", err);
         setError("발화자 매핑 정보를 불러오지 못했습니다.");
-      })
-      .finally(() => setLoading(false));
-  }, [meetingId]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void loadSpeakerMapping();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meetingId, navigate, user?.users_id]);
 
   const activeSegment = useMemo(
     () => segments.find((segment) => segment.id === activeSpeakerId) ?? segments[0],
@@ -194,6 +220,7 @@ export default function SpeakerMappingPage() {
       setGenerating(true);
       await generateMinutes(meetingId);
 
+      allowReviewNavigation();
       navigate(`/meetings/${meetingId}/minutes`);
     } catch (err) {
       console.error("발화자 매핑 및 회의록 생성 실패:", err);
@@ -213,6 +240,7 @@ export default function SpeakerMappingPage() {
   }
 
   return (
+    <>
     <div className="mx-auto w-full max-w-[1280px] p-8">
       <StepBar steps={STEP_LABELS} activeStep={1} />
 
@@ -308,5 +336,7 @@ export default function SpeakerMappingPage() {
         </button>
       </div>
     </div>
+    {reviewExitModal}
+    </>
   );
 }

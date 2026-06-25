@@ -13,7 +13,7 @@ export {
   shiftCalendarMonth,
 } from "./calendar";
 
-export const KANBAN_BOARD_MIN_HEIGHT = 1053;
+export const KANBAN_BOARD_MIN_HEIGHT = 780;
 export const KANBAN_COLUMN_TOP = 91;
 export const KANBAN_COLUMN_BODY_TOP = 51;
 export const KANBAN_FIRST_CARD_TOP = 10;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMeeting, getUserList } from "../../services/meeting";
+import { createMeeting, getProjectDetail } from "../../services/meeting";
 import { useAuth } from "../../context/AuthContext";
 import * as DESIGN from "../../constants/design";
 import Button from "../../components/ui/Button";
@@ -32,12 +32,25 @@ export default function MeetingCreatePage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getUserList()
-      .then(list => {
-        setUsers(list);
+    if (!projectId) {
+      setUsers([]);
+      return;
+    }
+
+    getProjectDetail(projectId)
+      .then(project => {
+        setUsers(
+          (project.members || []).map(member => ({
+            users_id: member.user_id,
+            name: member.name,
+            email: member.email,
+            rank_name: member.rank_name,
+            dept_name: member.dept_name,
+          })),
+        );
       })
       .catch(console.error);
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -76,7 +89,7 @@ export default function MeetingCreatePage() {
       participants,
     });
 
-    navigate(`/meetings/${meeting.meeting_id}`);
+    navigate(`/meetings/${meeting.meeting_id}`, { replace: true });
   } catch (e) {
     console.error(e);
 

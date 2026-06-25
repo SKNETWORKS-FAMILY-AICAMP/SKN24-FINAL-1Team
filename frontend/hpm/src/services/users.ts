@@ -4,10 +4,18 @@ import type { User } from "../types/user";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   withCredentials: true,
+  xsrfCookieName: "csrftoken",
+  xsrfHeaderName: "X-CSRFToken",
+  withXSRFToken: true,
 });
 
 export const loginUser = async (credentials: { email: string; password: string }) => {
   const response = await api.post<User>("/users/login/", credentials);
+  return response.data;
+};
+
+export const logoutUser = async () => {
+  const response = await api.post("/users/logout/");
   return response.data;
 };
 
