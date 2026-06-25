@@ -9,6 +9,7 @@ import {
   updateMeeting,
   approveMinutes,
   rejectMinutes,
+  completeMeetingMappedTranscriptOnly,
   type Meeting,
   type Task,
 } from "../../services/meeting";
@@ -52,7 +53,11 @@ export default function MeetingMinutesPage() {
   const [requested, setRequested] = useState(false);
   const [addingTask, setAddingTask] = useState(false);
   const completedNavigationRef = useRef(false);
-  const allowReviewNavigation = useMeetingReviewNavigationGuard(Boolean(meeting && !meeting.is_meeting_approve));
+  const { allowReviewNavigation, reviewExitModal } = useMeetingReviewNavigationGuard({
+    enabled: Boolean(meeting && !meeting.is_meeting_approve),
+    meetingId,
+    onConfirmExit: () => completeMeetingMappedTranscriptOnly(meetingId),
+  });
 
   const toggleCollapse = (taskId: number) => {
     setCollapsedTasks(prev => {
@@ -193,6 +198,7 @@ export default function MeetingMinutesPage() {
   };
 
   return (
+    <>
     <div className="p-8 max-w-5xl mx-auto">
 
       <StepBar steps={STEP_LABELS} activeStep={2} />
@@ -476,5 +482,7 @@ export default function MeetingMinutesPage() {
         )}
       </div>
     </div>
+    {reviewExitModal}
+    </>
   );
 }

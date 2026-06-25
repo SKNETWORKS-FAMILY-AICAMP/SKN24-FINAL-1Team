@@ -9,9 +9,11 @@ import sendImg from "../../assets/meeting/send.png";
 import {
   getMeetingDetail,
   startMeeting,
+  resetMeetingRecording,
   pauseMeeting,
   resumeMeeting,
   endMeeting,
+  completeMeetingRawTranscriptOnly,
   sendChatMessage,
   saveAgendaList,
   getPrepMaterial,
@@ -22,6 +24,7 @@ import {
 import * as DESIGN from "../../constants/design";
 
 type ChatMsg = { role: "user" | "bot"; content: string; source?: string };
+const MISSING_AUDIO_MESSAGE = "녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.";
 
 export default function MeetingDetailPage() {
   const { id } = useParams();
@@ -32,7 +35,7 @@ export default function MeetingDetailPage() {
   const { showAgenda = true, showPrepMaterial = true, status: navStatus } =
     (location.state as { showAgenda?: boolean; showPrepMaterial?: boolean; status?: string }) ?? {};
 
-  const { meetingId: ctxMeetingId, startTime: ctxStartTime, isPaused: ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording } = useRecording();
+  const { meetingId: ctxMeetingId, startTime: ctxStartTime, isPaused: ctxIsPaused, startRecording, finishRecording, stopRecording, pauseRecording, resumeRecording } = useRecording();
 
   const isReturningToRecording = ctxMeetingId === meetingId && ctxStartTime !== null;
   const initialStatus = isReturningToRecording || navStatus === "in_progress" ? "in_progress" : "scheduled";
@@ -71,8 +74,6 @@ export default function MeetingDetailPage() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatRef = useRef<HTMLDivElement>(null);
-  const mediaRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const tenMinWarnedRef = useRef(false);
   const maxTimeTriggeredRef = useRef(false);
 
@@ -93,6 +94,7 @@ export default function MeetingDetailPage() {
         }
 
         if (data.status !== "scheduled" && data.status !== "in_progress") {
+          stopRecording();
           navigate(`/meetings/${meetingId}/archive`, { replace: true });
           return;
         }
@@ -119,7 +121,7 @@ export default function MeetingDetailPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [meetingId, navigate]);
+  }, [meetingId, navigate, stopRecording]);
 
   useEffect(() => {
     if (meeting?.status === "in_progress" && !isPaused) {
@@ -163,6 +165,7 @@ export default function MeetingDetailPage() {
           if (statusChanged || pauseChanged) {
             setMeeting(data);
             if (data.status === "finished") {
+              stopRecording();
               navigate(`/meetings/${meetingId}/speaker-mapping`, { replace: true });
             }
           }
@@ -195,7 +198,7 @@ export default function MeetingDetailPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, pauseRecording, resumeRecording, navigate]);
+  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording, navigate]);
 
   useEffect(() => {
     if (meeting) {
@@ -213,6 +216,7 @@ export default function MeetingDetailPage() {
             setElapsed(data.elapsed_seconds);
           }
           if (data.status !== "scheduled" && data.status !== "in_progress") {
+            stopRecording();
             navigate(`/meetings/${meetingId}/archive`, { replace: true });
           }
         }
@@ -238,7 +242,7 @@ export default function MeetingDetailPage() {
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [meetingId, navigate]);
+  }, [meetingId, navigate, stopRecording]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
@@ -255,20 +259,29 @@ export default function MeetingDetailPage() {
   const fmt = (s: number) =>
     `${String(Math.floor(s / 3600)).padStart(2, "0")}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
+  const clearLocalRecordingState = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    tenMinWarnedRef.current = false;
+    maxTimeTriggeredRef.current = false;
+    setIsPaused(false);
+    setElapsed(0);
+    stopRecording();
+  };
+
   const handleStart = async () => {
     let stream: MediaStream | null = null;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
 
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-
       await startMeeting(meetingId);
+      startRecording(meetingId, 0, recorder);
       recorder.start();
 
-      mediaRef.current = recorder;
-      startRecording(meetingId);
       setMeeting((m) => (m ? { ...m, status: "in_progress" } : m));
       setElapsed(0);
     } catch (err) {
@@ -279,10 +292,6 @@ export default function MeetingDetailPage() {
   };
 
   const handlePause = async () => {
-    if (mediaRef.current && mediaRef.current.state === "recording") {
-      mediaRef.current.pause();
-    }
-
     if (timerRef.current) clearInterval(timerRef.current);
     setIsPaused(true);
     pauseRecording(elapsed);
@@ -295,10 +304,6 @@ export default function MeetingDetailPage() {
   };
 
   const handleResume = async () => {
-    if (mediaRef.current && mediaRef.current.state === "paused") {
-      mediaRef.current.resume();
-    }
-
     timerRef.current = setInterval(() => setElapsed((e) => e + 1), 1000);
     setIsPaused(false);
     resumeRecording();
@@ -316,20 +321,10 @@ export default function MeetingDetailPage() {
     setEndLoading(true);
 
     try {
-      let audioFile: File | undefined;
-
-      if (mediaRef.current && mediaRef.current.state !== "inactive") {
-        await new Promise<void>((resolve) => {
-          mediaRef.current!.onstop = () => resolve();
-          mediaRef.current!.stop();
-        });
-
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        audioFile = new File([blob], `meeting-${meetingId}.webm`, { type: "audio/webm" });
-      }
+      const audioFile = await finishRecording(`meeting-${meetingId}.webm`);
 
       if (!audioFile || audioFile.size === 0) {
-        throw new Error("녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.");
+        throw new Error(MISSING_AUDIO_MESSAGE);
       }
 
       await endMeeting(meetingId, audioFile);
@@ -342,6 +337,30 @@ export default function MeetingDetailPage() {
         (err as Error).message ||
         "회의 종료 또는 STT 처리에 실패했습니다.";
       alert(message);
+      if (message === MISSING_AUDIO_MESSAGE) {
+        try {
+          const resetMeeting = await resetMeetingRecording(meetingId);
+          clearLocalRecordingState();
+          setMeeting(resetMeeting);
+        } catch (resetError) {
+          console.error("녹음 상태 초기화 실패:", resetError);
+          alert("녹음 상태 초기화에 실패했습니다. 회의 목록으로 이동한 뒤 다시 시도해주세요.");
+        }
+      }
+    } finally {
+      setEndLoading(false);
+    }
+  };
+
+  const finishWithoutMinutes = async () => {
+    setEndLoading(true);
+    try {
+      clearLocalRecordingState();
+      await completeMeetingRawTranscriptOnly(meetingId);
+      navigate(`/meetings/${meetingId}/archive`, { replace: true });
+    } catch (error) {
+      console.error("회의 원문 저장 종료 실패:", error);
+      alert("회의 종료 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
       setEndLoading(false);
     }
@@ -483,7 +502,7 @@ export default function MeetingDetailPage() {
                 취소
               </button>
               <button
-                onClick={() => { setShowShortRecordingModal(false); doEndMeeting(); }}
+                onClick={() => { setShowShortRecordingModal(false); finishWithoutMinutes(); }}
                 className="flex-1 py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
               >
                 확인

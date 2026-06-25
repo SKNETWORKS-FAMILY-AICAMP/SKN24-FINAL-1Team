@@ -138,7 +138,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       {/* 네비게이션 */}
       {!isCollapsed && (
         <nav
-          className={`flex-1 flex flex-col py-3 px-[10px] overflow-y-auto ${DESIGN.GAP_SIZES.lg} transition-all duration-300`}
+          className={`flex-1 flex flex-col py-3 px-[10px] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${DESIGN.GAP_SIZES.lg} transition-all duration-300`}
         >
           <ProjectDropdown isCollapsed={isCollapsed} toggleCollapse={toggleCollapse} />
 

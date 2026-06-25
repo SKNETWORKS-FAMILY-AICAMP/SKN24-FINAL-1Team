@@ -86,7 +86,10 @@ export default function SpeakerMappingPage() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
-  const allowReviewNavigation = useMeetingReviewNavigationGuard(!loading && !error);
+  const { allowReviewNavigation, reviewExitModal } = useMeetingReviewNavigationGuard({
+    enabled: !loading && !error,
+    meetingId,
+  });
 
   useEffect(() => {
     setLoading(true);
@@ -216,6 +219,7 @@ export default function SpeakerMappingPage() {
   }
 
   return (
+    <>
     <div className="mx-auto w-full max-w-[1280px] p-8">
       <StepBar steps={STEP_LABELS} activeStep={1} />
 
@@ -311,5 +315,7 @@ export default function SpeakerMappingPage() {
         </button>
       </div>
     </div>
+    {reviewExitModal}
+    </>
   );
 }

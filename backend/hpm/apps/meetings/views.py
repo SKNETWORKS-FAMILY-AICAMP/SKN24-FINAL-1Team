@@ -572,6 +572,28 @@ def resume_meeting(request, meeting_id):
 
 
 @api_view(["POST"])
+def reset_meeting_recording(request, meeting_id):
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+    if not _can_control_meeting(request, meeting):
+        return Response({"error": "회의 생성자만 녹음 상태를 초기화할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+    if meeting.meeting_status == Meeting.MeetingStatus.FINISHED:
+        return Response({"error": "이미 종료된 회의는 녹음 상태를 초기화할 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    meeting.meeting_status = Meeting.MeetingStatus.SCHEDULED
+    meeting.during_time = "0"
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "during_time", "is_paused"])
+
+    data = MeetingSerializer(meeting).data
+    data["participants"] = build_meeting_participants(meeting)
+    data["agenda"] = MeetingAgendaSerializer(MeetingAgendas.objects.filter(meeting=meeting), many=True).data
+    data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
+    return Response(data)
+
+
+@api_view(["POST"])
 def end_meeting(request, meeting_id):
     meeting, error_response = _get_accessible_meeting(request, meeting_id)
     if error_response:
@@ -772,6 +794,78 @@ def speaker_mapping_list(request, meeting_id):
         .order_by("time", "utterance_id")
     )
     return Response(RecordUtteranceSerializer(mappings, many=True).data)
+
+
+@api_view(["POST"])
+def complete_raw_transcript_only(request, meeting_id):
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+
+    record = None
+    try:
+        record = Record.objects.get(meeting=meeting)
+    except Record.DoesNotExist:
+        pass
+
+    raw_text = _get_raw_transcript(record) if record else ""
+
+    if meeting.meeting_status == Meeting.MeetingStatus.IN_PROGRESS and not meeting.is_paused and meeting.meeting_at:
+        delta = timezone.now() - meeting.meeting_at
+        try:
+            curr_sec = int(meeting.during_time or "0")
+        except ValueError:
+            curr_sec = 0
+        meeting.during_time = str(curr_sec + int(delta.total_seconds()))
+
+    RecordUtterance.objects.filter(record__meeting=meeting).update(meeting_users=None)
+    MeetingTask.objects.filter(meeting=meeting).delete()
+
+    meeting.meeting_status = Meeting.MeetingStatus.FINISHED
+    meeting.meeting_document = raw_text or ""
+    meeting.is_meeting_approve = False
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "meeting_document", "is_meeting_approve", "is_paused", "during_time"])
+
+    return Response({
+        "message": "회의 원문만 저장하고 검토를 종료했습니다.",
+        "meeting_id": meeting_id,
+    })
+
+
+@api_view(["POST"])
+def complete_mapped_transcript_only(request, meeting_id):
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+
+    try:
+        record = Record.objects.get(meeting=meeting)
+    except Record.DoesNotExist:
+        return Response({"error": "녹음 원문 데이터가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    mapped_text = _get_mapped_transcript(record) or _get_raw_transcript(record) or ""
+
+    if meeting.meeting_status == Meeting.MeetingStatus.IN_PROGRESS and not meeting.is_paused and meeting.meeting_at:
+        delta = timezone.now() - meeting.meeting_at
+        try:
+            curr_sec = int(meeting.during_time or "0")
+        except ValueError:
+            curr_sec = 0
+        meeting.during_time = str(curr_sec + int(delta.total_seconds()))
+
+    MeetingTask.objects.filter(meeting=meeting).delete()
+
+    meeting.meeting_status = Meeting.MeetingStatus.FINISHED
+    meeting.meeting_document = mapped_text
+    meeting.is_meeting_approve = False
+    meeting.is_paused = False
+    meeting.save(update_fields=["meeting_status", "meeting_document", "is_meeting_approve", "is_paused", "during_time"])
+
+    return Response({
+        "message": "회의 발화자 지정 원문만 저장하고 검토를 종료했습니다.",
+        "meeting_id": meeting_id,
+    })
 
 
 # ── 회의록 승인 플로우 ───────────────────────────────────────────
