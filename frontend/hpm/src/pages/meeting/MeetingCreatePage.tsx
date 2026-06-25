@@ -65,7 +65,6 @@ export default function MeetingCreatePage() {
   }, []);
 
   const toggleParticipant = (id: number) => {
-    if (participants.length === 1 && participants.includes(id)) return;
     setParticipants(prev =>
       prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
     );
@@ -306,7 +305,7 @@ export default function MeetingCreatePage() {
                 );
               })}
               {participants.length === 0 && (
-                <span className={`${DESIGN.COLORS.gray} ${DESIGN.FONT_SIZES.sm} pl-2`}>참여자를 선택해주세요. (최소 2명)</span>
+                <span className={`${DESIGN.COLORS.gray} ${DESIGN.FONT_SIZES.sm} pl-2`}>참여자를 선택해주세요. (최소 1명)</span>
               )}
             </div>
 

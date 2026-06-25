@@ -366,7 +366,7 @@ def meeting_list(request):
 
     participants = data.get("participants", [])
     if len(participants) < 1:  
-        return Response({"error": "참여자를 최소 1명 이상 추가해야 합니다. (생성자 포함 2명)"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "참여자를 최소 1명 이상 추가해야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         participant_ids = {int(participant_id) for participant_id in participants}

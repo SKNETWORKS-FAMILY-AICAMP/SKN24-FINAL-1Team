@@ -42,25 +42,21 @@ function PriorityChip({
 function OptionChip({
   label,
   selected,
-  disabled,
   onClick,
 }: {
   label: string;
   selected: boolean;
-  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-px text-[11px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
+        "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-[2px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
         selected
           ? "border-[#623FB5] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
-          : "border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
-        disabled && "cursor-not-allowed opacity-60",
+          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#623FB5] hover:bg-[#F4F1FF] hover:text-[#623FB5]",
       )}
     >
       {label}
@@ -228,13 +224,12 @@ export default function KanbanTaskModal({
         </div>
 
         <label className="absolute left-[32px] top-[512px] text-[15px] font-medium leading-[1.2] text-[#141414]">
-          {isEdit ? "상위 업무(수정 불가)" : "상위 업무"}
+          상위 업무
         </label>
         <div className="absolute left-[32px] top-[537px] flex w-[414px] gap-[10px] overflow-x-auto pb-[4px]">
           <OptionChip
             label="Epic 없음"
             selected={!values.parentKey}
-            disabled={isEdit}
             onClick={() => onChange({ ...values, parentKey: "", category: "" })}
           />
           {parentOptions.map((option) => (
@@ -242,7 +237,6 @@ export default function KanbanTaskModal({
               key={option.value}
               label={option.label}
               selected={values.parentKey === option.value}
-              disabled={isEdit}
               onClick={() =>
                 onChange({
                   ...values,
