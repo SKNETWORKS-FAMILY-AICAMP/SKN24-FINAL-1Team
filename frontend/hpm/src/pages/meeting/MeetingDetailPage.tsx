@@ -42,7 +42,8 @@ export default function MeetingDetailPage() {
 
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const { user } = useAuth();
-  const isCreator = Boolean(meeting && user && meeting.creator === user.users_id);
+  const currentUserId = user?.users_id;
+  const isCreator = Boolean(meeting && currentUserId && meeting.creator === currentUserId);
   const [elapsed, setElapsed] = useState(() =>
     isReturningToRecording && ctxStartTime !== null
       ? Math.floor((Date.now() - ctxStartTime) / 1000)
@@ -95,7 +96,12 @@ export default function MeetingDetailPage() {
 
         if (data.status !== "scheduled" && data.status !== "in_progress") {
           stopRecording();
-          navigate(`/meetings/${meetingId}/archive`, { replace: true });
+          navigate(
+            data.status === "finished" && data.creator === currentUserId
+              ? `/meetings/${meetingId}/speaker-mapping`
+              : `/meetings/${meetingId}/archive`,
+            { replace: true },
+          );
           return;
         }
 
@@ -121,7 +127,7 @@ export default function MeetingDetailPage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [meetingId, navigate, stopRecording]);
+  }, [meetingId, navigate, stopRecording, currentUserId]);
 
   useEffect(() => {
     if (meeting?.status === "in_progress" && !isPaused) {
@@ -166,7 +172,12 @@ export default function MeetingDetailPage() {
             setMeeting(data);
             if (data.status === "finished") {
               stopRecording();
-              navigate(`/meetings/${meetingId}/speaker-mapping`, { replace: true });
+              navigate(
+                data.creator === currentUserId
+                  ? `/meetings/${meetingId}/speaker-mapping`
+                  : `/meetings/${meetingId}/archive`,
+                { replace: true },
+              );
             }
           }
 
@@ -198,7 +209,7 @@ export default function MeetingDetailPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording, navigate]);
+  }, [meeting?.status, meeting?.is_paused, meetingId, ctxMeetingId, ctxIsPaused, startRecording, stopRecording, pauseRecording, resumeRecording, navigate, currentUserId]);
 
   useEffect(() => {
     if (meeting) {
@@ -217,7 +228,12 @@ export default function MeetingDetailPage() {
           }
           if (data.status !== "scheduled" && data.status !== "in_progress") {
             stopRecording();
-            navigate(`/meetings/${meetingId}/archive`, { replace: true });
+            navigate(
+              data.status === "finished" && data.creator === currentUserId
+                ? `/meetings/${meetingId}/speaker-mapping`
+                : `/meetings/${meetingId}/archive`,
+              { replace: true },
+            );
           }
         }
       } catch (err) {
@@ -242,7 +258,7 @@ export default function MeetingDetailPage() {
       window.removeEventListener("pageshow", handlePageShow);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [meetingId, navigate, stopRecording]);
+  }, [meetingId, navigate, stopRecording, currentUserId]);
 
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
