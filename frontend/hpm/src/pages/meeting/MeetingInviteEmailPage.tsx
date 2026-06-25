@@ -192,11 +192,10 @@ export default function MeetingInviteEmailPage() {
             </div>
           </div>
         </div>
-
         {/* 오른쪽 이메일 미리보기 */}
-        <div className="w-[380px] flex-shrink-0 bg-white border border-[#E6E1E6] rounded-2xl p-6">
+        <div className="w-[380px] flex-shrink-0 bg-white border border-[#E6E1E6] rounded-2xl p-6 overflow-hidden">
           <p className="text-[16px] font-bold text-[#141414] mb-5">이메일 미리보기</p>
-          <div className="text-[13px] text-[#141414] leading-relaxed space-y-3">
+          <div className="text-[13px] text-[#141414] leading-relaxed space-y-3 break-words">
             <p style={{ whiteSpace: "pre-line" }}>{greeting}</p>
             <p className="font-bold">[회의 정보]</p>
             <p>• 회의 제목: {meeting?.title ?? ""}</p>

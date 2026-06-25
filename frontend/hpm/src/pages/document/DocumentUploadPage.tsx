@@ -25,6 +25,7 @@ const DEFAULT_MESSAGES = {
 };
 
 const DEFAULT_MAX_FILES = 10;
+const DOCUMENT_UPLOAD_PENDING_MESSAGE = "내부문서 업로드 중... 완료후 알림 발송 해드리겠습니다";
 
 export default function DocumentUploadPage() {
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ export default function DocumentUploadPage() {
 
     const maxAttempts = 120;
     for (let attempts = 1; attempts <= maxAttempts; attempts += 1) {
-      setUploadMessage(`내부문서 적재 중입니다. (${attempts}/${maxAttempts})`);
+      setUploadMessage(DOCUMENT_UPLOAD_PENDING_MESSAGE);
       await delay(3000);
 
       const status = await getDocumentIngestStatus(projectId, jobId);
@@ -107,6 +108,7 @@ export default function DocumentUploadPage() {
 
     setSubmitting(true);
     try {
+      setUploadMessage(DOCUMENT_UPLOAD_PENDING_MESSAGE);
       const result = await uploadDocuments(
         projectId,
         uploadedDocuments.map((item) => item.file),
@@ -130,8 +132,6 @@ export default function DocumentUploadPage() {
       }
 
       await waitForDocumentIngest(result.ingest_job_id);
-
-      navigate("/documents");
     } catch (error) {
       const message = error instanceof Error ? error.message : "문서 업로드에 실패했습니다.";
       setUploadMessage(message);

@@ -74,7 +74,7 @@ def chat(request, meeting_id):
         resp.encoding = "utf-8"
         resp_json = resp.json()
         result = resp_json.get("result", {})
-        answer = result.get("answer", "답변을 불러오지 못했습니다.")
+        answer = result.get("answer", "관련 문서에서 확인할 수 있는 내용이 없습니다.")
         citations = result.get("citations", [])
     except Exception as e:
         answer = f"챗봇 요청 중 오류가 발생했습니다: {str(e)}"
