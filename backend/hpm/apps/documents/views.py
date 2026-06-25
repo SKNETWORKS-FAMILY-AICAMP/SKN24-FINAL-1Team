@@ -66,7 +66,7 @@ def _start_parsed_ingest(project_id, documents):
     files = []
     try:
         for doc in documents:
-            file_obj = open(doc.path, "rb")
+            file_obj = default_storage.open(doc.path, "rb")
             opened_files.append(file_obj)
             files.append(
                 (
@@ -169,9 +169,6 @@ def document_list(request, project_id):
 
     created = []
     errors = []
-    created_docs = []
-
-    use_s3 = bool(getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""))
 
     for file in files:
         ext = os.path.splitext(file.name)[1].lower()
@@ -192,14 +189,66 @@ def document_list(request, project_id):
             title=file.name,
             path=saved_path,
         )
-        created_docs.append(doc)
         created.append(DocumentSerializer(doc, context={"request": request}).data)
 
-    ingest_info = _start_parsed_ingest(project_id, created_docs) if created_docs else {}
+    return Response(
+        {"created": created, "errors": errors},
+        status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["POST"])
+def document_ingest_start(request, project_id):
+    project_user = get_project_user_or_response(project_id, request.auth["user_id"])
+    if isinstance(project_user, Response):
+        return project_user
+
+    raw_ids = request.data.get("document_ids", [])
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return Response(
+            {"error": "document_ids must be a non-empty list."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    document_ids = []
+    for raw_id in raw_ids:
+        try:
+            document_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "document_ids must contain only integer IDs."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    documents = list(
+        Document.objects.filter(
+            project_id=project_id,
+            document_id__in=document_ids,
+        ).order_by("document_id")
+    )
+    if len(documents) != len(set(document_ids)):
+        found_ids = {doc.document_id for doc in documents}
+        missing_ids = [doc_id for doc_id in document_ids if doc_id not in found_ids]
+        return Response(
+            {"error": "Some documents were not found.", "missing_document_ids": missing_ids},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    ingest_info = _start_parsed_ingest(project_id, documents)
+    if not ingest_info.get("ingest_job_id"):
+        error_status = (
+            status.HTTP_500_INTERNAL_SERVER_ERROR
+            if ingest_info.get("ingest_error") == "RUNPOD_PARSED_BASE_URL is not configured."
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        return Response(ingest_info, status=error_status)
 
     return Response(
-        {"created": created, "errors": errors, **ingest_info},
-        status=status.HTTP_201_CREATED,
+        {
+            **ingest_info,
+            "document_ids": document_ids,
+        },
+        status=status.HTTP_202_ACCEPTED,
     )
 
 

@@ -9,9 +9,12 @@ export interface DocumentUploadError {
 export interface DocumentUploadResponse {
   created: DocumentRecord[];
   errors: DocumentUploadError[];
-  ingest_job_id?: string;
+}
+
+export interface DocumentIngestStartResponse {
+  document_ids: number[];
+  ingest_job_id: string;
   ingest_status?: string;
-  ingest_error?: string;
 }
 
 export interface DocumentIngestStatusResponse {
@@ -54,6 +57,18 @@ export const uploadDocuments = async (
   const res = await api.post(`/documents/${projectId}/`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
+  return res.data;
+};
+
+export const startDocumentIngest = async (
+  projectId: number,
+  documentIds: number[],
+): Promise<DocumentIngestStartResponse> => {
+  const res = await api.post(
+    `/documents/${projectId}/ingest/`,
+    { document_ids: documentIds },
+    { timeout: 300000 },
+  );
   return res.data;
 };
 

@@ -10,6 +10,7 @@ import { useAuth } from "../../context/AuthContext";
 import {
   getDocumentIngestStatus,
   getUploadConfig,
+  startDocumentIngest,
   uploadDocuments,
 } from "../../services/documents";
 import type { UploadConfig } from "../../services/documents";
@@ -117,14 +118,14 @@ export default function DocumentUploadPage() {
         return;
       }
 
-      if (result.ingest_error) {
-        setUploadMessage(`문서는 저장됐지만 내부문서 적재 요청에 실패했습니다. ${result.ingest_error}`);
+      const documentIds = result.created.map((document) => document.id);
+      if (documentIds.length === 0) {
+        setUploadMessage("문서는 저장되지 않았습니다.");
         return;
       }
 
-      if (result.ingest_job_id) {
-        await waitForDocumentIngest(result.ingest_job_id);
-      }
+      const ingest = await startDocumentIngest(projectId, documentIds);
+      await waitForDocumentIngest(ingest.ingest_job_id);
 
       navigate("/documents");
     } catch (error) {
