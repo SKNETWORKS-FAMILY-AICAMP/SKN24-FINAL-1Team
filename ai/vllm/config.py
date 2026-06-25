@@ -80,6 +80,16 @@ CHAT_RAG_MAX_CONTEXT_CHARS = int(os.getenv("CHAT_RAG_MAX_CONTEXT_CHARS", "6000")
 PIPELINE_TIMEOUT_SEC = int(os.getenv("PIPELINE_TIMEOUT_SEC", "2400"))
 
 
+def feature_chat_dir_is_valid(path: Path) -> bool:
+    return (
+        (
+            (path / "rag_search.py").exists()
+            or (path / "04_query_qdrant_openai.py").exists()
+        )
+        and (path / "rag").exists()
+    )
+
+
 def default_feature_chat_dir() -> Path:
     candidates = [
         APP_DIR / "feature_chat",
@@ -91,12 +101,21 @@ def default_feature_chat_dir() -> Path:
         Path("/workspace/feature_chat"),
     ]
     for path in candidates:
-        if ((path / "rag_search.py").exists() or (path / "04_query_qdrant_openai.py").exists()) and (path / "rag").exists():
+        if feature_chat_dir_is_valid(path):
             return path
     return candidates[0]
 
 
-FEATURE_CHAT_DIR = Path(os.getenv("FEATURE_CHAT_DIR", str(default_feature_chat_dir())))
+def resolve_feature_chat_dir() -> Path:
+    configured = os.getenv("FEATURE_CHAT_DIR")
+    if configured:
+        path = Path(configured)
+        if feature_chat_dir_is_valid(path):
+            return path
+    return default_feature_chat_dir()
+
+
+FEATURE_CHAT_DIR = resolve_feature_chat_dir()
 
 
 def qdrant_collection_for_project(project_id: str | int | None) -> str:

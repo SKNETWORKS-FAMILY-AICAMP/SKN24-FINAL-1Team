@@ -110,7 +110,8 @@ export interface Notification {
     | "meeting_invited"
     | "meeting_started"
     | "minutes_approved"
-    | "task_assigned";
+    | "task_assigned"
+    | "document_uploaded";
   content: string;
   target_id: number | null;
   is_read: boolean;

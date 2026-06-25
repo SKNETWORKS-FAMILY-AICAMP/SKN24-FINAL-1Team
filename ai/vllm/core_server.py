@@ -133,6 +133,8 @@ def preparation_sources(selected_documents: dict[str, Any]) -> list[dict[str, An
             metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
             viewer_type = str(metadata.get("viewer_type") or "")
             viewer_id = str(metadata.get("viewer_id") or "")
+            if viewer_type == "document" and not viewer_id:
+                viewer_id = str(metadata.get("document_id") or "")
             if not viewer_type:
                 if category == "previous_meetings":
                     viewer_type = "meeting_minutes"
@@ -145,6 +147,9 @@ def preparation_sources(selected_documents: dict[str, Any]) -> list[dict[str, An
             viewer: dict[str, Any] = {"type": viewer_type}
             if viewer_id:
                 viewer["id"] = viewer_id
+            doc_id = metadata.get("doc_id")
+            if doc_id:
+                viewer["doc_id"] = str(doc_id)
             if metadata.get("project_id"):
                 viewer["project_id"] = str(metadata.get("project_id"))
             page = metadata.get("page") or metadata.get("page_number") or metadata.get("page_no") or metadata.get("page_idx")
@@ -184,7 +189,7 @@ def _clean_text(value: Any) -> str:
 def _source_document_id(source: dict[str, Any]) -> int | None:
     viewer = source.get("viewer") if isinstance(source.get("viewer"), dict) else {}
     metadata = source.get("metadata") if isinstance(source.get("metadata"), dict) else {}
-    for value in [viewer.get("id"), metadata.get("document_id"), source.get("document_id")]:
+    for value in [viewer.get("id"), metadata.get("viewer_id"), metadata.get("document_id"), source.get("document_id")]:
         document_id = _coerce_int_or_none(value)
         if document_id is not None:
             return document_id
@@ -224,6 +229,12 @@ def preparation_response_sources(sources: list[dict[str, Any]]) -> list[dict[str
             item["chunk_id"] = chunk_id
         if category:
             item["category"] = category
+        doc_id = _clean_text(metadata.get("doc_id") or viewer.get("doc_id") or source.get("doc_id"))
+        if doc_id:
+            item["doc_id"] = doc_id
+        source_sha256 = _clean_text(metadata.get("source_sha256") or source.get("source_sha256"))
+        if source_sha256:
+            item["source_sha256"] = source_sha256
         page = viewer.get("page") or metadata.get("page") or metadata.get("page_number") or metadata.get("page_no") or metadata.get("page_idx")
         if page is not None:
             item["page"] = page
@@ -458,6 +469,7 @@ def _answer_has_no_evidence(answer: str) -> bool:
         keyword in text
         for keyword in [
             "제공된 자료에서 확인할 수 없습니다",
+            "관련 문서에서 확인할 수 있는 내용이 없습니다",
             "확인할 수 없습니다",
             "자료에서 확인되지",
             "근거가 부족",
@@ -632,6 +644,36 @@ def generate_agendas(req: AgendaRequest) -> TextResponse:
     return TextResponse(result=result, elapsed_sec=round(time.perf_counter() - started, 3), model=TEXT_MODEL_ID)
 
 
+def simple_preparation_result(
+    req: PreparationRequest,
+    selected_documents: dict[str, Any],
+    *,
+    error: str = "",
+) -> dict[str, Any]:
+    agendas = [str(item) for item in req.agendas if str(item).strip()]
+    agenda_text = "\n".join(f"- {item}" for item in agendas) or "- 등록된 안건이 없습니다."
+    participants = [
+        f"- {item.get('name', '미정')} / 역할: {item.get('work', '미정')}"
+        for item in req.participants
+        if isinstance(item, dict)
+    ]
+    participant_text = "\n".join(participants) or "- 미정"
+    status_text = "\n\n## 참고\n- 자동 생성 결과를 JSON으로 파싱하지 못해 기본 준비자료로 대체했습니다." if error else ""
+    text = (
+        f"# {req.title or '회의'} 준비자료\n\n"
+        f"## 참석자\n{participant_text}\n\n"
+        f"## 안건\n{agenda_text}\n\n"
+        f"## 준비 체크포인트\n"
+        f"- 안건별로 결정해야 할 항목을 사전에 정리합니다.\n"
+        f"- 참석자별 확인 자료와 예상 질문을 준비합니다."
+        f"{status_text}"
+    )
+    return {
+        "text": text,
+        "sources": preparation_sources(selected_documents),
+    }
+
+
 @app.post("/generate-preparation", response_model=TextResponse)
 def generate_preparation(req: PreparationRequest) -> TextResponse:
     started = time.perf_counter()
@@ -673,7 +715,7 @@ def generate_preparation(req: PreparationRequest) -> TextResponse:
         try:
             result = generate_json(
                 preparation_messages(req, selected_documents),
-                max_new_tokens=int(os.getenv("PREPARATION_MAX_NEW_TOKENS", "512")),
+                max_new_tokens=int(os.getenv("PREPARATION_MAX_NEW_TOKENS", "1024")),
             )
         except Exception as generation_exc:
             result = simple_preparation_result(req, selected_documents, error=str(generation_exc))
@@ -728,7 +770,7 @@ def chat(req: ChatRequest) -> TextResponse:
             raise HTTPException(status_code=500, detail=f"Feature chat Qdrant search failed: {exc}") from exc
     if not context:
         result = {
-            "answer": "제공된 자료에서 확인할 수 없습니다.",
+            "answer": "관련 문서에서 확인할 수 있는 내용이 없습니다.",
             "citations": [],
             "used_context_ids": [],
             "confidence": "low",

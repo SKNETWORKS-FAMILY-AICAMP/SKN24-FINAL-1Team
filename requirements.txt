@@ -17,3 +17,6 @@ djangorestframework-simplejwt==5.5.1
 
 # boto3
 boto3==1.34.0
+
+# S3 스토리지
+django-storages[s3]==1.14.2
