@@ -31,6 +31,20 @@ COLUMN_TO_STATUS_NAMES = {
 }
 
 
+def _jira_error_detail(error: requests.RequestException):
+    if not getattr(error, "response", None):
+        return ""
+    try:
+        return error.response.json()
+    except Exception:
+        return error.response.text
+
+
+def _is_assignee_create_error(detail) -> bool:
+    text = str(detail).lower()
+    return "assignee" in text or "accountid" in text or "assign" in text or "담당" in text
+
+
 def create_jira_project(project_name: str, access_token: str, cloud_id: str) -> dict:
     """Jira에 새 프로젝트를 생성하고 key와 name을 반환."""
     # project key: 대문자 알파벳으로만, 최대 10자
@@ -369,21 +383,33 @@ def create_jira_issue_for_board(
     if parent_key:
         fields["parent"] = {"key": parent_key}
 
-    payload = {"fields": fields}
-
-    try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
+    def post_issue(issue_fields: dict) -> dict:
+        response = requests.post(url, json={"fields": issue_fields}, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
         return {"success": True, "issue_key": data.get("key")}
 
+    try:
+        result = post_issue(fields)
+        result["assignee_applied"] = bool(assignee_account_id)
+        return result
+
     except requests.RequestException as e:
-        error_detail = ""
-        if hasattr(e, "response") and e.response is not None:
+        error_detail = _jira_error_detail(e)
+        if assignee_account_id and _is_assignee_create_error(error_detail):
+            retry_fields = {key: value for key, value in fields.items() if key != "assignee"}
             try:
-                error_detail = e.response.json()
-            except Exception:
-                error_detail = e.response.text
+                result = post_issue(retry_fields)
+                result.update({
+                    "assignee_applied": False,
+                    "assignee_skipped_reason": "담당자가 Jira 프로젝트에 배정 가능하지 않아 미배정으로 등록했습니다.",
+                    "assignee_error": error_detail,
+                })
+                return result
+            except requests.RequestException as retry_error:
+                retry_detail = _jira_error_detail(retry_error)
+                return {"success": False, "error": str(retry_error), "detail": retry_detail}
+
         return {"success": False, "error": str(e), "detail": error_detail}
     
 

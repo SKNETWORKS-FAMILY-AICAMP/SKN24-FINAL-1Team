@@ -9,7 +9,7 @@ import Button from "../../components/ui/Button";
 import searchIcon from "../../assets/meeting/search.png"
 import * as DESIGN from "../../constants/design";
 
-const MOCK_MEETINGS: Meeting[] = [
+export const MOCK_MEETINGS: Meeting[] = [
   {
     meeting_id: 1,
     title: "AI 매칭 엔진 스프린트 리뷰 1차",
@@ -187,8 +187,8 @@ export default function MeetingListPage() {
   const navigate = useNavigate();
   const { projectId } = useAuth();
 
-  const [meetings, setMeetings] = useState<Meeting[]>(MOCK_MEETINGS);
-  const loading = false;
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // 필터 관련 상태들
   const [search, setSearch] = useState("");
@@ -205,15 +205,18 @@ export default function MeetingListPage() {
   const PER_PAGE = 10;
 
   useEffect(() => {
+    setLoading(true);
     getMeetingList(projectId ?? undefined)
       .then((data) => {
-        if (data && data.length > 0) {
-          setMeetings(data);
-        }
+        setMeetings(data ?? []);
+        setSelectedIds(new Set());
+        setPage(1);
       })
       .catch((err) => {
-        console.warn("API 호출 실패, 로컬 더미 데이터를 유지합니다.", err);
-      });
+        console.warn("회의 목록 API 호출 실패", err);
+        setMeetings([]);
+      })
+      .finally(() => setLoading(false));
   }, [projectId]);
 
   // 클라이언트 사이드 필터링 로직
@@ -287,18 +290,38 @@ export default function MeetingListPage() {
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     if (window.confirm(`선택한 ${selectedIds.size}개의 회의를 삭제하시겠습니까?`)) {
-      try {
-        await Promise.all(
-          Array.from(selectedIds).map((meetingId) => deleteMeeting(meetingId))
-        );
-        setMeetings((prev) => prev.filter((m) => !selectedIds.has(m.meeting_id)));
+      const results = await Promise.allSettled(
+        Array.from(selectedIds).map(async (meetingId) => {
+          await deleteMeeting(meetingId);
+          return meetingId;
+        }),
+      );
+
+      const deletedIds = new Set(
+        results
+          .filter((result): result is PromiseFulfilledResult<number> => result.status === "fulfilled")
+          .map((result) => result.value),
+      );
+      const failed = results.filter(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+
+      if (deletedIds.size > 0) {
+        setMeetings((prev) => prev.filter((m) => !deletedIds.has(m.meeting_id)));
         setSelectedIds(new Set());
         setPage(1);
-        alert("삭제되었습니다.");
-      } catch (err) {
-        console.error("회의 삭제 실패:", err);
-        alert("회의 삭제에 실패했습니다.");
       }
+
+      if (failed.length > 0) {
+        const firstError = failed[0].reason as { response?: { data?: { error?: string } } };
+        const message =
+          firstError.response?.data?.error ||
+          `회의 ${failed.length}건 삭제에 실패했습니다.`;
+        alert(message);
+        return;
+      }
+
+      alert("삭제되었습니다.");
     }
   };
 

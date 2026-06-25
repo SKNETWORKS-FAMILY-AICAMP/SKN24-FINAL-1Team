@@ -5,6 +5,7 @@ from datetime import datetime
 import boto3
 
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -13,6 +14,7 @@ from rest_framework.response import Response
 from apps.notifications.models import Notification
 from apps.users.models import Users
 from apps.users.views import get_valid_access_token
+from apps.projects.models import Project, ProjectUsers
 from apps.meetings.jira_client import create_jira_issue_for_board
 from .models import Meeting, MeetingAgendas, MeetingTask, MeetingUsers, Record, RecordUtterance, MeetingPreparation, PreparationDocument
 from .serializers import (
@@ -23,6 +25,46 @@ from .serializers import (
     MeetingPreparationSerializer,
     build_meeting_participants,
 )
+
+
+def _request_user_id(request):
+    if isinstance(request.auth, dict) and request.auth.get("user_id") is not None:
+        user_id = request.auth["user_id"]
+    else:
+        user_id = getattr(request.user, "users_id", None)
+
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return user_id
+
+
+def _can_access_meeting(request, meeting):
+    user_id = _request_user_id(request)
+    if meeting.creator_id == user_id:
+        return True
+
+    return MeetingUsers.objects.filter(meeting=meeting, user_id=user_id).exists()
+
+
+def _can_control_meeting(request, meeting):
+    return meeting.creator_id == _request_user_id(request)
+
+
+def _get_accessible_meeting(request, meeting_id):
+    try:
+        meeting = Meeting.objects.select_related("project", "creator").get(meeting_id=meeting_id)
+    except Meeting.DoesNotExist:
+        return None, Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    if not _can_access_meeting(request, meeting):
+        return None, Response({"error": "회의 접근 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    return meeting, None
+
+
+def _is_project_member(project, user_id):
+    return ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
 
 
 def _minutes_payload(meeting, text):
@@ -283,12 +325,26 @@ def _replace_record_utterances(record, result, full_text):
 def meeting_list(request):
     if request.method == "GET":
         project_id = request.query_params.get("project_id")
-        qs = Meeting.objects.all().order_by("-meeting_at")
+        qs = Meeting.objects.all()
+        user_id = _request_user_id(request)
+        qs = qs.filter(
+            Q(creator_id=user_id) | Q(meetingusers__user_id=user_id)
+        ).distinct()
         if project_id:
             qs = qs.filter(project_id=project_id)
+        qs = qs.order_by("-meeting_at")
         return Response(MeetingSerializer(qs, many=True).data)
 
     data = request.data
+    user_id = _request_user_id(request)
+
+    try:
+        project = Project.objects.get(pk=data.get("project_id", 1))
+    except Project.DoesNotExist:
+        return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not _is_project_member(project, user_id):
+        return Response({"error": "프로젝트 구성원만 회의를 생성할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     title = data.get("title", "")
     if not title or len(title) > 30:
@@ -312,19 +368,28 @@ def meeting_list(request):
     if len(participants) < 1:  
         return Response({"error": "참여자를 최소 1명 이상 추가해야 합니다. (생성자 포함 2명)"}, status=status.HTTP_400_BAD_REQUEST)
 
+    try:
+        participant_ids = {int(participant_id) for participant_id in participants}
+    except (TypeError, ValueError):
+        return Response({"error": "참여자 목록이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+    project_member_ids = set(
+        ProjectUsers.objects
+        .filter(project=project, user_id__in=participant_ids)
+        .values_list("user_id", flat=True)
+    )
+    invalid_participant_ids = participant_ids - project_member_ids
+    if invalid_participant_ids:
+        return Response(
+            {"error": "프로젝트 구성원만 회의 참여자로 추가할 수 있습니다."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
  
     invalid_users = Users.objects.filter(users_id__in=participants, status__in=[1, 2])
     if invalid_users.exists():
         names = ", ".join(u.name for u in invalid_users)
         return Response({"error": f"휴직 또는 퇴사 처리된 사용자는 참여자로 추가할 수 없습니다: {names}"}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        from apps.projects.models import Project
-        project = Project.objects.get(pk=data.get("project_id", 1))
-    except Exception:
-        return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-
-    user_id = request.auth['user_id']
     creator = Users.objects.get(pk=user_id)
     meeting = Meeting.objects.create(
         project=project,
@@ -361,10 +426,9 @@ def meeting_list(request):
 # ── 회의 상세 / 수정 / 삭제 ─────────────────────────────────────────────
 @api_view(["GET", "PATCH", "DELETE"])
 def meeting_detail(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if request.method == "GET":
         data = MeetingSerializer(meeting).data
@@ -373,9 +437,21 @@ def meeting_detail(request, meeting_id):
         data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
         return Response(data)
 
+    if request.method == "PATCH":
+        if "meeting_document" not in request.data:
+            return Response({"error": "수정할 회의록 내용이 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        meeting.meeting_document = request.data.get("meeting_document") or ""
+        meeting.save(update_fields=["meeting_document"])
+        data = MeetingSerializer(meeting).data
+        data["participants"] = build_meeting_participants(meeting)
+        data["agenda"] = MeetingAgendaSerializer(MeetingAgendas.objects.filter(meeting=meeting), many=True).data
+        data["tasks"] = MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data
+        return Response(data)
+
     if request.method == "DELETE":
        
-        if meeting.creator_id != request.auth["user_id"]:
+        if meeting.creator_id != _request_user_id(request):
             return Response({"error": "회의 생성자만 삭제할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
      
@@ -383,7 +459,7 @@ def meeting_detail(request, meeting_id):
             return Response({"error": "진행 전인 회의만 삭제할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
       
-        if meeting.minutes_status == "approved":
+        if getattr(meeting, "minutes_status", None) == "approved":
             return Response({"error": "회의록이 확정된 회의는 삭제할 수 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         meeting.delete()
@@ -393,10 +469,9 @@ def meeting_detail(request, meeting_id):
 # ── 기초 안건 ────────────────────────────────────────────────────
 @api_view(["GET", "POST"])
 def agenda_list(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if request.method == "GET":
         return Response(MeetingAgendaSerializer(MeetingAgendas.objects.filter(meeting=meeting), many=True).data)
@@ -416,10 +491,9 @@ def agenda_list(request, meeting_id):
 
 @api_view(["POST"])
 def confirm_agenda(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
     # is_confirmed 제거 (모델에 없음) → 확정 개념 자체를 제거
     return Response({"message": "안건이 확정되었습니다."})
 
@@ -427,10 +501,11 @@ def confirm_agenda(request, meeting_id):
 # ── 회의 시작 / 종료 ─────────────────────────────────────────────
 @api_view(["POST"])
 def start_meeting(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+    if not _can_control_meeting(request, meeting):
+        return Response({"error": "회의 생성자만 회의를 시작할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     if meeting.meeting_status == Meeting.MeetingStatus.IN_PROGRESS:
         return Response({"error": "이미 진행 중인 회의입니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -447,7 +522,7 @@ def start_meeting(request, meeting_id):
     # 회의 참여자들에게 시작 알림 생성 (생성자 제외)
     meeting_users = MeetingUsers.objects.filter(meeting=meeting)
     for mu in meeting_users:
-        if mu.user_id != request.auth["user_id"]:
+        if mu.user_id != _request_user_id(request):
             _create_notification(
                 user=mu.user,
                 notification_type="meeting_started",
@@ -460,10 +535,11 @@ def start_meeting(request, meeting_id):
 
 @api_view(["POST"])
 def pause_meeting(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+    if not _can_control_meeting(request, meeting):
+        return Response({"error": "회의 생성자만 회의를 일시 중지할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     if not meeting.is_paused:
         meeting.is_paused = True
@@ -481,10 +557,11 @@ def pause_meeting(request, meeting_id):
 
 @api_view(["POST"])
 def resume_meeting(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+    if not _can_control_meeting(request, meeting):
+        return Response({"error": "회의 생성자만 회의를 재개할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
 
     if meeting.is_paused:
         meeting.is_paused = False
@@ -496,10 +573,18 @@ def resume_meeting(request, meeting_id):
 
 @api_view(["POST"])
 def end_meeting(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+    if not _can_control_meeting(request, meeting):
+        return Response({"error": "회의 생성자만 회의를 종료할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    audio_file = request.FILES.get("audio")
+    if not audio_file:
+        return Response(
+            {"error": "녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.", "meeting_id": meeting_id},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     meeting.meeting_status = Meeting.MeetingStatus.FINISHED
     meeting.is_meeting_approve = False
@@ -515,8 +600,6 @@ def end_meeting(request, meeting_id):
     meeting.save(update_fields=["meeting_status", "is_meeting_approve", "during_time", "is_paused"])
 
     minutes_data = {"content": "", "todo_list": []}
-    audio_file = request.FILES.get("audio")
-
     if audio_file:
         save_dir = os.path.join(settings.MEDIA_ROOT, "records", str(meeting_id))
         os.makedirs(save_dir, exist_ok=True)
@@ -545,9 +628,7 @@ def end_meeting(request, meeting_id):
             
             # 비동기 STT Job 완료 시까지 폴링
             import time
-            attempts = 0
-            max_attempts = 150  # 최대 300초 (5분) 대기
-            while attempts < max_attempts:
+            while True:
                 status_res = requests.get(f"{stt_base_url}/transcribe/jobs/{job_id}", timeout=10)
                 status_res.raise_for_status()
                 status_res.encoding = "utf-8"
@@ -561,9 +642,6 @@ def end_meeting(request, meeting_id):
                     raise Exception(f"STT 작업이 실패했습니다. 상태: {job_status}")
                 
                 time.sleep(2)
-                attempts += 1
-            else:
-                raise Exception("STT 작업 대기 시간 초과")
 
             result = stt_data.get("result", {})
             if not isinstance(result, dict):
@@ -635,10 +713,9 @@ def _create_tasks_from_todo(meeting, todo_list):
 @api_view(["GET", "POST"])
 def speaker_mapping_list(request, meeting_id):
     """발화자 매핑 조회 / 저장"""
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if request.method == "GET":
         mappings = (
@@ -702,10 +779,9 @@ def speaker_mapping_list(request, meeting_id):
 @api_view(["POST"])
 def complete_minutes_review(request, meeting_id):
     """회의록 검토 완료 처리"""
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if not meeting.meeting_document:
         return Response({"error": "확정할 회의록이 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
@@ -734,10 +810,9 @@ def _notify_meeting_users(meeting, notification_type, content):
 # ── 태스크 ───────────────────────────────────────────────────────
 @api_view(["GET", "POST"])
 def task_list(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if request.method == "GET":
         return Response(MeetingTaskSerializer(MeetingTask.objects.filter(meeting=meeting), many=True).data)
@@ -760,8 +835,12 @@ def task_list(request, meeting_id):
 
 @api_view(["PATCH"])
 def task_detail(request, meeting_id, task_id):
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
+
     try:
-        task = MeetingTask.objects.get(meeting_task_id=task_id, meeting_id=meeting_id)
+        task = MeetingTask.objects.get(meeting_task_id=task_id, meeting=meeting)
     except MeetingTask.DoesNotExist:
         return Response({"error": "태스크를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -786,16 +865,15 @@ def task_detail(request, meeting_id, task_id):
 # ── Jira 등록 (OAuth 방식) ───────────────────────────────────────
 @api_view(["POST"])
 def register_jira_tasks(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     if not meeting.project.jira_project_key:
         return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
 
-    user_id = request.data.get("user_id") or request.auth.get("user_id")
+    user_id = request.data.get("user_id") or _request_user_id(request)
     if not user_id:
         return Response({"error": "user_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -840,7 +918,12 @@ def register_jira_tasks(request, meeting_id):
 
         if result.get("success"):
             registered.append(
-                {"task_id": task_id, "jira_key": result.get("issue_key", "")}
+                {
+                    "task_id": task_id,
+                    "jira_key": result.get("issue_key", ""),
+                    "assignee_applied": result.get("assignee_applied", False),
+                    "assignee_skipped_reason": result.get("assignee_skipped_reason", ""),
+                }
             )
         else:
             failed.append({"task_id": task_id, "reason": result})
@@ -849,10 +932,9 @@ def register_jira_tasks(request, meeting_id):
 
 @api_view(["POST"])
 def send_summary_email(request, meeting_id):
-    try:
-        meeting = Meeting.objects.select_related("creator").get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     recipients = _meeting_email_recipients(meeting)
     recipient_user_ids = request.data.get("recipient_user_ids")
@@ -917,10 +999,9 @@ def _get_raw_transcript(record):
 
 @api_view(["POST"])
 def generate_minutes(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     try:
         record = Record.objects.get(meeting=meeting)
@@ -966,10 +1047,9 @@ def generate_minutes(request, meeting_id):
 # ── OCR + 기초 안건 생성 ─────────────────────────────────────────
 @api_view(["POST"])
 def generate_agenda(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     ocr_text = ""
     uploaded_file = request.FILES.get("file")
@@ -1026,10 +1106,9 @@ def check_agenda_status(request, meeting_id):
     if not job_id:
         return Response({"error": "job_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     ocr_base_url = settings.RUNPOD_OCR_BASE_URL
     
@@ -1144,10 +1223,9 @@ def _compile_prep_markdown(prep):
 
 @api_view(["GET", "POST", "PATCH"])
 def prep_material_detail(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     prep = MeetingPreparation.objects.filter(meeting=meeting).first()
 
@@ -1196,10 +1274,9 @@ def prep_material_detail(request, meeting_id):
 
 @api_view(["POST"])
 def generate_prep_material(request, meeting_id):
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     uploaded_file = request.FILES.get("file")
 
@@ -1327,10 +1404,9 @@ def check_prep_status(request, meeting_id):
     if not job_id:
         return Response({"error": "job_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        meeting = Meeting.objects.get(meeting_id=meeting_id)
-    except Meeting.DoesNotExist:
-        return Response({"error": "회의를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+    meeting, error_response = _get_accessible_meeting(request, meeting_id)
+    if error_response:
+        return error_response
 
     ocr_base_url = settings.RUNPOD_OCR_BASE_URL
     try:

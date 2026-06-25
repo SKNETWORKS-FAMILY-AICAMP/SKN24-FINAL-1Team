@@ -1,10 +1,23 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from django.middleware.csrf import CsrfViewMiddleware
 from .models import Users
 
 
+class CSRFCheck(CsrfViewMiddleware):
+    def _reject(self, request, reason):
+        return reason
+
+
 class CustomJWTAuthentication(JWTAuthentication):
+    def enforce_csrf(self, request):
+        check = CSRFCheck(lambda req: None)
+        check.process_request(request)
+        reason = check.process_view(request, None, (), {})
+        if reason:
+            raise PermissionDenied(f"CSRF Failed: {reason}")
+
     def authenticate(self, request):
         raw_token = request.COOKIES.get("access")
 
@@ -13,7 +26,11 @@ class CustomJWTAuthentication(JWTAuthentication):
 
         try:
             validated_token = self.get_validated_token(raw_token)
+            if request.method not in ("GET", "HEAD", "OPTIONS", "TRACE"):
+                self.enforce_csrf(request)
             return self.get_user(validated_token), validated_token
+        except PermissionDenied:
+            raise
         except Exception:
             return None
 

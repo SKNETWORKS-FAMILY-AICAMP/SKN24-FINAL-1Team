@@ -1,5 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
+import type { ReactNode } from "react";
 import Layout from "../components/layout/Layout";
+import { useAuth } from "../context/AuthContext";
 import LoginPage from "../pages/auth/LoginPage";
 import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import ProjectSelectPage from "../pages/project/ProjectSelectPage";
@@ -29,6 +31,24 @@ import NotFoundPage from "../pages/error/NotFoundPage";
 
 function DocumentRoutes() {
   return <Outlet />;
+}
+
+function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="p-8 text-gray-400">권한을 확인하는 중...</div>;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user.role !== "ADMIN") {
+    return <Navigate to="/projects" replace />;
+  }
+
+  return children;
 }
 
 const router = createBrowserRouter([
@@ -64,10 +84,16 @@ const router = createBrowserRouter([
         ],
       },
       { path: "/members", element: <MemberManagementPage /> },
-      { path: "/admin/users", element: <UserManagementPage /> },
+      {
+        path: "/admin/users",
+        element: (
+          <RequireAdmin>
+            <UserManagementPage />
+          </RequireAdmin>
+        ),
+      },
     ],
   },
-  { path: "/admin/users", element: <UserManagementPage /> },
   { path: "*", element: <NotFoundPage /> },
 ]);
 

@@ -56,14 +56,17 @@ export default function AgendaCreatePage() {
       const selected = items.filter(item => item.checked);
       await saveAgendaList(meetingId, selected.map(item => ({ title: item.content, reason: item.reason })));
       await confirmAgenda(meetingId);
-    } catch {
-      // 실패해도 다음 단계 진행
+      navigate(`/meetings/${meetingId}/prep-material`, {
+        state: { showAgenda: true, showPrepMaterial },
+      });
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+        "기초안건 저장에 실패했습니다.";
+      alert(message);
     } finally {
       setSubmitting(false);
     }
-    navigate(`/meetings/${meetingId}/prep-material`, {
-      state: { showAgenda: true, showPrepMaterial },
-    });
   };
 
   return (

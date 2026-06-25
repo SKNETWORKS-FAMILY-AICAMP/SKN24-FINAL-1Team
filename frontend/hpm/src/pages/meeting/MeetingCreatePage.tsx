@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { createMeeting, getUserList } from "../../services/meeting";
+import { createMeeting, getProjectDetail } from "../../services/meeting";
 import { useAuth } from "../../context/AuthContext";
 import * as DESIGN from "../../constants/design";
 import Button from "../../components/ui/Button";
@@ -32,12 +32,25 @@ export default function MeetingCreatePage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    getUserList()
-      .then(list => {
-        setUsers(list);
+    if (!projectId) {
+      setUsers([]);
+      return;
+    }
+
+    getProjectDetail(projectId)
+      .then(project => {
+        setUsers(
+          (project.members || []).map(member => ({
+            users_id: member.user_id,
+            name: member.name,
+            email: member.email,
+            rank_name: member.rank_name,
+            dept_name: member.dept_name,
+          })),
+        );
       })
       .catch(console.error);
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -179,6 +192,15 @@ export default function MeetingCreatePage() {
         </div>
       )}
   <div className="mb-6 justify-center w-full ">
+        <div className="mb-4">
+          <button
+            type="button"
+            onClick={() => navigate("/meetings")}
+            className="text-[14px] font-medium text-[#623FB5] hover:underline"
+          >
+            뒤로가기
+          </button>
+        </div>
         <div className="flex items-baseline gap-2 flex-wrap">
           <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold`}>회의 기본 정보 입력</h1>
           <span className={`${DESIGN.FONT_SIZES.sm} text-red-500 font-medium`}>* 회의 생성 후 회의 정보는 수정 불가합니다.</span>

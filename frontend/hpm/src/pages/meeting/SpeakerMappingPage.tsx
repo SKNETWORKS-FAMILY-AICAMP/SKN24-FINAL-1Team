@@ -10,6 +10,7 @@ import {
   type Meeting,
   type TranscriptItem,
 } from "../../services/meeting";
+import useMeetingReviewNavigationGuard from "../../hooks/useMeetingReviewNavigationGuard";
 import type { SpeakerParticipant, SpeakerSegment } from "../../types/speakerMapping";
 
 const STEP_LABELS = ["발화자 매핑", "회의록 검토 & 태스크 수정", "Jira 태스크 등록"];
@@ -85,6 +86,7 @@ export default function SpeakerMappingPage() {
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const allowReviewNavigation = useMeetingReviewNavigationGuard(!loading && !error);
 
   useEffect(() => {
     setLoading(true);
@@ -194,6 +196,7 @@ export default function SpeakerMappingPage() {
       setGenerating(true);
       await generateMinutes(meetingId);
 
+      allowReviewNavigation();
       navigate(`/meetings/${meetingId}/minutes`);
     } catch (err) {
       console.error("발화자 매핑 및 회의록 생성 실패:", err);
