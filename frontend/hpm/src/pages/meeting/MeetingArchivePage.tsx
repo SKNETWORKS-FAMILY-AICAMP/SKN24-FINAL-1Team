@@ -62,6 +62,7 @@ export default function MeetingArchivePage() {
   const [emailRecipientQuery, setEmailRecipientQuery] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -602,12 +603,12 @@ export default function MeetingArchivePage() {
         <div>
           <p className="text-[13px] mb-4" style={{ color: "#969696" }}>요약 이메일입니다.</p>
 
-          {emailSent ? (
-            <div className="flex items-center justify-center py-20 text-[14px] font-medium" style={{ color: "#623FB5" }}>
-              ✅ 메일이 발송되었습니다.
+          {emailSent && (
+            <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-lg text-[13px] font-medium" style={{ backgroundColor: "#F2F0FF", color: "#623FB5" }}>
+              메일이 발송되었습니다.
             </div>
-          ) : (
-            <>
+          )}
+          <>
               <div className="flex gap-5">
                 {/* 왼쪽: 회의 정보 */}
                 <div className="flex-1 flex flex-col gap-4">
@@ -754,7 +755,7 @@ export default function MeetingArchivePage() {
               {/* 발송 버튼 */}
               <div className="flex justify-end mt-5">
                 <button
-                  onClick={handleEmailSend}
+                  onClick={() => setShowEmailConfirmModal(true)}
                   disabled={emailSending || recipients.length === 0}
                   className="px-8 py-3 text-[14px] text-white rounded-lg font-semibold disabled:opacity-50"
                   style={{ backgroundColor: "#623FB5" }}
@@ -762,7 +763,32 @@ export default function MeetingArchivePage() {
                   {emailSending ? "발송 중..." : "이메일 발송"}
                 </button>
               </div>
-            </>
+          </>
+
+          {/* 이메일 발송 확인 모달 */}
+          {showEmailConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+              <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
+                <div className="px-8 py-10 text-center">
+                  <p className="text-[15px] font-semibold text-[#141414] mb-2">이메일을 발송하시겠습니까?</p>
+                  <p className="text-[12px] text-[#969696]">참석자들에게 회의 요약 이메일이 전송됩니다.</p>
+                </div>
+                <div className="border-t border-gray-200 flex">
+                  <button
+                    onClick={() => setShowEmailConfirmModal(false)}
+                    className="flex-1 py-4 text-sm text-[#141414] hover:bg-gray-50 transition border-r border-gray-200"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={() => { setShowEmailConfirmModal(false); handleEmailSend(); }}
+                    className="flex-1 py-4 text-sm font-bold text-[#623FB5] hover:bg-gray-50 transition"
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
