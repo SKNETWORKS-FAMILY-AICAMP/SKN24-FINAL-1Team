@@ -52,7 +52,7 @@ const getNotificationPath = (notification: Notification) => {
     case "meeting_started":
       return notification.target_id ? `/meetings/${notification.target_id}` : null;
     case "minutes_approved":
-      return notification.target_id ? `/meetings/${notification.target_id}/minutes` : null;
+      return notification.target_id ? `/meetings/${notification.target_id}/archive` : null;
     case "task_assigned":
       return "/dashboard";
     case "document_uploaded":
@@ -80,6 +80,10 @@ export default function HeaderNotificationPopover({
       ? notifications
       : notifications.filter((notification) => TYPE_META[notification.notification_type]?.category === activeTab);
   }, [activeTab, notifications]);
+  const visibleNotificationIds = useMemo(
+    () => visibleNotifications.map((notification) => notification.notification_id),
+    [visibleNotifications],
+  );
 
   const hasUnreadInTab = (tab: NotificationTab) => {
     return notifications.some((notification) => {
@@ -172,6 +176,13 @@ export default function HeaderNotificationPopover({
     setDeleteMode(false);
   };
 
+  const handleSelectAllClick = () => {
+    if (visibleNotificationIds.length === 0) return;
+
+    setDeleteMode(true);
+    setSelectedIds(new Set(visibleNotificationIds));
+  };
+
   return (
     <section
       aria-label="알림"
@@ -181,6 +192,14 @@ export default function HeaderNotificationPopover({
       <h2 className="absolute left-[26px] top-[18px] m-0 text-[24px] font-medium leading-[1.2] text-[#141414]">
         알림
       </h2>
+      <button
+        type="button"
+        onClick={handleSelectAllClick}
+        disabled={loading || visibleNotificationIds.length === 0}
+        className="absolute left-[200px] top-[15px] flex h-[24px] w-[68px] items-center justify-center rounded-[5px] border border-[#623FB5] bg-[#FFFDFD] text-[12px] font-normal leading-[1.2] text-[#623FB5] transition-all duration-150 ease-out hover:bg-[#F0ECFA] active:scale-[0.96] disabled:cursor-not-allowed disabled:border-[#C9C9C9] disabled:text-[#969696] disabled:hover:bg-[#FFFDFD]"
+      >
+        전체 선택
+      </button>
       <button
         type="button"
         onClick={handleDeleteClick}
@@ -211,7 +230,7 @@ export default function HeaderNotificationPopover({
         ))}
       </div>
 
-      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] w-[324px] flex-col gap-[10px] overflow-y-auto pr-1">
+      <div className="absolute left-[14px] top-[107px] flex max-h-[310px] w-[324px] flex-col gap-[10px] overflow-x-hidden overflow-y-auto pr-1">
         {loading ? (
           <div className="flex h-[70px] w-full items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
             알림을 불러오는 중입니다.
@@ -260,7 +279,7 @@ export default function HeaderNotificationPopover({
             );
           })
         ) : (
-          <div className="flex h-[70px] w-[324px] items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
+          <div className="flex h-[70px] w-full items-center justify-center rounded-[7px] border border-[#969696] bg-[#F4F5F8] text-[12px] text-[#969696]">
             표시할 알림이 없습니다.
           </div>
         )}

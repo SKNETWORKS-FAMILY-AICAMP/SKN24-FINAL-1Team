@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from apps.users.models import Users
 from apps.users.views import get_valid_access_token
-from apps.meetings.jira_client import create_jira_issue_for_board, update_jira_issue_status
+from apps.meetings.jira_client import create_jira_issue_for_board, update_jira_issue, update_jira_issue_status
 from apps.notifications.models import Notification
 from .models import Project, ProjectUsers
 from .serializers import ProjectSerializer, ProjectUsersSerializer
@@ -228,6 +228,53 @@ def _match_jira_column(columns, jira_status):
     return columns[0]["id"] if columns else "jira-new"
 
 
+def _jira_description_to_text(value):
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        return ""
+
+    chunks = []
+
+    def walk(node):
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+
+        if not isinstance(node, dict):
+            return
+
+        if node.get("type") == "text":
+            chunks.append(node.get("text", ""))
+
+        content = node.get("content")
+        if content:
+            walk(content)
+
+        if node.get("type") in {"paragraph", "heading", "blockquote"}:
+            chunks.append("\n")
+
+    walk(value.get("content", []))
+    return "".join(chunks).strip()
+
+
+def _is_parent_candidate(issue_type):
+    issue_type_name = (issue_type.get("name") or "").lower()
+    hierarchy_level = issue_type.get("hierarchyLevel")
+    return issue_type_name in {"epic", "에픽"} or hierarchy_level == 1
+
+
+def _merge_jira_issues(base_issues, extra_issues):
+    seen_keys = {issue.get("key") for issue in base_issues if issue.get("key")}
+    for issue in extra_issues:
+        key = issue.get("key")
+        if not key or key in seen_keys:
+            continue
+        base_issues.append(issue)
+        seen_keys.add(key)
+
+
 @api_view(["GET", "POST"])
 def project_list(request):
     user_id = _request_user_id(request)
@@ -418,22 +465,27 @@ def project_jira_board(request, project_id):
         if agile_res.ok:
             raw_issues = agile_res.json().get("issues", [])
 
-    # 2) Agile API 실패 시 JQL 폴백
-    if not raw_issues:
-        try:
-            res = requests.post(
-                f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/search/jql",
-                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "Content-Type": "application/json"},
-                json={"jql": f"project = {project.jira_project_key} ORDER BY created DESC", "maxResults": 100, "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"]},
-                timeout=10,
-            )
-            if res.ok:
-                raw_issues = res.json().get("issues", [])
-        except requests.RequestException:
-            pass
+    # 2) JQL 전체 조회를 병합해 Agile API에서 빠질 수 있는 Epic도 상위 업무 후보로 사용
+    try:
+        res = requests.post(
+            f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/search/jql",
+            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json", "Content-Type": "application/json"},
+            json={"jql": f"project = {project.jira_project_key} ORDER BY created DESC", "maxResults": 100, "fields": ["summary", "description", "status", "assignee", "priority", "duedate", "created", "parent", "issuetype"]},
+            timeout=10,
+        )
+        if res.ok:
+            jql_issues = res.json().get("issues", [])
+            if raw_issues:
+                _merge_jira_issues(raw_issues, jql_issues)
+            else:
+                raw_issues = jql_issues
+    except requests.RequestException:
+        pass
     
     print(f"[BOARD] JQL 결과 이슈 수: {len(raw_issues)}")
     issues_by_column = {column["id"]: [] for column in jira_columns}
+    parent_options = []
+    seen_parent_keys = set()
     for issue in raw_issues:
         fields = issue.get("fields", {})
         jira_status = fields.get("status", {})
@@ -444,11 +496,19 @@ def project_jira_board(request, project_id):
         parent = fields.get("parent") or {}
         parent_fields = parent.get("fields") or {}
         issue_type = fields.get("issuetype") or {}
+        issue_key = issue.get("key")
+
+        if issue_key and _is_parent_candidate(issue_type) and issue_key not in seen_parent_keys:
+            parent_options.append({
+                "issue_key": issue_key,
+                "title": fields.get("summary", ""),
+            })
+            seen_parent_keys.add(issue_key)
 
         issues_by_column.setdefault(column_id, []).append({
-            "issue_key": issue.get("key"),
+            "issue_key": issue_key,
             "title": fields.get("summary", ""),
-            "description": "",
+            "description": _jira_description_to_text(fields.get("description")),
             "assignee": assignee.get("displayName", ""),
             "priority": priority.get("name", ""),
             "due_date": fields.get("duedate") or "",
@@ -464,9 +524,106 @@ def project_jira_board(request, project_id):
     return Response({
         "columns": jira_columns,
         "issues": issues_by_column,
+        "parent_options": parent_options,
         "can_manage": can_manage_jira,
         "read_only": not can_manage_jira,
     })
+
+
+@api_view(["PATCH"])
+def project_jira_board_issue(request, project_id, issue_key):
+    user_id = _request_user_id(request)
+
+    try:
+        project = Project.objects.get(project_id=project_id)
+    except Project.DoesNotExist:
+        return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    is_member = ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
+    if project.project_owner_id != user_id and not is_member:
+        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    if not project.jira_project_key:
+        return Response({"error": "프로젝트에 Jira 프로젝트 키가 설정되지 않았습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = Users.objects.get(users_id=user_id)
+    except Users.DoesNotExist:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    access_token = get_valid_access_token(user)
+    if not access_token:
+        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+    if not user.jira_cloud_id:
+        return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    jira_access_error = _check_jira_project_access(
+        access_token,
+        user.jira_cloud_id,
+        project.jira_project_key,
+    )
+    if jira_access_error:
+        return jira_access_error
+
+    data = request.data
+    title = data.get("title")
+    if title is not None:
+        title = str(title).strip()
+        if not title:
+            return Response({"error": "title is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(title) > 255:
+            return Response({"error": "업무명은 255자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        title = ""
+
+    description_provided = "description" in data
+    description = data.get("description", "") if description_provided else ""
+    if description_provided and len(str(description)) > 1000:
+        return Response({"error": "설명은 1000자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    update_kwargs = {}
+    if "due_date" in data:
+        update_kwargs["due_date"] = data.get("due_date") or None
+    if "priority" in data:
+        update_kwargs["priority"] = data.get("priority") or None
+    if "parent_key" in data:
+        update_kwargs["parent_key"] = data.get("parent_key") or None
+
+    if "assignee_user_id" in data:
+        assignee_user_id = data.get("assignee_user_id")
+        if assignee_user_id in (None, ""):
+            update_kwargs["assignee_account_id"] = None
+        elif ProjectUsers.objects.filter(project=project, user_id=assignee_user_id).exists():
+            try:
+                assignee = Users.objects.get(users_id=assignee_user_id)
+            except Users.DoesNotExist:
+                return Response({"error": "담당자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+            if not assignee.jira_account_id:
+                return Response({"error": "담당자의 Jira 계정이 연동되어 있지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+            update_kwargs["assignee_account_id"] = assignee.jira_account_id
+        else:
+            return Response({"error": "담당자는 프로젝트 구성원이어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    result = update_jira_issue(
+        issue_key,
+        title,
+        str(description),
+        access_token,
+        user.jira_cloud_id,
+        description_provided=description_provided,
+        **update_kwargs,
+    )
+
+    if not result.get("success"):
+        return Response(
+            {"error": "Jira 이슈 수정에 실패했습니다.", "detail": result},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response(result, status=status.HTTP_200_OK)
 
 
 @api_view(["PATCH"])
