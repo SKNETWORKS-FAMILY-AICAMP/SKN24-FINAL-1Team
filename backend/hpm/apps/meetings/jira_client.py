@@ -413,7 +413,35 @@ def create_jira_issue_for_board(
         return {"success": False, "error": str(e), "detail": error_detail}
     
 
-def update_jira_issue(issue_key: str, title: str, description: str, access_token: str, cloud_id: str) -> dict:
+_UNSET = object()
+
+
+def _jira_adf_text(text: str) -> dict:
+    return {
+        "version": 1,
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": text}],
+            }
+        ],
+    }
+
+
+def update_jira_issue(
+    issue_key: str,
+    title: str,
+    description: str,
+    access_token: str,
+    cloud_id: str,
+    *,
+    description_provided: bool = False,
+    due_date=_UNSET,
+    priority=_UNSET,
+    assignee_account_id=_UNSET,
+    parent_key=_UNSET,
+) -> dict:
 
     url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue/{issue_key}"
     headers = {
@@ -423,20 +451,25 @@ def update_jira_issue(issue_key: str, title: str, description: str, access_token
     }
 
     fields = {}
+    title = (title or "").strip()
     if title:
         fields["summary"] = title
-    if description:
-        # Jira는 description을 ADF(Atlassian Document Format) 형식으로 받아
-        fields["description"] = {
-            "version": 1,
-            "type": "doc",
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": description}]
-                }
-            ]
-        }
+    if description_provided:
+        fields["description"] = _jira_adf_text(description) if description else None
+    elif description:
+        # Jira는 description을 ADF(Atlassian Document Format) 형식으로 받음.
+        fields["description"] = _jira_adf_text(description)
+    if due_date is not _UNSET:
+        fields["duedate"] = due_date or None
+    if priority is not _UNSET:
+        fields["priority"] = {"name": priority} if priority else None
+    if assignee_account_id is not _UNSET:
+        fields["assignee"] = {"accountId": assignee_account_id} if assignee_account_id else None
+    if parent_key is not _UNSET:
+        fields["parent"] = {"key": parent_key} if parent_key else None
+
+    if not fields:
+        return {"success": True, "issue_key": issue_key}
 
     try:
         response = requests.put(url, json={"fields": fields}, headers=headers, timeout=10)

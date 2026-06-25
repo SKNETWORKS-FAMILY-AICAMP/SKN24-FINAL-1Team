@@ -1,5 +1,6 @@
-import { type ChangeEvent } from "react";
+import { useEffect, type ChangeEvent } from "react";
 import closeIcon from "../../assets/kanban/close.png";
+import * as DESIGN from "../../constants/design";
 import { KANBAN_PRIORITIES } from "../../constants/kanban";
 import type {
   KanbanModalState,
@@ -9,6 +10,9 @@ import type {
 
 const cn = (...classes: Array<string | false | null | undefined>) =>
   classes.filter(Boolean).join(" ");
+
+const TASK_TITLE_MAX_LENGTH = 255;
+const TASK_DESCRIPTION_MAX_LENGTH = 1000;
 
 function PriorityChip({
   priority,
@@ -38,25 +42,21 @@ function PriorityChip({
 function OptionChip({
   label,
   selected,
-  disabled,
   onClick,
 }: {
   label: string;
   selected: boolean;
-  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-px text-[11px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
+        "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-[2px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
         selected
           ? "border-[#623FB5] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
-          : "border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
-        disabled && "cursor-not-allowed opacity-60",
+          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#623FB5] hover:bg-[#F4F1FF] hover:text-[#623FB5]",
       )}
     >
       {label}
@@ -89,12 +89,32 @@ export default function KanbanTaskModal({
   const { values } = modal;
   const canSubmit = Boolean(values.title.trim()) && Boolean(values.priority);
   const isEdit = modal.mode === "edit";
+  const titleValue = values.title.slice(0, TASK_TITLE_MAX_LENGTH);
+  const descriptionValue = values.description.slice(0, TASK_DESCRIPTION_MAX_LENGTH);
+
+  useEffect(() => {
+    if (titleValue === values.title && descriptionValue === values.description) return;
+
+    onChange({
+      ...values,
+      title: titleValue,
+      description: descriptionValue,
+    });
+  }, [descriptionValue, onChange, titleValue, values]);
 
   const update = <Key extends keyof KanbanTaskFormValues>(
     key: Key,
     value: KanbanTaskFormValues[Key],
   ) => {
-    onChange({ ...values, [key]: value });
+    let nextValue = value;
+    if (key === "title" && typeof value === "string") {
+      nextValue = value.slice(0, TASK_TITLE_MAX_LENGTH) as KanbanTaskFormValues[Key];
+    }
+    if (key === "description" && typeof value === "string") {
+      nextValue = value.slice(0, TASK_DESCRIPTION_MAX_LENGTH) as KanbanTaskFormValues[Key];
+    }
+
+    onChange({ ...values, [key]: nextValue });
   };
 
   return (
@@ -127,25 +147,33 @@ export default function KanbanTaskModal({
           업무 명 <span className="text-[#E52E2E]">*</span>
         </label>
         <input
-          value={values.title}
+          value={titleValue}
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
             update("title", event.target.value)
           }
+          maxLength={TASK_TITLE_MAX_LENGTH}
           placeholder="업무 명을 작성해 주세요"
           className="absolute left-[32px] top-[129px] h-[36px] w-[414px] rounded-[7px] border border-[#969696] bg-transparent px-[11px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none placeholder:text-[#969696]"
         />
+        <p className={`absolute left-[32px] top-[170px] m-0 w-[414px] text-right ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>
+          {titleValue.length}/{TASK_TITLE_MAX_LENGTH}
+        </p>
 
         <label className="absolute left-[32px] top-[191px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           설명
         </label>
         <textarea
-          value={values.description}
+          value={descriptionValue}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             update("description", event.target.value)
           }
+          maxLength={TASK_DESCRIPTION_MAX_LENGTH}
           placeholder="업무에 대한 설명을 작성해 주세요"
           className="absolute left-[32px] top-[216px] h-[108px] w-[414px] resize-none rounded-[7px] border border-[#969696] bg-transparent px-[11px] py-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none placeholder:text-[#969696]"
         />
+        <p className={`absolute left-[32px] top-[329px] m-0 w-[414px] text-right ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>
+          {descriptionValue.length}/{TASK_DESCRIPTION_MAX_LENGTH}
+        </p>
 
         <label className="absolute left-[33px] top-[350px] text-[15px] font-medium leading-[1.2] text-[#141414]">
           담당자
@@ -196,13 +224,12 @@ export default function KanbanTaskModal({
         </div>
 
         <label className="absolute left-[32px] top-[512px] text-[15px] font-medium leading-[1.2] text-[#141414]">
-          {isEdit ? "상위 업무(수정 불가)" : "상위 업무"}
+          상위 업무
         </label>
         <div className="absolute left-[32px] top-[537px] flex w-[414px] gap-[10px] overflow-x-auto pb-[4px]">
           <OptionChip
             label="Epic 없음"
             selected={!values.parentKey}
-            disabled={isEdit}
             onClick={() => onChange({ ...values, parentKey: "", category: "" })}
           />
           {parentOptions.map((option) => (
@@ -210,7 +237,6 @@ export default function KanbanTaskModal({
               key={option.value}
               label={option.label}
               selected={values.parentKey === option.value}
-              disabled={isEdit}
               onClick={() =>
                 onChange({
                   ...values,

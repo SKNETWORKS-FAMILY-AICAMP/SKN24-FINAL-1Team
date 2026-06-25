@@ -15,7 +15,9 @@ import {
   createProjectJiraIssue,
   getProjectDetail,
   getProjectJiraBoard,
+  updateProjectJiraIssue,
   updateProjectJiraIssueStatus,
+  type JiraParentOption,
   type ProjectMember,
   type ProjectJiraBoard,
   type JiraBoardColumn,
@@ -109,11 +111,13 @@ export default function KanbanBoardPage() {
   const [saving, setSaving] = useState(false);
   const [draggingTask, setDraggingTask] = useState<KanbanTask | null>(null);
   const [canManageJira, setCanManageJira] = useState(false);
+  const [jiraParentOptions, setJiraParentOptions] = useState<JiraParentOption[]>([]);
 
   useEffect(() => {
     if (!user || !projectId) {
       setTasks([]);
       setBoardColumns(KANBAN_COLUMNS);
+      setJiraParentOptions([]);
       setCanManageJira(false);
       setLoading(false);
       setError(null);
@@ -133,12 +137,14 @@ export default function KanbanBoardPage() {
         console.log("[KANBAN] tasks 수:", nextTasks.length);
         setBoardColumns(nextColumns);
         setTasks(nextTasks);
+        setJiraParentOptions(board.parent_options || []);
         setCanManageJira(Boolean(board.can_manage));
       })
       .catch((error) => {
         console.error("Jira 칸반 조회 실패:", error);
         setBoardColumns(KANBAN_COLUMNS);
         setTasks([]);
+        setJiraParentOptions([]);
         setCanManageJira(false);
         setError(getApiErrorMessage(error));
       })
@@ -202,14 +208,32 @@ export default function KanbanBoardPage() {
   );
 
   const parentOptions = useMemo(
-    () =>
-      tasks
-        .filter(isEpicTask)
-        .map((task) => ({
-          value: task.code,
-          label: task.title,
-        })),
-    [tasks],
+    () => {
+      const options = new Map<string, string>();
+
+      jiraParentOptions.forEach((option) => {
+        if (!option.issue_key) return;
+        options.set(option.issue_key, option.title || option.issue_key);
+      });
+
+      tasks.filter(isEpicTask).forEach((task) => {
+        if (!task.code) return;
+        options.set(task.code, task.title || task.code);
+      });
+
+      return Array.from(options, ([value, label]) => ({ value, label }));
+    },
+    [jiraParentOptions, tasks],
+  );
+
+  const modalParentOptions = useMemo(
+    () => {
+      if (!modal || modal.mode !== "edit" || !modal.taskId) return parentOptions;
+
+      const editingTask = tasks.find((task) => task.id === modal.taskId);
+      return parentOptions.filter((option) => option.value !== editingTask?.code);
+    },
+    [modal, parentOptions, tasks],
   );
 
   const openAddModal = (columnId: KanbanColumnId) => {
@@ -230,11 +254,15 @@ export default function KanbanBoardPage() {
   const openEditModal = (task: KanbanTask) => {
     if (!canManageJira) return;
 
+    const matchedAssignee = assigneeOptions.find((option) => option.label === task.assignee);
     setModal({
       mode: "edit",
       columnId: task.columnId,
       taskId: task.id,
-      values: toKanbanFormValues(task),
+      values: {
+        ...toKanbanFormValues(task),
+        assigneeId: matchedAssignee?.value || "",
+      },
     });
   };
 
@@ -292,25 +320,43 @@ export default function KanbanBoardPage() {
     if (!canManageJira) return;
     if (!modal || !modal.values.title.trim() || !modal.values.priority || saving) return;
 
-    if (modal.mode === "edit" && modal.taskId) {
-      setTasks((current) =>
-        current.map((task) =>
-          task.id === modal.taskId
-            ? {
-                ...task,
-                ...modal.values,
-                title: modal.values.title.trim(),
-                priority: modal.values.priority as KanbanPriority,
-              }
-            : task,
-        ),
-      );
-      closeModal();
+    if (!projectId) {
+      alert("프로젝트를 먼저 선택해 주세요.");
       return;
     }
 
-    if (!projectId) {
-      alert("프로젝트를 먼저 선택해 주세요.");
+    if (modal.mode === "edit" && modal.taskId) {
+      const currentTask = tasks.find((task) => task.id === modal.taskId);
+      if (!currentTask) return;
+
+      setSaving(true);
+      try {
+        const updatePayload: Parameters<typeof updateProjectJiraIssue>[2] = {
+          title: modal.values.title.trim(),
+          description: modal.values.description,
+          due_date: modal.values.dueDate || null,
+          priority: mapKanbanPriorityToJira(modal.values.priority),
+          parent_key: modal.values.parentKey || null,
+        };
+        if (modal.values.assigneeId) {
+          updatePayload.assignee_user_id = Number(modal.values.assigneeId);
+        }
+
+        await updateProjectJiraIssue(projectId, currentTask.code, updatePayload);
+
+        const board = await getProjectJiraBoard(projectId);
+        const nextColumns = toKanbanColumns(board.columns || []);
+        setBoardColumns(nextColumns);
+        setTasks(jiraBoardToTasks(board, nextColumns));
+        setJiraParentOptions(board.parent_options || []);
+        setCanManageJira(Boolean(board.can_manage));
+        closeModal();
+      } catch (error) {
+        console.error("Jira 업무 수정 실패:", error);
+        alert("Jira 업무 수정에 실패했습니다.");
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -351,6 +397,7 @@ export default function KanbanBoardPage() {
       }
       setBoardColumns(nextColumns);
       setTasks(nextTasks);
+      setJiraParentOptions(board.parent_options || []);
       setCanManageJira(Boolean(board.can_manage));
       closeModal();
     } catch (error) {
@@ -415,7 +462,7 @@ export default function KanbanBoardPage() {
           onChange={(values) => setModal({ ...modal, values })}
           onSubmit={submitTask}
           assigneeOptions={assigneeOptions}
-          parentOptions={parentOptions}
+          parentOptions={modalParentOptions}
         />
       ) : null}
     </div>

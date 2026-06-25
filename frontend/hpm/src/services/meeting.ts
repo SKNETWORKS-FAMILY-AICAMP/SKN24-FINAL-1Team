@@ -386,6 +386,11 @@ export interface JiraBoardIssue {
   issue_type_hierarchy_level?: number | null;
 }
 
+export interface JiraParentOption {
+  issue_key: string;
+  title: string;
+}
+
 export interface JiraBoardColumn {
   id: string;
   label: string;
@@ -396,6 +401,7 @@ export interface JiraBoardColumn {
 export interface ProjectJiraBoard {
   columns: JiraBoardColumn[];
   issues: Record<string, JiraBoardIssue[]>;
+  parent_options?: JiraParentOption[];
   can_manage?: boolean;
   read_only?: boolean;
 }
@@ -419,6 +425,22 @@ export const createProjectJiraIssue = async (
   },
 ): Promise<{ success: boolean; issue_key: string; column_id: string }> => {
   const res = await api.post(`/projects/${projectId}/jira-board/`, data);
+  return res.data;
+};
+
+export const updateProjectJiraIssue = async (
+  projectId: number,
+  issueKey: string,
+  data: {
+    title?: string;
+    description?: string;
+    due_date?: string | null;
+    priority?: string;
+    assignee_user_id?: number;
+    parent_key?: string | null;
+  },
+): Promise<{ success: boolean; issue_key: string }> => {
+  const res = await api.patch(`/projects/${projectId}/jira-board/issue/${issueKey}/`, data);
   return res.data;
 };
 
