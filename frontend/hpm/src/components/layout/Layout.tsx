@@ -6,6 +6,7 @@ import * as DESIGN from "../../constants/design";
 import GlobalLoginModal from "../ui/GlobalLoginModal";
 import { useAuth } from "../../context/AuthContext";
 import { useAuthStore } from "../../constants/auth";
+import FloatingChatbot from "../ui/FloatingChatbot";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -31,6 +32,21 @@ export default function Layout() {
   }
 
   const noLayoutPaths = ["/login", "/projects", "/admin/users", "/projects/create"];
+
+  // 챗봇 숨길 페이지 판단
+  const meetingProgressPaths = [
+    "/upload", "/agenda", "/prep-material", "/complete",
+    "/speaker-mapping", "/minutes", "/jira", "/email",
+    "/jira-register", "/invite-email",
+  ];
+  const isMeetingInProgress = meetingProgressPaths.some((p) =>
+    location.pathname.includes(p)
+  );
+  const noChatbotPaths = ["/login", "/change-password", "/projects", "/projects/create", "/admin/users"];
+  const showChatbot =
+    !!user &&
+    !noChatbotPaths.includes(location.pathname) &&
+    !isMeetingInProgress;
   const isNoLayout =
     noLayoutPaths.includes(location.pathname) ||
     (isChangePasswordPage && (requiresInitialPasswordChange || !user));
@@ -44,6 +60,7 @@ export default function Layout() {
             <Outlet />
           </div>
           <GlobalLoginModal />
+          {showChatbot && <FloatingChatbot />}
         </div>
       );
     }
@@ -60,6 +77,7 @@ export default function Layout() {
           </main>
         </div>
         <GlobalLoginModal />
+        {showChatbot && <FloatingChatbot />}
       </div>
   );
 }
