@@ -137,7 +137,6 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
               }`}
             >
               <span className="truncate max-w-[110px]">{m.title}</span>
-              <span className="opacity-0 group-hover:opacity-100 text-gray-500">⋮</span>
             </button>
           ))}
           <button
