@@ -461,11 +461,11 @@ def end_meeting(request, meeting_id):
             stt_res.encoding = "utf-8"
             stt_res.raise_for_status()
             stt_data = stt_res.json()
-            
+
             job_id = stt_data.get("job_id")
             if not job_id:
                 raise Exception("STT 작업 등록 실패: job_id가 반환되지 않았습니다.")
-            
+
             # 비동기 STT Job 완료 시까지 폴링
             import time
             attempts = 0
@@ -476,13 +476,13 @@ def end_meeting(request, meeting_id):
                 status_res.encoding = "utf-8"
                 status_data = status_res.json()
                 job_status = str(status_data.get("status", "")).lower()
-                
+
                 if job_status == "succeeded":
                     stt_data = status_data
                     break
                 elif job_status in ["failed", "error", "cancelled"]:
                     raise Exception(f"STT 작업이 실패했습니다. 상태: {job_status}")
-                
+
                 time.sleep(2)
                 attempts += 1
             else:

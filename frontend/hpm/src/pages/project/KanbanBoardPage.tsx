@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import projectIcon from "../../assets/kanban/icon-project.svg";
+import projectIcon from "../../assets/kanban/folder.png";
 import KanbanColumn from "../../components/project/KanbanColumn";
 import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {

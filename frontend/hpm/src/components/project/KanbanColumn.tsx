@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import plusIcon from "../../assets/kanban/icon-plus.svg";
+import plusIcon from "../../assets/kanban/plus.png";
 import {
   getKanbanColumnHeight,
   KANBAN_CARD_GAP,
