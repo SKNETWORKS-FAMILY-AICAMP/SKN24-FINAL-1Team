@@ -6,8 +6,25 @@ import Table from "../../components/ui/Table";
 import type { TableColumn } from "../../components/ui/Table";
 import Pagination from "../../components/ui/Pagination";
 import Button from "../../components/ui/Button";
-import searchIcon from "../../assets/meeting/search.png"
+import { DateRangePicker, FilterSelect } from "../../components/ui/DatePickerBox";
+import searchIcon from "../../assets/meeting/search.png";
 import * as DESIGN from "../../constants/design";
+
+const MEETING_STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "전체" },
+  { value: "scheduled", label: "예정" },
+  { value: "in_progress", label: "진행 중" },
+  { value: "finished", label: "종료" },
+] as const;
+
+const MEETING_PERIOD_FILTER_OPTIONS = [
+  { value: "all", label: "전체" },
+  { value: "week", label: "최근 1주일" },
+  { value: "month", label: "최근 1개월" },
+  { value: "3months", label: "최근 3개월" },
+] as const;
+
+const MEETING_SORT_OPTIONS = ["최신순", "오래된순"] as const;
 
 export const MOCK_MEETINGS: Meeting[] = [
   {
@@ -196,6 +213,7 @@ export default function MeetingListPage() {
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [sortOrder, setSortOrder] = useState<(typeof MEETING_SORT_OPTIONS)[number]>("최신순");
 
   // 선택된 행들의 ID 집합
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -221,7 +239,7 @@ export default function MeetingListPage() {
 
   // 클라이언트 사이드 필터링 로직
   const filteredMeetings = useMemo(() => {
-    return meetings.filter((m) => {
+    const filtered = meetings.filter((m) => {
       // 검색어 필터 
       const creatorName = m.creator_name || m.participants?.[0]?.name || "";
       const matchSearch =
@@ -233,7 +251,16 @@ export default function MeetingListPage() {
 
       // 기간 필터
       let matchPeriod = true;
-      if (periodFilter !== "all" && m.meeting_at) {
+      const hasDateRange = Boolean(startDate || endDate);
+      if (hasDateRange) {
+        if (!m.meeting_at) return false;
+        const meetingDate = new Date(m.meeting_at);
+        const start = startDate ? new Date(startDate + "T00:00:00") : null;
+        const end = endDate ? new Date(endDate + "T23:59:59") : null;
+        if (start && meetingDate < start) matchPeriod = false;
+        if (end && meetingDate > end) matchPeriod = false;
+      } else if (periodFilter !== "all") {
+        if (!m.meeting_at) return false;
         const meetingDate = new Date(m.meeting_at);
         const now = new Date();
 
@@ -246,17 +273,23 @@ export default function MeetingListPage() {
         } else if (periodFilter === "3months") {
           const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
           matchPeriod = meetingDate >= threeMonthsAgo && meetingDate <= now;
-        } else if (periodFilter === "custom") {
-          const start = startDate ? new Date(startDate + "T00:00:00") : null;
-          const end = endDate ? new Date(endDate + "T23:59:59") : null;
-          if (start && meetingDate < start) matchPeriod = false;
-          if (end && meetingDate > end) matchPeriod = false;
         }
       }
 
       return matchSearch && matchStatus && matchPeriod;
     });
-  }, [meetings, search, statusFilter, periodFilter, startDate, endDate]);
+
+    filtered.sort((a, b) => {
+      const aTime = a.meeting_at ? new Date(a.meeting_at).getTime() : Number.NaN;
+      const bTime = b.meeting_at ? new Date(b.meeting_at).getTime() : Number.NaN;
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+      if (Number.isNaN(aTime)) return 1;
+      if (Number.isNaN(bTime)) return -1;
+      return sortOrder === "오래된순" ? aTime - bTime : bTime - aTime;
+    });
+
+    return filtered;
+  }, [meetings, search, statusFilter, periodFilter, startDate, endDate, sortOrder]);
 
   // 페이지네이션 처리
   const totalPages = Math.ceil(filteredMeetings.length / PER_PAGE);
@@ -526,68 +559,64 @@ export default function MeetingListPage() {
 
         {/* 하단 세부 필터 (상태, 기간, 삭제 버튼) */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {/* 상태 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>상태</span>
-              <select
+              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>상태</span>
+              <FilterSelect
+                ariaLabel="상태 필터"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
+                onChange={(value) => {
+                  setStatusFilter(value);
                   setPage(1);
                 }}
-                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none cursor-pointer focus:border-[#623FB5]`}
-              >
-                <option value="all">전체</option>
-                <option value="scheduled">예정</option>
-                <option value="in_progress">진행 중</option>
-                <option value="finished">종료</option>
-              </select>
+                options={MEETING_STATUS_FILTER_OPTIONS}
+              />
             </div>
 
             {/* 기간 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>기간</span>
-              <select
+              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>기간</span>
+              <FilterSelect
+                ariaLabel="회의 기간 필터"
                 value={periodFilter}
-                onChange={(e) => {
-                  setPeriodFilter(e.target.value);
+                onChange={(value) => {
+                  setPeriodFilter(value);
                   setPage(1);
                 }}
-                className={`py-2 px-3 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none cursor-pointer focus:border-[#623FB5]`}
-              >
-                <option value="all">전체</option>
-                <option value="week">최근 1주일</option>
-                <option value="month">최근 1개월</option>
-                <option value="3months">최근 3개월</option>
-                <option value="custom">직접 입력</option>
-              </select>
+                options={MEETING_PERIOD_FILTER_OPTIONS}
+              />
             </div>
 
-            {/* 직접 입력 시 표시되는 날짜 인풋 */}
-            {periodFilter === "custom" && (
-              <div className="flex items-center gap-2 transition-all duration-200">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none focus:border-[#623FB5]`}
-                />
-                <span className="text-gray-400">-</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value);
-                    setPage(1);
-                  }}
-                  className={`py-1.5 px-2 bg-white ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.sm} ${DESIGN.FONT_SIZES.md} outline-none focus:border-[#623FB5]`}
-                />
-              </div>
-            )}
+            {/* 날짜 필터 */}
+            <DateRangePicker
+              startAriaLabel="회의 시작일 선택"
+              endAriaLabel="회의 종료일 선택"
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={(value) => {
+                setStartDate(value);
+                setPage(1);
+              }}
+              onEndDateChange={(value) => {
+                setEndDate(value);
+                setPage(1);
+              }}
+            />
+
+            {/* ?뺣젹 */}
+            <div className="flex items-center gap-2">
+              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>정렬</span>
+              <FilterSelect
+                ariaLabel="정렬"
+                value={sortOrder}
+                onChange={(value) => {
+                  setSortOrder(value as (typeof MEETING_SORT_OPTIONS)[number]);
+                  setPage(1);
+                }}
+                options={MEETING_SORT_OPTIONS}
+              />
+            </div>
           </div>
 
           {/* 회의 추가 및 삭제 버튼 영역 */}
@@ -610,7 +639,12 @@ export default function MeetingListPage() {
       </div>
 
       {/*메인 테이블 영역 */}
-      <Table data={pagedMeetings} columns={columns} isLoading={loading} />
+      <Table
+        data={pagedMeetings}
+        columns={columns}
+        isLoading={loading}
+        emptyMessage="조건에 맞는 회의가 없습니다."
+      />
 
       {/* 페이지네이션 영역 */}
       {!loading && (

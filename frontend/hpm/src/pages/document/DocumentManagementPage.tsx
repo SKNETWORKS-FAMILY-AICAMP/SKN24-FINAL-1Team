@@ -48,7 +48,7 @@ export default function DocumentManagementPage() {
   const [uploadPeriod, setUploadPeriod] = useState("전체");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [sortOrder, setSortOrder] = useState("전체");
+  const [sortOrder, setSortOrder] = useState("최신순");
   const [currentPage, setCurrentPage] = useState(1);
   const [showDeletePermissionModal, setShowDeletePermissionModal] = useState(false);
 
@@ -119,9 +119,9 @@ export default function DocumentManagementPage() {
       return matchesQuery && matchesCreator && matchesDate;
     });
 
-    if (sortOrder === "내림차순") {
+    if (sortOrder === "최신순") {
       filtered.sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
-    } else if (sortOrder === "오름차순") {
+    } else if (sortOrder === "오래된순") {
       filtered.sort((a, b) => a.uploadedAt.localeCompare(b.uploadedAt));
     }
 

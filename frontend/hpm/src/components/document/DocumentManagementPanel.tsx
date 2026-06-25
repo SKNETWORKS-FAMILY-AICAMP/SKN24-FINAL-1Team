@@ -8,6 +8,7 @@ import type { TableColumn } from "../ui/Table";
 import * as DESIGN from "../../constants/design";
 import Button from "../ui/Button";
 import Pagination from "../ui/Pagination";
+import { DateRangePicker, FilterSelect } from "../ui/DatePickerBox";
 import searchIcon from "../../assets/meeting/search.png";
 import downloadIcon from "../../assets/document/download.png";
 
@@ -95,41 +96,6 @@ function DocumentCheckButton({
         </svg>
       ) : null}
     </button>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg aria-hidden="true" className="size-[16px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="4" width="18" height="18" rx="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M16 2v4M8 2v4M3 10h18" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-const BOX_WIDTH = "w-[100px]";
-const selectStyle = `${BOX_WIDTH} py-2 px-3 bg-white border border-gray-300 rounded-md text-[12px] outline-none cursor-pointer focus:border-[#623FB5] appearance-none`;
-
-function DatePickerBox({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div
-      className={`${BOX_WIDTH} relative flex items-center justify-between py-2 px-3 bg-white border border-gray-300 rounded-md text-[12px] text-[#141414] cursor-pointer hover:border-[#623FB5] transition overflow-hidden`}
-    >
-      {value && <span className="flex-1 truncate">{value}</span>}
-      <span className="ml-auto pointer-events-none"><CalendarIcon /></span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-      />
-    </div>
   );
 }
 
@@ -235,7 +201,7 @@ export default function DocumentManagementPanel({
     <section className="mx-auto w-full max-w-[1376px]" data-node-id="1:1397">
       <header>
         <h1 className="m-0 text-[32px] font-medium leading-[1.2] text-[#141414]">
-          내부 문서 관리
+          문서 관리
         </h1>
         <p className="mt-[12px] text-[15px] font-normal leading-[1.2] text-[#969696]">
           사내 문서를 등록하고 관리할 수 있습니다.
@@ -268,49 +234,42 @@ export default function DocumentManagementPanel({
           {/* 업로더 */}
           <div className="flex items-center gap-2">
             <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>업로더</span>
-            <select
-              aria-label="업로더 필터"
+            <FilterSelect
+              ariaLabel="업로더 필터"
               value={creatorFilter}
-              onChange={(e) => onCreatorFilterChange(e.target.value)}
-              className={selectStyle}
-            >
-              {creators.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+              onChange={onCreatorFilterChange}
+              options={creators}
+            />
           </div>
 
           {/* 업로드 날짜 */}
           <div className="flex items-center gap-2">
             <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>업로드 날짜</span>
-            <select
-              aria-label="업로드 기간 필터"
+            <FilterSelect
+              ariaLabel="업로드 기간 필터"
               value={uploadPeriod}
-              onChange={(e) => onUploadPeriodChange(e.target.value)}
-              className={selectStyle}
-            >
-              {UPLOAD_PERIOD_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-            <DatePickerBox value={startDate} onChange={onStartDateChange} />
-            <span className="text-[12px] text-gray-400">-</span>
-            <DatePickerBox value={endDate} onChange={onEndDateChange} />
+              onChange={onUploadPeriodChange}
+              options={UPLOAD_PERIOD_OPTIONS}
+            />
+            <DateRangePicker
+              startAriaLabel="업로드 시작일 선택"
+              endAriaLabel="업로드 종료일 선택"
+              startDate={startDate}
+              endDate={endDate}
+              onStartDateChange={onStartDateChange}
+              onEndDateChange={onEndDateChange}
+            />
           </div>
 
           {/* 정렬 */}
           <div className="flex items-center gap-2">
             <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>정렬</span>
-            <select
-              aria-label="정렬"
+            <FilterSelect
+              ariaLabel="정렬"
               value={sortOrder}
-              onChange={(e) => onSortOrderChange(e.target.value)}
-              className={selectStyle}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
+              onChange={onSortOrderChange}
+              options={SORT_OPTIONS}
+            />
           </div>
 
           <div className="ml-auto flex items-center gap-2">
