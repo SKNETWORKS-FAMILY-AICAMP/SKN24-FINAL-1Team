@@ -9,6 +9,9 @@ export interface DocumentUploadError {
 export interface DocumentUploadResponse {
   created: DocumentRecord[];
   errors: DocumentUploadError[];
+  ingest_job_id?: string;
+  ingest_status?: string;
+  ingest_error?: string;
 }
 
 export interface DocumentIngestStartResponse {
@@ -56,6 +59,7 @@ export const uploadDocuments = async (
 
   const res = await api.post(`/documents/${projectId}/`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
+    timeout: 300000,
   });
   return res.data;
 };

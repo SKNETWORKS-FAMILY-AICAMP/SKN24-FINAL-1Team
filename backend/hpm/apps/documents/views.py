@@ -1,6 +1,7 @@
 import os
 import json
 import mimetypes
+from io import BytesIO
 
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -54,7 +55,7 @@ def _parsed_metadata(project_id, documents):
     )
 
 
-def _start_parsed_ingest(project_id, documents):
+def _start_parsed_ingest(project_id, documents, file_payloads=None):
     base_url = _parsed_base_url()
     if not base_url:
         return {
@@ -65,19 +66,34 @@ def _start_parsed_ingest(project_id, documents):
     opened_files = []
     files = []
     try:
-        for doc in documents:
-            file_obj = default_storage.open(doc.path, "rb")
-            opened_files.append(file_obj)
-            files.append(
-                (
-                    "files",
+        if file_payloads is None:
+            for doc in documents:
+                file_obj = default_storage.open(doc.path, "rb")
+                opened_files.append(file_obj)
+                files.append(
                     (
-                        doc.title,
-                        file_obj,
-                        _content_type_for_file(doc.path),
-                    ),
+                        "files",
+                        (
+                            doc.title,
+                            file_obj,
+                            _content_type_for_file(doc.path),
+                        ),
+                    )
                 )
-            )
+        else:
+            for payload in file_payloads:
+                file_obj = BytesIO(payload["content"])
+                opened_files.append(file_obj)
+                files.append(
+                    (
+                        "files",
+                        (
+                            payload["filename"],
+                            file_obj,
+                            _content_type_for_file(payload["filename"]),
+                        ),
+                    )
+                )
 
         response = requests.post(
             f"{base_url}/internal-docs/ingest/jobs",
@@ -108,6 +124,14 @@ def _start_parsed_ingest(project_id, documents):
     finally:
         for file_obj in opened_files:
             file_obj.close()
+
+
+def _start_parsed_ingest_from_storage(project_id, documents):
+    return _start_parsed_ingest(project_id, documents)
+
+
+def _start_parsed_ingest_from_uploads(project_id, documents, file_payloads):
+    return _start_parsed_ingest(project_id, documents, file_payloads=file_payloads)
 
 
 def _create_document_ingest_notification(user_id, project_id, job_id, files):
@@ -168,6 +192,8 @@ def document_list(request, project_id):
         return Response({"error": "한 번에 최대 10개까지 업로드할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     created = []
+    created_documents = []
+    file_payloads = []
     errors = []
 
     for file in files:
@@ -180,8 +206,9 @@ def document_list(request, project_id):
             continue
 
         # S3에 저장
+        file_content = file.read()
         s3_key = f"documents/{project_id}/{file.name}"
-        saved_path = default_storage.save(s3_key, ContentFile(file.read()))
+        saved_path = default_storage.save(s3_key, ContentFile(file_content))
 
         doc = Document.objects.create(
             project_id=project_id,
@@ -189,10 +216,16 @@ def document_list(request, project_id):
             title=file.name,
             path=saved_path,
         )
+        created_documents.append(doc)
+        file_payloads.append({"filename": file.name, "content": file_content})
         created.append(DocumentSerializer(doc, context={"request": request}).data)
 
+    ingest_info = {}
+    if created_documents:
+        ingest_info = _start_parsed_ingest_from_uploads(project_id, created_documents, file_payloads)
+
     return Response(
-        {"created": created, "errors": errors},
+        {"created": created, "errors": errors, **ingest_info},
         status=status.HTTP_201_CREATED,
     )
 
@@ -234,7 +267,7 @@ def document_ingest_start(request, project_id):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    ingest_info = _start_parsed_ingest(project_id, documents)
+    ingest_info = _start_parsed_ingest_from_storage(project_id, documents)
     if not ingest_info.get("ingest_job_id"):
         error_status = (
             status.HTTP_500_INTERNAL_SERVER_ERROR
