@@ -68,6 +68,7 @@ interface KanbanColumnProps {
   draggingTaskId?: number | null;
   isDragActive?: boolean;
   canManage?: boolean;
+  minHeight?: number;
 }
 
 export default function KanbanColumn({
@@ -81,10 +82,11 @@ export default function KanbanColumn({
   draggingTaskId = null,
   isDragActive = false,
   canManage = true,
+  minHeight,
 }: KanbanColumnProps) {
   const [isOver, setIsOver] = useState(false);
   const hasTasks = tasks.length > 0;
-  const naturalColumnHeight = getKanbanColumnHeight(tasks.length);
+  const naturalColumnHeight = Math.max(getKanbanColumnHeight(tasks.length), minHeight ?? 0);
   const columnHeight = naturalColumnHeight;
   const bodyHeight = columnHeight - KANBAN_COLUMN_BODY_TOP - 12;
   const contentHeight = Math.max(naturalColumnHeight - KANBAN_COLUMN_BODY_TOP, bodyHeight);

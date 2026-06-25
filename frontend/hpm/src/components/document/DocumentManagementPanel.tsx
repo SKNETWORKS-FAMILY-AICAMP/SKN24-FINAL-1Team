@@ -219,7 +219,10 @@ export default function DocumentManagementPanel({
         <button
           type="button"
           aria-label={`${row.name} 다운로드`}
-          onClick={() => onDownloadDocument(row)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDownloadDocument(row);
+          }}
           className="mx-auto flex items-center justify-center hover:opacity-70 active:scale-95 transition"
         >
           <img src={downloadIcon} alt="다운로드" className="w-5 h-5" />

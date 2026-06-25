@@ -5,6 +5,7 @@ import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
   getKanbanBoardHeight,
+  getKanbanColumnHeight,
   KANBAN_COLUMNS,
   KANBAN_PRIORITIES,
   toKanbanFormValues,
@@ -197,6 +198,16 @@ export default function KanbanBoardPage() {
   const boardWidth = useMemo(
     () => Math.max(BOARD_MIN_WIDTH, COLUMN_LEFT_START * 2 + boardColumns.length * COLUMN_STEP),
     [boardColumns.length],
+  );
+
+  const maxColumnHeight = useMemo(
+    () =>
+      Math.max(
+        ...boardColumns.map((column) =>
+          getKanbanColumnHeight((tasksByColumn[column.id] || []).length),
+        ),
+      ),
+    [boardColumns, tasksByColumn],
   );
 
   const assigneeOptions = useMemo(
@@ -409,6 +420,7 @@ export default function KanbanBoardPage() {
             draggingTaskId={draggingTask?.id ?? null}
             isDragActive={draggingTask !== null}
             canManage={canManageJira}
+            minHeight={maxColumnHeight}
           />
         )) : null}
       </section>

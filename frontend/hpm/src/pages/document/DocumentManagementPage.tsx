@@ -12,14 +12,19 @@ import type { DocumentRecord } from "../../types/documentManagement";
 
 const DOCUMENTS_PER_PAGE = 10;
 
+function openInNewTab(url: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function downloadDocumentFile(item: DocumentRecord) {
   if (item.fileUrl) {
-    const link = document.createElement("a");
-    link.href = item.fileUrl;
-    link.download = item.name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    openInNewTab(item.fileUrl);
     return;
   }
 
@@ -29,13 +34,8 @@ function downloadDocumentFile(item: DocumentRecord) {
       type: "text/plain;charset=utf-8",
     });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = item.name;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  openInNewTab(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export default function DocumentManagementPage() {
@@ -176,20 +176,27 @@ export default function DocumentManagementPage() {
     if (!projectId || selectedIds.size === 0) return;
 
     const selectedDocs = documents.filter((item) => selectedIds.has(item.id));
-    const currentUserId = user?.users_id ?? user?.user_id;
+    const currentUserId = Number(user?.users_id ?? user?.user_id);
     const hasUnauthorized = selectedDocs.some(
-      (doc) => doc.uploaderId !== undefined && doc.uploaderId !== currentUserId,
+      (doc) => doc.uploaderId === undefined || Number(doc.uploaderId) !== currentUserId,
     );
     if (hasUnauthorized) {
       setShowDeletePermissionModal(true);
       return;
     }
 
-    await Promise.all(
-      Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
-    );
-    setSelectedIds(new Set());
-    await loadDocuments();
+    try {
+      await Promise.all(
+        Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
+      );
+      setSelectedIds(new Set());
+      await loadDocuments();
+    } catch (error) {
+      const message =
+        (error as { response?: { data?: { error?: string } } }).response?.data?.error ||
+        "문서 삭제에 실패했습니다.";
+      alert(message);
+    }
   };
 
   const downloadSelected = () => {

@@ -29,8 +29,14 @@ from .serializers import (
 
 def _request_user_id(request):
     if isinstance(request.auth, dict) and request.auth.get("user_id") is not None:
-        return request.auth["user_id"]
-    return getattr(request.user, "users_id", None)
+        user_id = request.auth["user_id"]
+    else:
+        user_id = getattr(request.user, "users_id", None)
+
+    try:
+        return int(user_id)
+    except (TypeError, ValueError):
+        return user_id
 
 
 def _can_access_meeting(request, meeting):

@@ -19,6 +19,8 @@ const DEFAULT_MESSAGES = {
   unsupported_format: "지원하지 않는 파일 형식입니다",
 };
 
+const DEFAULT_MAX_FILES = 10;
+
 export default function DocumentUploadPage() {
   const navigate = useNavigate();
   const { projectId } = useAuth();
@@ -32,16 +34,19 @@ export default function DocumentUploadPage() {
 
   useEffect(() => {
     getUploadConfig()
-      .then((cfg) => {
-        setConfig(cfg);
-        setModal(cfg.messages.entry);
-      })
-      .catch(() => {
-        setModal(DEFAULT_MESSAGES.entry);
-      });
+      .then(setConfig)
+      .catch(() => setConfig(null));
   }, []);
 
   const addUploadFiles = (files: File[]) => {
+    if (files.length === 0) return;
+
+    const maxFiles = config?.max_files ?? DEFAULT_MAX_FILES;
+    if (uploadedDocuments.length + files.length > maxFiles) {
+      setModal(messages.entry);
+      return;
+    }
+
     for (const file of files) {
       if (!DOCUMENT_ALLOWED_EXTENSIONS.has(getExtension(file.name))) {
         setModal(messages.unsupported_format);
