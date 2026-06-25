@@ -1,6 +1,7 @@
 import os
 import json
 import mimetypes
+from io import BytesIO
 
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
@@ -54,7 +55,7 @@ def _parsed_metadata(project_id, documents):
     )
 
 
-def _start_parsed_ingest(project_id, documents):
+def _start_parsed_ingest(project_id, documents, file_payloads=None):
     base_url = _parsed_base_url()
     if not base_url:
         return {
@@ -65,19 +66,34 @@ def _start_parsed_ingest(project_id, documents):
     opened_files = []
     files = []
     try:
-        for doc in documents:
-            file_obj = open(doc.path, "rb")
-            opened_files.append(file_obj)
-            files.append(
-                (
-                    "files",
+        if file_payloads is None:
+            for doc in documents:
+                file_obj = default_storage.open(doc.path, "rb")
+                opened_files.append(file_obj)
+                files.append(
                     (
-                        doc.title,
-                        file_obj,
-                        _content_type_for_file(doc.path),
-                    ),
+                        "files",
+                        (
+                            doc.title,
+                            file_obj,
+                            _content_type_for_file(doc.path),
+                        ),
+                    )
                 )
-            )
+        else:
+            for payload in file_payloads:
+                file_obj = BytesIO(payload["content"])
+                opened_files.append(file_obj)
+                files.append(
+                    (
+                        "files",
+                        (
+                            payload["filename"],
+                            file_obj,
+                            _content_type_for_file(payload["filename"]),
+                        ),
+                    )
+                )
 
         response = requests.post(
             f"{base_url}/internal-docs/ingest/jobs",
@@ -108,6 +124,14 @@ def _start_parsed_ingest(project_id, documents):
     finally:
         for file_obj in opened_files:
             file_obj.close()
+
+
+def _start_parsed_ingest_from_storage(project_id, documents):
+    return _start_parsed_ingest(project_id, documents)
+
+
+def _start_parsed_ingest_from_uploads(project_id, documents, file_payloads):
+    return _start_parsed_ingest(project_id, documents, file_payloads=file_payloads)
 
 
 def _create_document_ingest_notification(user_id, project_id, job_id, files):
@@ -168,10 +192,9 @@ def document_list(request, project_id):
         return Response({"error": "한 번에 최대 10개까지 업로드할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     created = []
+    created_documents = []
+    file_payloads = []
     errors = []
-    created_docs = []
-
-    use_s3 = bool(getattr(settings, "AWS_STORAGE_BUCKET_NAME", ""))
 
     for file in files:
         ext = os.path.splitext(file.name)[1].lower()
@@ -183,8 +206,9 @@ def document_list(request, project_id):
             continue
 
         # S3에 저장
+        file_content = file.read()
         s3_key = f"documents/{project_id}/{file.name}"
-        saved_path = default_storage.save(s3_key, ContentFile(file.read()))
+        saved_path = default_storage.save(s3_key, ContentFile(file_content))
 
         doc = Document.objects.create(
             project_id=project_id,
@@ -192,14 +216,72 @@ def document_list(request, project_id):
             title=file.name,
             path=saved_path,
         )
-        created_docs.append(doc)
+        created_documents.append(doc)
+        file_payloads.append({"filename": file.name, "content": file_content})
         created.append(DocumentSerializer(doc, context={"request": request}).data)
 
-    ingest_info = _start_parsed_ingest(project_id, created_docs) if created_docs else {}
+    ingest_info = {}
+    if created_documents:
+        ingest_info = _start_parsed_ingest_from_uploads(project_id, created_documents, file_payloads)
 
     return Response(
         {"created": created, "errors": errors, **ingest_info},
         status=status.HTTP_201_CREATED,
+    )
+
+
+@api_view(["POST"])
+def document_ingest_start(request, project_id):
+    project_user = get_project_user_or_response(project_id, request.auth["user_id"])
+    if isinstance(project_user, Response):
+        return project_user
+
+    raw_ids = request.data.get("document_ids", [])
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return Response(
+            {"error": "document_ids must be a non-empty list."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    document_ids = []
+    for raw_id in raw_ids:
+        try:
+            document_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            return Response(
+                {"error": "document_ids must contain only integer IDs."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    documents = list(
+        Document.objects.filter(
+            project_id=project_id,
+            document_id__in=document_ids,
+        ).order_by("document_id")
+    )
+    if len(documents) != len(set(document_ids)):
+        found_ids = {doc.document_id for doc in documents}
+        missing_ids = [doc_id for doc_id in document_ids if doc_id not in found_ids]
+        return Response(
+            {"error": "Some documents were not found.", "missing_document_ids": missing_ids},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    ingest_info = _start_parsed_ingest_from_storage(project_id, documents)
+    if not ingest_info.get("ingest_job_id"):
+        error_status = (
+            status.HTTP_500_INTERNAL_SERVER_ERROR
+            if ingest_info.get("ingest_error") == "RUNPOD_PARSED_BASE_URL is not configured."
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        return Response(ingest_info, status=error_status)
+
+    return Response(
+        {
+            **ingest_info,
+            "document_ids": document_ids,
+        },
+        status=status.HTTP_202_ACCEPTED,
     )
 
 

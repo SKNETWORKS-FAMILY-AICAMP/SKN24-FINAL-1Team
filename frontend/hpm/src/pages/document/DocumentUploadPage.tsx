@@ -117,14 +117,19 @@ export default function DocumentUploadPage() {
         return;
       }
 
-      if (result.ingest_error) {
-        setUploadMessage(`문서는 저장됐지만 내부문서 적재 요청에 실패했습니다. ${result.ingest_error}`);
+      if (result.created.length === 0) {
+        setUploadMessage("문서는 저장되지 않았습니다.");
         return;
       }
 
-      if (result.ingest_job_id) {
-        await waitForDocumentIngest(result.ingest_job_id);
+      if (!result.ingest_job_id) {
+        setUploadMessage(
+          `문서는 저장됐지만 내부문서 적재 요청에 실패했습니다. ${result.ingest_error || ""}`.trim(),
+        );
+        return;
       }
+
+      await waitForDocumentIngest(result.ingest_job_id);
 
       navigate("/documents");
     } catch (error) {
