@@ -1,5 +1,5 @@
 import { type ChangeEvent } from "react";
-import closeIcon from "../../assets/kanban/icon-close.svg";
+import closeIcon from "../../assets/kanban/close.png";
 import { KANBAN_PRIORITIES } from "../../constants/kanban";
 import type {
   KanbanModalState,

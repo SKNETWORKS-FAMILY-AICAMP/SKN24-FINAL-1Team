@@ -1,4 +1,4 @@
-import moreIcon from "../../assets/kanban/icon-more-vertical.svg";
+import moreIcon from "../../assets/kanban/more.png";
 
 interface KanbanMoreButtonProps {
   label: string;
