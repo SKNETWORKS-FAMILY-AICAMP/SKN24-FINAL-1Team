@@ -498,7 +498,7 @@ export default function MeetingArchivePage() {
       {tab === "material" && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <p className="text-[13px]" style={{ color: "#969696" }}>회의의 준비 자료입니다.</p>
+            <p className="text-[13px]" style={{ color: "#969696" }}></p>
             <button
               onClick={async () => {
                 if (!hasMeetingMaterial) return;

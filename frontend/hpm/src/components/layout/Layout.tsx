@@ -71,7 +71,7 @@ export default function Layout() {
         <div className={`${isCollapsed ? "ml-[54px]" : "ml-[256px]"} flex flex-1 flex-col h-full min-w-0 transition-all duration-300`}>
           <Header />
           <main className={`flex-1 h-full overflow-y-auto ${DESIGN.BACKGROUND_COLORS.white} p-6 text-gray-950`}>
-            <div className="max-w-[1550px] mx-auto w-full">
+            <div className={`mx-auto w-full ${location.pathname === "/dashboard" ? "" : "max-w-[1504px]"}`}>
               <Outlet />
             </div>
           </main>

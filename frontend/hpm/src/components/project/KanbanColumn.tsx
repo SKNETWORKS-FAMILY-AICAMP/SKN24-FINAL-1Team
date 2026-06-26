@@ -1,9 +1,7 @@
-import { useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import plusIcon from "../../assets/kanban/plus.png";
 import {
-  getKanbanColumnHeight,
   KANBAN_CARD_GAP,
-  KANBAN_COLUMN_BODY_TOP,
   KANBAN_COLUMN_TOP,
   KANBAN_FIRST_CARD_TOP,
 } from "../../constants/kanban";
@@ -26,7 +24,7 @@ function AddTaskButton({ className, onClick, style }: AddTaskButtonProps) {
       onClick={onClick}
       style={style}
       className={cn(
-        "absolute flex items-center gap-[8px] rounded-[5px] border-0 bg-transparent p-0 transition-all duration-150 ease-out hover:text-[#623FB5] hover:opacity-80 active:scale-[0.97]",
+        "mt-[23px] ml-[23px] flex items-center gap-[8px] rounded-[5px] border-0 bg-transparent p-0 transition-all duration-150 ease-out hover:text-[#623FB5] hover:opacity-80 active:scale-[0.97]",
         className,
       )}
     >
@@ -47,7 +45,7 @@ function EmptyAddCard({ onClick }: EmptyAddCardProps) {
     <button
       type="button"
       onClick={onClick}
-      className="absolute left-[23px] top-[10px] flex h-[142px] w-[306px] flex-col items-center justify-center gap-[12px] rounded-[10px] border border-dashed border-[#C4B6E5] bg-[#FFFDFD] p-0 text-center transition-all duration-150 ease-out hover:border-[#623FB5] hover:bg-[#F4F5F8] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985]"
+      className=" flex ml-[23px] h-[142px] w-[306px] flex-col items-center justify-center gap-[12px] rounded-[10px] border border-dashed border-[#C4B6E5] bg-[#FFFDFD] p-0 text-center transition-all duration-150 ease-out hover:border-[#623FB5] hover:bg-[#F4F5F8] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985]"
     >
       <img alt="" aria-hidden="true" className="size-[14px] object-contain" src={plusIcon} />
       <span className="text-[15px] font-normal leading-[1.2] text-[#141414]">
@@ -76,61 +74,30 @@ export default function KanbanColumn({
   tasks,
   onAddTask,
   onEditTask,
-  onCardDragStart,
-  onCardDragEnd,
-  onDropTask,
-  draggingTaskId = null,
-  isDragActive = false,
   canManage = true,
-  minHeight,
 }: KanbanColumnProps) {
-  const [isOver, setIsOver] = useState(false);
+
   const hasTasks = tasks.length > 0;
-  const naturalColumnHeight = Math.max(getKanbanColumnHeight(tasks.length), minHeight ?? 0);
-  const columnHeight = naturalColumnHeight;
-  const bodyHeight = columnHeight - KANBAN_COLUMN_BODY_TOP - 12;
-  const contentHeight = Math.max(naturalColumnHeight - KANBAN_COLUMN_BODY_TOP, bodyHeight);
-  const columnBackground = isOver ? "#E3DAFB" : hasTasks ? "#ECECF2" : "#EFECEF";
-  const addButtonTop = KANBAN_FIRST_CARD_TOP + tasks.length * KANBAN_CARD_GAP;
 
   return (
     <section
-      onDragOver={(event) => {
-        if (!canManage || !isDragActive) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
-        if (!isOver) setIsOver(true);
-      }}
-      onDragLeave={(event) => {
-        if (event.currentTarget.contains(event.relatedTarget as Node)) return;
-        setIsOver(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setIsOver(false);
-        if (!canManage) return;
-        onDropTask?.(column.id);
-      }}
-      className={`absolute overflow-hidden rounded-[12px] transition-all duration-200 ease-out ${
-        isOver ? "outline outline-2 outline-dashed outline-[#623FB5]" : ""
-      }`}
+      className={`absolute rounded-[12px] mt-[-20px] transition-all`}
       style={{
         left: column.left,
         top: KANBAN_COLUMN_TOP,
         width: 352,
-        height: columnHeight,
-        backgroundColor: columnBackground,
+        height: "auto",
+        backgroundColor: "#ECECF2",
       }}
       data-name="dashboard-card-group"
     >
-      <h2 className="absolute left-[24px] top-[23px] m-0 whitespace-nowrap text-[17px] font-medium leading-[1.2] text-[#141414]">
+      <h2 className=" m-[26px] mb-[18px] text-[17px] font-medium leading-[1.2] text-[#141414]">
         {column.label}
       </h2>
       <div
-        className="absolute left-0 w-full"
-        style={{ top: KANBAN_COLUMN_BODY_TOP, height: bodyHeight }}
+        className="flex flex-col pb-[28px]"
       >
-        <div className="relative w-full" style={{ height: contentHeight }}>
+        <div className="w-full">
           {hasTasks ? (
             <>
               {tasks.map((task, index) => (
@@ -139,16 +106,12 @@ export default function KanbanColumn({
                   task={task}
                   top={KANBAN_FIRST_CARD_TOP + index * KANBAN_CARD_GAP}
                   onClick={() => onEditTask(task)}
-                  onDragStart={onCardDragStart}
-                  onDragEnd={onCardDragEnd}
-                  isDragging={draggingTaskId === task.id}
                   canManage={canManage}
                 />
               ))}
               {canManage ? (
                 <AddTaskButton
                   className="left-[23px]"
-                  style={{ top: addButtonTop }}
                   onClick={() => onAddTask(column.id)}
                 />
               ) : null}
