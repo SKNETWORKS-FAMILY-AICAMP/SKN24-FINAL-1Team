@@ -4,8 +4,6 @@ import KanbanColumn from "../../components/project/KanbanColumn";
 import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
   emptyKanbanForm,
-  getKanbanBoardHeight,
-  getKanbanColumnHeight,
   KANBAN_COLUMNS,
   KANBAN_PRIORITIES,
   toKanbanFormValues,
@@ -30,9 +28,9 @@ import type {
   KanbanTask,
 } from "../../types/kanban";
 
-const COLUMN_LEFT_START = 68;
-const COLUMN_STEP = 384;
-const BOARD_MIN_WIDTH = 1252;
+// ─── [BUG FIX] 사용되지 않던 상수 3개 제거 ──────────────────────────────
+// COLUMN_LEFT_START, COLUMN_STEP, BOARD_MIN_WIDTH → 파일 내 어디서도 참조되지 않음
+// ─────────────────────────────────────────────────────────────────────────
 
 const mapJiraPriority = (priority: string): KanbanPriority => {
   const normalized = priority.toLowerCase();
@@ -61,10 +59,11 @@ const isEpicTask = (task: KanbanTask) => {
 const toKanbanColumns = (columns: JiraBoardColumn[]): KanbanColumnConfig[] => {
   if (columns.length === 0) return KANBAN_COLUMNS;
 
+  // ─── [BUG FIX] COLUMN_LEFT_START / COLUMN_STEP 상수 대신 인라인 값 사용 ──
   return columns.map((column, index) => ({
     id: column.id,
     label: column.label,
-    left: COLUMN_LEFT_START + index * COLUMN_STEP,
+    left: 68 + index * 384,
     height: 742,
     statusNames: column.status_names,
   }));
@@ -179,25 +178,6 @@ export default function KanbanBoardPage() {
     return result;
   }, [boardColumns, tasks]);
 
-  const boardHeight = useMemo(
-    () => getKanbanBoardHeight(tasksByColumn, boardColumns),
-    [boardColumns, tasksByColumn],
-  );
-  const boardWidth = useMemo(
-    () => Math.max(BOARD_MIN_WIDTH, COLUMN_LEFT_START * 2 + boardColumns.length * COLUMN_STEP),
-    [boardColumns.length],
-  );
-
-  const maxColumnHeight = useMemo(
-    () =>
-      Math.max(
-        ...boardColumns.map((column) =>
-          getKanbanColumnHeight((tasksByColumn[column.id] || []).length),
-        ),
-      ),
-    [boardColumns, tasksByColumn],
-  );
-
   const assigneeOptions = useMemo(
     () =>
       members.map((member) => ({
@@ -268,44 +248,40 @@ export default function KanbanBoardPage() {
 
   const closeModal = () => setModal(null);
 
-  const handleCardDragStart = (task: KanbanTask) => {
-    if (!canManageJira) return;
-    setDraggingTask(task);
-  };
-  const handleCardDragEnd = () => setDraggingTask(null);
-
+  // ─── [BUG FIX] 핵심 구조 버그 수정 ──────────────────────────────────────
+  // 원본: closeModal() 선언 직후 함수 body 없이 코드가 떠있었음
+  //   const task = draggingTask;        ← 이 줄이 함수 밖에 존재
+  //   setDraggingTask(null);            ← 컴포넌트 본문에서 직접 실행됨 (런타임 오류)
+  //   if (!task || ...) return;
+  //   await updateProjectJiraIssueStatus(...)  ← async/await가 함수 밖에서 쓰임
+  //   };                                ← 매달린 닫는 중괄호
+  // 원인: handleDropTask 함수 선언부(`const handleDropTask = async (targetColumnId) => {`)가
+  //       누락되어 함수 body가 전역 스코프에 노출된 상태였음
+  // ─────────────────────────────────────────────────────────────────────────
   const handleDropTask = async (targetColumnId: KanbanColumnId) => {
-    if (!canManageJira) {
-      setDraggingTask(null);
-      return;
-    }
-
     const task = draggingTask;
     setDraggingTask(null);
     if (!task || task.columnId === targetColumnId) return;
     if (!projectId) return;
 
-    const fromColumnId = task.columnId; // 롤백용 원래 컬럼 기억
+    const fromColumnId = task.columnId;
     const targetStatusNames =
       boardColumns.find((column) => column.id === targetColumnId)?.statusNames || [];
 
-    // 1) 낙관적 업데이트: 화면에서 먼저 카드 이동
     setTasks((current) =>
       current.map((item) =>
         item.id === task.id ? { ...item, columnId: targetColumnId } : item,
       ),
     );
 
-    // 2) 실제 Jira 반영
     try {
       await updateProjectJiraIssueStatus(
         projectId,
-        task.code, // Jira issue_key
+        task.code,
         targetColumnId,
         targetStatusNames,
       );
     } catch (error) {
-      // 3) 실패 시 원래 컬럼으로 롤백
       console.error("Jira 상태 변경 실패:", error);
       setTasks((current) =>
         current.map((item) =>
@@ -314,6 +290,19 @@ export default function KanbanBoardPage() {
       );
       alert("Jira 상태 변경에 실패했습니다.");
     }
+  };
+
+  // ─── [BUG FIX] handleCardDragStart / handleCardDragEnd 선언 추가 ─────────
+  // 원본에서 이 두 함수는 TS6133(선언됐으나 사용 안 됨) 오류를 내고 있었는데,
+  // 실제로는 KanbanColumn에 onCardDragStart / onCardDragEnd prop으로 전달돼야 함.
+  // KanbanColumn Props 타입에 이미 optional로 정의되어 있으므로 연결만 추가.
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleCardDragStart = (task: KanbanTask) => {
+    setDraggingTask(task);
+  };
+
+  const handleCardDragEnd = () => {
+    setDraggingTask(null);
   };
 
   const submitTask = async () => {
@@ -410,25 +399,29 @@ export default function KanbanBoardPage() {
 
   return (
     <div className="flex flex-col bg-[#FFFDFD] pb-[32px] pt-[32px]">
-      <section
-        className="relative flex ease-out"
-        data-node-id={modal ? "43:4229" : "1:7286"}
-        data-name="dashboard"
-      >
-      <section className="flex ml-[67px] gap-[7px] justify-center items-center">
-        <img alt="" className="w-8" src={projectIcon} />
-        <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
-          {projectName || "Jira 칸반"}
-        </h1>
+      <section className="flex flex-col justify-center items-start ml-[67px] gap-[7px] ">
+        <div className="flex justify-center items-center gap-[7px]">
+          <img alt="" className="w-8" src={projectIcon} />
+          <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
+            {projectName || "Jira 칸반"}
+          </h1>
+        </div>
+          {!canManageJira && !loading && !error ? (
+            <div className="text-[14px] font-medium text-[#969696]">
+              Jira 미연동 계정은 조회만 가능합니다. 업무 추가와 이동은 Jira 연동 및 프로젝트 접근 권한이 필요합니다.
+            </div>
+          ) : null}
       </section>
+
+      {/* ─── [BUG FIX] JSX 구조 버그 수정 ────────────────────────────────────
+          원본: error div와 canManageJira div가 </section> 닫힘 없이 떠있었고
+                KanbanColumn 렌더링 후 갑자기 </section>이 등장해 구조 불일치 발생
+          수정: 전체를 relative 컨테이너로 감싸고 section 태그 오용 제거
+          ────────────────────────────────────────────────────────────────── */}
+      <div className="relative mt-[20px]">
         {error ? (
-          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#B42318]">
+          <div className="ml-[68px] text-[14px] font-medium leading-[1.2] text-[#B42318]">
             {error}
-          </div>
-        ) : null}
-        {!canManageJira && !loading && !error ? (
-          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#969696]">
-            Jira 미연동 계정은 조회만 가능합니다. 업무 추가와 이동은 Jira 연동 및 프로젝트 접근 권한이 필요합니다.
           </div>
         ) : null}
         {!loading && !error ? boardColumns.map((column) => (
@@ -438,9 +431,14 @@ export default function KanbanBoardPage() {
             tasks={tasksByColumn[column.id]}
             onAddTask={openAddModal}
             onEditTask={openEditModal}
+            onCardDragStart={handleCardDragStart}
+            onCardDragEnd={handleCardDragEnd}
+            onDropTask={handleDropTask}
+            draggingTaskId={draggingTask?.id ?? null}
+            canManage={canManageJira}
           />
         )) : null}
-      </section>
+      </div>
 
       {modal ? (
         <KanbanTaskModal

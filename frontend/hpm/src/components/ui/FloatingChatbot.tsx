@@ -1,9 +1,17 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { sendProjectChatMessage } from "../../services/meeting";
 import sendImg from "../../assets/meeting/send.png";
+import chatbotImg from "../../assets/project/chatbot_image.png"
 
 type ChatMsg = { role: "user" | "bot"; content: string };
+
+const MIN_WIDTH = 280;
+const MIN_HEIGHT = 360;
+const MAX_WIDTH = 600;
+const MAX_HEIGHT = 800;
+const DEFAULT_WIDTH = 320;
+const DEFAULT_HEIGHT = 460;
 
 export default function FloatingChatbot() {
   const { projectId } = useAuth();
@@ -11,7 +19,11 @@ export default function FloatingChatbot() {
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [size, setSize] = useState({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
   const chatRef = useRef<HTMLDivElement>(null);
+  const isResizing = useRef(false);
+  const startPos = useRef({ x: 0, y: 0 });
+  const startSize = useRef({ width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT });
 
   // 프로젝트 바뀌면 대화 초기화
   useEffect(() => {
@@ -23,6 +35,42 @@ export default function FloatingChatbot() {
   useEffect(() => {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [chatMessages, chatLoading]);
+
+  // 드래그 중 크기 변경
+  const onMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing.current) return;
+    const dx = startPos.current.x - e.clientX; // 왼쪽으로 드래그 → 넓어짐
+    const dy = startPos.current.y - e.clientY; // 위로 드래그 → 높아짐
+    const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startSize.current.width + dx));
+    const newHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, startSize.current.height + dy));
+    setSize({ width: newWidth, height: newHeight });
+  }, []);
+
+  // 드래그 종료
+// 수정 — useRef로 최신 함수 참조 유지
+  const onMouseUpRef = useRef<() => void>(() => {});
+
+  const onMouseUp = useCallback(() => {
+    isResizing.current = false;
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUpRef.current);
+    document.body.style.userSelect = "";
+    document.body.style.cursor = "";
+  }, [onMouseMove]);
+
+  onMouseUpRef.current = onMouseUp;
+
+  // 드래그 시작 (좌상단 모서리)
+  const onResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizing.current = true;
+    startPos.current = { x: e.clientX, y: e.clientY };
+    startSize.current = { width: size.width, height: size.height };
+    document.body.style.userSelect = "none"; // 드래그 중 텍스트 선택 방지
+    document.body.style.cursor = "nw-resize";
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
 
   const sendChat = async () => {
     if (!chatInput.trim() || chatLoading || !projectId) return;
@@ -49,9 +97,20 @@ export default function FloatingChatbot() {
     <>
       {/* 채팅창 */}
       {isOpen && (
-        <div className="fixed bottom-20 right-6 w-[320px] h-[460px] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-50">
+        <div
+          className="fixed bottom-20 right-6 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-50"
+          style={{ width: size.width, height: size.height }}
+        >
+          {/* 크기 조절 핸들 (좌상단 모서리) */}
+          <div
+            onMouseDown={onResizeMouseDown}
+            className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-10"
+            style={{ borderRadius: "12px 0 0 0" }}
+            title="드래그하여 크기 조절"
+          />
+
           {/* 헤더 */}
-          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <span className="text-sm font-bold text-[#141414]">회의 챗봇</span>
             <button
               onClick={() => setIsOpen(false)}
@@ -103,7 +162,7 @@ export default function FloatingChatbot() {
           </div>
 
           {/* 입력창 */}
-          <div className="p-4 border-t border-gray-100">
+          <div className="p-4 border-t border-gray-100 flex-shrink-0">
             <div className="relative flex items-center">
               <input
                 value={chatInput}
@@ -135,15 +194,7 @@ export default function FloatingChatbot() {
         {isOpen ? (
           <span className="text-white text-lg leading-none">✕</span>
         ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <img src={chatbotImg} alt="챗봇" className="w-4" />
         )}
       </button>
     </>
