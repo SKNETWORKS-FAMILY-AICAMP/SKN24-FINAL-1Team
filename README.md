@@ -125,9 +125,6 @@
 
 ### 서비스 흐름
 
-:::writing{variant="standard" id="84927"}
-### 서비스 흐름
-
 ```mermaid
 flowchart LR
     A["회의 생성"] --> B["AI 기초 안건 생성"]
