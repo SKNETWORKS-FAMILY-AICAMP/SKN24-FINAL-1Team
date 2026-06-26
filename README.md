@@ -1,8 +1,7 @@
 <h1 align="center">HPM</h1>
 
 <p align="center">
-  <strong>회의 피하지마</strong><br />
-  <sub>회의 준비, 녹음, 회의록 생성, Jira 등록, 문서 기반 챗봇까지 연결하는 AI 회의 협업 플랫폼</sub>
+  <img src="assets/인트로.png" width="800" alt="회의피하지마 - AI 회의 자동화 플랫폼">
 </p>
 
 ---
