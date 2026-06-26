@@ -360,7 +360,8 @@ def meeting_list(request):
     meeting_at = data.get("meeting_at")
     if not meeting_at:
         return Response({"error": "회의 일정을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
-    if timezone.datetime.fromisoformat(str(meeting_at)).replace(tzinfo=timezone.utc) <= timezone.now():
+    from datetime import timezone as dt_timezone
+    if datetime.fromisoformat(str(meeting_at)).replace(tzinfo=dt_timezone.utc) <= timezone.now():
         return Response({"error": "현재 시각 이후의 일정만 등록할 수 있습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
 
