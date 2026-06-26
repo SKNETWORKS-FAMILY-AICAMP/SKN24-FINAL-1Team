@@ -82,7 +82,7 @@ export default function DocumentUploadPage() {
   const waitForDocumentIngest = async (jobId: string) => {
     if (!projectId) return;
 
-    const maxAttempts = 120;
+    const maxAttempts = 1000;
     for (let attempts = 1; attempts <= maxAttempts; attempts += 1) {
       setUploadMessage(DOCUMENT_UPLOAD_PENDING_MESSAGE);
       await delay(3000);
