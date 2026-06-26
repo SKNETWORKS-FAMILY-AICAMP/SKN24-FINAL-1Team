@@ -52,7 +52,7 @@ const STATUS_LABELS: Record<number, string> = { 0: "재직", 1: "휴직", 2: "�
 const STATUS_VALUES: Record<string, number> = { "재직": 0, "휴직": 1, "퇴사": 2 };
 
 
-const EMP_NO_PATTERN = /^\d{4}-[A-Za-z]+-\d+$/;
+const EMP_NO_PATTERN = /^\d{4}-[A-Z]+-\d+$/;
 const NAME_PATTERN = /^[가-힣a-zA-Z]{1,30}$/;
 const EMAIL_PREFIX_PATTERN = /^[a-zA-Z0-9]{1,50}$/;
 
@@ -176,8 +176,9 @@ export default function UserManagementPage() {
     setUsers((prev) => prev.filter((u) => !selectedIds.includes(u.users_id)));
     if (selectedUser && selectedIds.includes(selectedUser.users_id)) setSelectedUser(null);
     setSelectedIds([]);
-  } catch {
-    alert("삭제에 실패했습니다.");
+  } catch (e: any) {
+    const msg = e?.response?.data?.error ?? "삭제에 실패했습니다.";
+    alert(msg);
   } finally {
     setShowDeleteModal(false);
   }
