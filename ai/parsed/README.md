@@ -87,6 +87,55 @@ bash runpod_start_parsed.sh
 | `MINERU_TIMEOUT_SEC` | `1800` | MinerU timeout |
 | `INTERNAL_DOCS_JOB_WORKERS` | `1` | ingest job worker 수 |
 
+## .env 양식
+
+`ai/parsed/.env` 예시입니다.
+
+```dotenv
+# Qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+QDRANT_COLLECTION=mineru_pdf_chunks_ko_sroberta
+QDRANT_COLLECTION_PROJECT_MODE=true
+QDRANT_COLLECTION_PREFIX=hpm_project
+
+# Embedding
+EMBEDDING_PROVIDER=huggingface
+EMBEDDING_MODEL_ID=jhgan/ko-sroberta-multitask
+EMBEDDING_DEVICE=auto
+EMBEDDING_BATCH_SIZE=16
+PRELOAD_EMBEDDING_MODEL=true
+
+# Chunking
+CHUNK_SIZE=650
+CHUNK_OVERLAP=100
+CHUNK_VERSION=mineru_v3_650
+CHUNK_ENCODING=cl100k_base
+CHUNK_MIN_CHARS=30
+CHUNK_MAX_TABLE_TOKENS=500
+
+# MinerU parser
+MINERU_BACKEND=hybrid-auto-engine
+MINERU_METHOD=auto
+MINERU_LANG=korean
+MINERU_FORMULA=true
+MINERU_TABLE=true
+MINERU_TIMEOUT_SEC=1800
+PIPELINE_TIMEOUT_SEC=2400
+
+# Optional path override
+PARSER_SCRIPT_PATH=
+CHUNK_SCRIPT_PATH=
+LIBREOFFICE_BIN=
+
+# Job worker
+INTERNAL_DOCS_JOB_WORKERS=1
+
+# Hugging Face
+HF_TOKEN=
+HF_HUB_ENABLE_HF_TRANSFER=1
+```
+
 ## 요청 예시
 
 ```bash

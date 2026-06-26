@@ -48,6 +48,33 @@ ai/.env
 
 `.env`에는 토큰, 모델 ID, Qdrant 주소, RunPod 환경 설정이 들어갈 수 있으므로 Git에 올리지 않습니다.
 
+## .env 양식
+
+`ai/.env`에 공통값을 두고, 서비스별로 다른 값은 `ai/ocr/.env`, `ai/stt/.env`, `ai/parsed/.env`, `ai/vllm/.env`에서 덮어쓰는 방식이 편합니다.
+
+```dotenv
+# Hugging Face
+HF_TOKEN=
+HF_HUB_ENABLE_HF_TRANSFER=1
+
+# Qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+QDRANT_COLLECTION=mineru_pdf_chunks_ko_sroberta
+QDRANT_COLLECTION_PROJECT_MODE=true
+QDRANT_COLLECTION_PREFIX=hpm_project
+
+# Embedding
+EMBEDDING_PROVIDER=huggingface
+EMBEDDING_MODEL_ID=jhgan/ko-sroberta-multitask
+EMBEDDING_DEVICE=auto
+EMBEDDING_BATCH_SIZE=16
+
+# Common runtime
+MAX_NEW_TOKENS=2048
+HF_HUB_ENABLE_HF_TRANSFER=1
+```
+
 ## 공통 의존 서비스
 
 - GPU/CUDA 환경: STT, OCR, LLM, 임베딩 모델 실행에 필요할 수 있습니다.

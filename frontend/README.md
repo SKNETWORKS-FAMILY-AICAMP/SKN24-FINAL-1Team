@@ -75,6 +75,15 @@ npm run build
 
 로컬 개발 시에는 `frontend/hpm/.env` 또는 루트 `.env`에 값을 둡니다. `.env` 파일은 Git에 올리지 않습니다.
 
+## .env 양식
+
+`frontend/hpm/.env` 예시입니다.
+
+```dotenv
+# Django API base URL
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+
 ## 화면 라우트
 
 대표 라우트는 `frontend/hpm/src/routes/index.tsx`에서 관리합니다.

@@ -91,6 +91,66 @@ TEXT_VLLM_BASE_URL=http://127.0.0.1:8000/v1
 | `COHERE_API_KEY` 또는 `CO_API_KEY` | 없음 | rerank 사용 시 필요 |
 | `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | 없음 | 뉴스 검색 사용 시 필요 |
 
+## .env 양식
+
+`ai/vllm/.env` 예시입니다.
+
+```dotenv
+# Text generation backend: vllm 또는 llama_cpp
+TEXT_BACKEND=vllm
+TEXT_MODEL_ID=cyankiwi/gemma-4-12B-it-AWQ-INT4
+MAX_NEW_TOKENS=2048
+PRELOAD_TEXT_MODEL=true
+
+# vLLM OpenAI-compatible endpoint
+TEXT_VLLM_BASE_URL=http://127.0.0.1:8000/v1
+TEXT_VLLM_API_KEY=EMPTY
+TEXT_VLLM_TIMEOUT_SEC=300
+TEXT_VLLM_STARTUP_WAIT_SEC=900
+TEXT_VLLM_STARTUP_POLL_SEC=5
+
+# llama.cpp backend를 사용할 때
+TEXT_GGUF_REPO=unsloth/gemma-4-12B-it-qat-GGUF
+TEXT_GGUF_FILENAME=*Q4*.gguf
+LLAMA_N_CTX=32768
+LLAMA_N_GPU_LAYERS=-1
+LLAMA_N_THREADS=8
+LLAMA_VERBOSE=false
+
+# Qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+QDRANT_COLLECTION=mineru_pdf_chunks_ko_sroberta
+QDRANT_COLLECTION_PROJECT_MODE=true
+QDRANT_COLLECTION_PREFIX=hpm_project
+
+# Embedding
+EMBEDDING_MODEL_ID=jhgan/ko-sroberta-multitask
+EMBEDDING_BATCH_SIZE=16
+PRELOAD_EMBEDDING_MODEL=true
+
+# RAG
+CHAT_RAG_TOP_K=5
+CHAT_RAG_MAX_CONTEXT_CHARS=6000
+FEATURE_CHAT_DIR=
+PIPELINE_TIMEOUT_SEC=2400
+
+# Optional rerank/news providers
+COHERE_API_KEY=
+CO_API_KEY=
+NAVER_CLIENT_ID=
+NAVER_CLIENT_SECRET=
+NAVER_NEWS_CLIENT_ID=
+NAVER_NEWS_CLIENT_SECRET=
+
+# Jobs
+MINUTES_JOB_WORKERS=1
+
+# Hugging Face
+HF_TOKEN=
+HF_HUB_ENABLE_HF_TRANSFER=1
+```
+
 ## 요청 예시
 
 회의록 생성:

@@ -1,100 +1,162 @@
-# 프로젝트명
+# HPM - 회의 피하지마
 
-> 한 줄 소개 (프로젝트를 한 문장으로 설명)
+HPM은 회의 준비, 녹음, 회의록 생성, 태스크 추출, Jira 등록, 문서 기반 챗봇까지 한 번에 처리하는 AI 회의 협업 플랫폼입니다. 프론트엔드, Django 백엔드, GPU 기반 AI 서버를 나누어 운영합니다.
 
+## 한눈에 보기
 
-**팀명:** 
+- 회의 녹음 파일을 STT로 텍스트화합니다.
+- LLM이 회의록, 액션 아이템, 안건, 회의 준비자료를 생성합니다.
+- 회의에서 나온 태스크를 Jira 이슈로 등록합니다.
+- 프로젝트별 문서를 업로드하고 RAG 챗봇에서 검색합니다.
+- 사용자, 프로젝트, 회의, 문서, 알림을 웹 화면에서 관리합니다.
 
-**팀원:** 
-| 이름 | 역할 | 담당 |
-|------|------|------|
-|      |      |      |
-|      |      |      |
-|      |      |      |
+## 폴더 구조
 
----
+```text
+SKN24-FINAL-1Team/
+├─ frontend/             # React + TypeScript + Vite 웹 클라이언트
+├─ backend/              # Django REST Framework API 서버
+├─ ai/                   # STT, OCR, 문서 파싱, LLM/RAG FastAPI 서버
+│  ├─ ocr/               # 문서/이미지 OCR
+│  ├─ stt/               # 회의 녹음 STT
+│  ├─ parsed/            # 내부 문서 파싱/임베딩/Qdrant 적재
+│  └─ vllm/              # 회의록/안건/챗봇 LLM 서버
+├─ docker-compose.yml    # 배포용 compose 설정
+├─ Dockerfile.backend
+├─ Dockerfile.frontend
+└─ nginx.conf
+```
 
-## 📑 목차
+## 상세 문서
 
-1. [개요](#개요)
-2. [문제 정의](#문제-정의)
-3. [서비스 필요성](#서비스-필요성)
-4. [목적](#목적)
-5. [주요 고객](#주요-고객)
-6. [주요 기능](#주요-기능)
-7. [시스템 아키텍처](#시스템-아키텍처)
-8. [ERD](#erd)
-9. [활용 데이터](#활용-데이터)
-10. [모델 선정](#모델-선정)
-11. [시연 영상](#시연-영상)
-12. [기대 효과](#기대-효과)
-13. [향후 발전 방향](#향후-발전-방향)
+- [frontend/README.md](frontend/README.md): 프론트엔드 실행, 라우트, API 호출 구조
+- [backend/README.md](backend/README.md): Django API, 환경변수, AI 서버 연동
+- [ai/README.md](ai/README.md): AI 서비스 전체 구조
+- [ai/ocr/README.md](ai/ocr/README.md): OCR 서버
+- [ai/stt/README.md](ai/stt/README.md): STT 서버
+- [ai/parsed/README.md](ai/parsed/README.md): 문서 ingest 서버
+- [ai/vllm/README.md](ai/vllm/README.md): LLM/RAG 서버
 
----
+## 주요 기술
 
-## 개요
+| 영역 | 기술 |
+| --- | --- |
+| Frontend | React, TypeScript, Vite, Zustand, Axios, Tailwind CSS |
+| Backend | Django, Django REST Framework, Simple JWT, MySQL |
+| AI | FastAPI, WhisperX, PaddleOCR-VL, vLLM, Qdrant, SentenceTransformers |
+| Infra | Docker, nginx, RunPod, AWS S3/SES, Jira API |
 
-회의 피하지마(HPM, Hoeui-Pi-haji-Ma)는 회의 준비부터 기록, 후속 업무 배정까지의 전 과정을 AI로 자동화하는 협업 플랫폼입니다. 사용자가 회의를 진행하면 음성을 자동으로 텍스트화(STT)하고, 화자별 발언을 분석해 회의록과 액션 아이템(태스크)을 자동 생성합니다. 생성된 태스크는 Jira 이슈로 바로 등록되며, 회의 내용에 대한 질의응답은 RAG 기반 챗봇으로 처리됩니다.React + TypeScript 프론트엔드, Django REST Framework 백엔드, 그리고 RunPod GPU 서버 위에서 동작하는 AI 추론 서버(STT·LLM·OCR·임베딩)로 구성된 3계층 아키텍처를 따릅니다.
+## 실행 순서
 
+로컬에서 전체 기능을 확인하려면 보통 아래 순서로 준비합니다.
 
-## 문제 정의
+1. MySQL 또는 사용할 DB를 준비합니다.
+2. Qdrant를 실행합니다.
+3. AI 서버를 필요한 기능별로 실행합니다.
+4. Django 백엔드를 실행합니다.
+5. React 프론트엔드를 실행합니다.
 
-회의는 모든 조직의 핵심 협업 수단이지만, 그 가치는 회의 자체가 아니라 "회의 이후"에 결정됩니다. 그러나 현실에서는 다음과 같은 문제가 반복됩니다.
-회의록 작성은 특정 담당자에게 부담이 집중되고, 수기 정리 과정에서 발언 내용이 누락되거나 왜곡됩니다. 회의에서 결정된 "누가, 무엇을, 언제까지" 해야 하는지가 명확히 기록되지 않아 후속 업무가 흐지부지됩니다. 또한 지난 회의에서 무엇을 논의했는지 다시 찾아보기 어렵고, 회의록과 실제 업무 관리 도구(Jira 등)가 분리되어 있어 수작업 이중 입력이 발생합니다.
+## Backend 실행
 
+```bash
+cd backend/hpm
+pip install -r ../requirements.txt
+python manage.py migrate
+python manage.py runserver 0.0.0.0:8000
+```
 
-## 서비스 필요성
+## Frontend 실행
 
-회의록 작성·업무 배정·이슈 등록이라는 반복적이고 소모적인 작업을 자동화하면, 구성원은 회의의 본질인 "논의와 의사결정"에 집중할 수 있습니다. 특히 음성을 화자별로 분리해 텍스트화하고 LLM으로 구조화하면, 사람이 직접 정리할 때보다 빠르고 일관된 회의록을 확보할 수 있습니다.
-또한 회의에서 도출된 태스크를 Jira와 직접 연동함으로써 "회의 → 기록 → 업무 실행"으로 이어지는 단절 없는 워크플로우를 제공합니다. 이는 단순 녹취 서비스를 넘어, 회의 데이터를 조직의 자산으로 축적하고 검색·활용할 수 있게 한다는 점에서 차별화됩니다.
+```bash
+cd frontend/hpm
+npm install
+npm run dev
+```
 
+기본 접속 주소:
 
-## 목적
+```text
+http://localhost:5173
+```
 
-이 프로젝트의 목적은 회의 전후의 수작업을 최소화하는 엔드투엔드 자동화 파이프라인을 구축하는 것입니다. 구체적으로는 (1) 음성 회의를 자동으로 회의록화하고, (2) 회의록에서 담당자·마감일이 포함된 태스크를 추출해 Jira에 등록하며, (3) 축적된 회의 데이터를 기반으로 질의응답이 가능한 챗봇을 제공하는 것을 목표로 합니다. 동시에 외부 상용 API 의존을 줄이고, RunPod 기반 오픈소스 LLM으로 자체 추론 환경을 운영하는 것을 기술적 목표로 삼았습니다.
+## AI 서버 실행 예시
 
+```bash
+# STT
+cd ai/stt
+uvicorn stt_server:app --host 0.0.0.0 --port 8502 --reload
 
-## 주요 고객
+# OCR
+cd ai/ocr
+uvicorn ocr_server:app --host 0.0.0.0 --port 8501 --reload
 
-여러 명이 정기적으로 회의를 진행하고 그 결과를 업무로 연결해야 하는 팀이 핵심 고객입니다. 구체적으로는 Jira 등 이슈 트래커로 업무를 관리하는 IT·개발 조직, 회의 결과를 문서로 남겨야 하는 기획·PM 직군, 그리고 회의록 작성 부담을 줄이고 싶은 스타트업·중소 규모 협업 팀을 주요 대상으로 합니다.
+# Parsed
+cd ai/parsed
+uvicorn parsed_server:app --host 0.0.0.0 --port 8503 --reload
 
+# LLM/RAG
+cd ai/vllm
+uvicorn core_server:app --host 0.0.0.0 --port 8504 --reload
+```
 
-## 주요 기능
+AI 서버는 GPU, 모델 파일, Hugging Face token, Qdrant 상태에 영향을 많이 받습니다. 자세한 설정은 각 AI 하위 README를 확인합니다.
 
-프로젝트 단위로 팀과 회의를 관리하며, 회의 시작/종료를 제어할 수 있습니다. 회의 종료 시 녹음된 음성을 자동으로 STT 처리하고, 화자별 발언을 분석해 회의록을 자동 생성합니다. 회의록에서 "본인 선언" 및 "리더의 지시" 패턴을 구분해 담당자와 마감일을 추출하고, 이를 태스크로 정리해 Jira 이슈로 등록합니다.
-이 외에 회의 전 안건 자동 생성 및 확정, 회의록 승인 요청/승인/반려 워크플로우, 회의 내용 기반 실시간 RAG 챗봇 질의응답, 문서 업로드 시 OCR·파싱을 통한 지식베이스 구축, 그리고 JWT 기반 인증과 관리자용 사용자 관리 기능을 제공합니다.
+## 환경변수
 
+실제 secret 값은 `.env`에 넣고 Git에 올리지 않습니다. 주요 위치는 다음과 같습니다.
 
-## 시스템 아키텍처
+```text
+.env
+backend/hpm/.env
+frontend/hpm/.env
+ai/.env
+ai/ocr/.env
+ai/stt/.env
+ai/parsed/.env
+ai/vllm/.env
+```
 
+대표적으로 필요한 값:
 
+```dotenv
+# Frontend
+VITE_API_BASE_URL=http://localhost:8000/api
 
+# Backend DB
+DB_NAME=hpm_db
+DB_USER=root
+DB_PASSWORD=change-me
+DB_HOST=localhost
+DB_PORT=3306
 
-## ERD
+# AI service URLs
+RUNPOD_CORE_BASE_URL=http://localhost:8504
+RUNPOD_STT_BASE_URL=http://localhost:8502
+RUNPOD_OCR_BASE_URL=http://localhost:8501
+RUNPOD_PARSED_BASE_URL=http://localhost:8503
+RAG_SERVER_URL=http://localhost:8504/chat
 
+# Vector DB
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+```
 
+## Docker 실행
 
+```bash
+docker-compose up --build
+```
 
-## 활용 데이터
+Docker 설정은 backend와 frontend 중심입니다. AI 서버와 Qdrant는 배포 방식에 맞춰 별도 서버 또는 RunPod에서 운영할 수 있습니다.
 
+## Git에 올리지 않을 것
 
+- `.env`, API key, token, 비밀번호
+- `node_modules/`
+- `backend/hpm/media/`
+- 모델 캐시, Qdrant 저장소, 임시 파싱 결과
+- `desktop.ini`, 로그 파일, 로컬 DB 파일
 
+## 현재 상태 메모
 
-## 모델 선정
-
-
-
-
-## 시연 영상
-
-
-
-
-## 기대 효과
-
-회의록 작성과 업무 배정에 드는 시간을 대폭 줄여 구성원이 핵심 논의에 집중할 수 있습니다. 회의에서 결정된 태스크가 담당자·마감일과 함께 Jira에 자동 등록되므로 후속 업무 누락이 줄고 실행력이 높아집니다. 또한 회의 데이터가 검색 가능한 형태로 축적되어 조직의 지식 자산으로 활용할 수 있습니다.
-
-
-## 향후 발전 방향
-
-<!-- 앞으로의 개선/확장 계획 -->
+이 프로젝트는 기능별 서버가 분리되어 있어서 한 번에 전부 실행하기보다, 필요한 기능부터 서버를 켜고 연결 상태를 확인하는 방식이 좋습니다. 프론트엔드와 백엔드는 기본 기능 확인용이고, 회의록/챗봇/문서 ingest는 AI 서버와 Qdrant 설정이 맞아야 정상 동작합니다.

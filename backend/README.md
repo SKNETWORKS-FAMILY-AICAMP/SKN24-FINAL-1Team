@@ -92,6 +92,49 @@ VITE_API_BASE_URL=http://localhost:8000/api
 
 `.env`는 Git에 올리지 않습니다.
 
+## .env 양식
+
+프로젝트 루트 `.env` 또는 `backend/hpm/.env` 예시입니다. 실제 secret 값은 팀 배포 환경에 맞게 채웁니다.
+
+```dotenv
+# Django
+SECRET_KEY=change-me
+CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+DEFAULT_USER_PASSWORD=change-me
+
+# MySQL
+DB_NAME=hpm_db
+DB_USER=root
+DB_PASSWORD=change-me
+DB_HOST=localhost
+DB_PORT=3306
+
+# AI / RunPod services
+RUNPOD_CORE_BASE_URL=http://localhost:8504
+RUNPOD_STT_BASE_URL=http://localhost:8502
+RUNPOD_OCR_BASE_URL=http://localhost:8501
+RUNPOD_PARSED_BASE_URL=http://localhost:8503
+RAG_SERVER_URL=http://localhost:8504/chat
+
+# Jira REST / OAuth
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_API_TOKEN=
+JIRA_PROJECT_KEY=HPM
+JIRA_CLIENT_ID=
+JIRA_CLIENT_SECRET=
+JIRA_REDIRECT_URI=http://localhost:8000/api/jira/callback/
+
+# AWS SES
+AWS_REGION=ap-northeast-2
+SES_FROM_EMAIL=
+
+# AWS S3
+AWS_STORAGE_BUCKET_NAME=
+AWS_S3_REGION_NAME=ap-northeast-2
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+```
+
 ## API 구성
 
 루트 라우팅은 `backend/hpm/hpm/urls.py`에서 관리합니다.

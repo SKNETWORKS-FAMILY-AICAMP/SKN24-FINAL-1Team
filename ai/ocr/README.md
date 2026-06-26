@@ -66,6 +66,35 @@ bash runpod_start_paddleocr_wrapper.sh
 | `PRELOAD_OCR_MODEL` | `false` | 시작 시 OCR 모델 선로딩 여부 |
 | `OCR_JOB_WORKERS` | `1` | OCR job worker 수 |
 
+## .env 양식
+
+`ai/ocr/.env` 예시입니다.
+
+```dotenv
+# OCR backend: paddleocr_vl 또는 qwen
+OCR_BACKEND=paddleocr_vl
+
+# PaddleOCR-VL serving
+PADDLEOCR_VL_URL=http://127.0.0.1:8080
+PADDLEOCR_VL_TIMEOUT_SEC=600
+PADDLEOCR_VL_RETURN_MARKDOWN_IMAGES=false
+PADDLEOCR_VL_VISUALIZE=false
+
+# Qwen OCR backend를 사용할 때
+OCR_MODEL_ID=Qwen/Qwen3-VL-4B-Instruct
+LOAD_IN_4BIT=true
+TORCH_DTYPE=auto
+MAX_NEW_TOKENS=2048
+PRELOAD_OCR_MODEL=false
+
+# Job worker
+OCR_JOB_WORKERS=1
+
+# Hugging Face token이 필요한 모델을 사용할 때만 입력
+HF_TOKEN=
+HF_HUB_ENABLE_HF_TRANSFER=1
+```
+
 ## 요청 예시
 
 ```bash

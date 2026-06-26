@@ -53,6 +53,30 @@ uvicorn stt_server:app --host 0.0.0.0 --port 8502 --reload
 | `STT_JOB_WORKERS` | `1` | job worker 수 |
 | `HF_TOKEN` | 없음 | diarization 또는 Hugging Face 모델 접근에 사용 |
 
+## .env 양식
+
+`ai/stt/.env` 예시입니다.
+
+```dotenv
+# WhisperX model
+STT_MODEL_ID=large-v3
+STT_DEVICE=cuda
+STT_COMPUTE_TYPE=float16
+STT_BATCH_SIZE=16
+STT_PRELOAD_MODEL=false
+
+# Alignment / diarization
+STT_ENABLE_ALIGN=true
+STT_ENABLE_DIARIZE=false
+
+# Job worker
+STT_JOB_WORKERS=1
+
+# Diarization 또는 private model 접근에 필요할 수 있음
+HF_TOKEN=
+HF_HUB_ENABLE_HF_TRANSFER=1
+```
+
 ## 요청 파라미터
 
 `/stt`, `/transcribe`, `/stt/jobs`는 multipart form 요청을 받습니다.
