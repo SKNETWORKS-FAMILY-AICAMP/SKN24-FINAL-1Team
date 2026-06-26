@@ -99,7 +99,7 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
               <img src={meeting} alt="" className="w-4 h-4" />
             )}
           </span>
-          <span>회의 목록</span>
+          <span onClick={(e) => { e.stopPropagation(); navigate("/meetings"); }} className="cursor-pointer">회의 목록</span>
         </div>
         <div className="flex items-center gap-1">
           <span
@@ -110,7 +110,7 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
             title="회의 추가"
             className="flex items-center justify-center transition"
           >
-            <img src={plus} alt="추가" className="" />
+            <img src={plus} alt="추가" className="w-3" />
           </span>
         </div>
       </button>

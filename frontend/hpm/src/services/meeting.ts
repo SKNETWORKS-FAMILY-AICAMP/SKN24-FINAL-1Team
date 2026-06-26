@@ -491,10 +491,8 @@ export const generateAgendaWithOcr = async (
 
   if (res.data.status === "processing" && res.data.job_id) {
     const jobId = res.data.job_id;
-    let attempts = 0;
-    const maxAttempts = 60;
 
-    while (attempts < maxAttempts) {
+    while (true) {
       await delay(3000);
 
       try {
@@ -507,12 +505,6 @@ export const generateAgendaWithOcr = async (
           return statusRes.data;
         }
 
-        if (statusRes.data.status === "processing") {
-          attempts++;
-          console.log(`[${attempts}/${maxAttempts}] 안건 생성 대기 중...`);
-          continue;
-        }
-
         throw new Error(statusRes.data.error || "안건 생성 중 알 수 없는 응답 상태입니다.");
       } catch (error: any) {
         console.error("상태 확인 중 에러 발생:", error);
@@ -520,11 +512,8 @@ export const generateAgendaWithOcr = async (
         if (errMsg) {
           throw new Error(errMsg);
         }
-        attempts++;
       }
     }
-
-    throw new Error("작업 시간이 초과되었습니다.");
   }
 
   throw new Error("알 수 없는 서버 응답입니다.");

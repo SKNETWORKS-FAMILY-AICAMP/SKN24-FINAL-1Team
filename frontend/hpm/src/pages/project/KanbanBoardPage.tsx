@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import projectIcon from "../../assets/kanban/folder.png";
+import projectIcon from "../../assets/project/folderBig.png";
 import KanbanColumn from "../../components/project/KanbanColumn";
 import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
@@ -409,24 +409,18 @@ export default function KanbanBoardPage() {
   };
 
   return (
-    <div className="-m-6 min-h-screen overflow-auto bg-[#FFFDFD] pb-[32px] pt-[32px] font-pretendard">
+    <div className="flex flex-col bg-[#FFFDFD] pb-[32px] pt-[32px]">
       <section
-        className="relative transition-all duration-200 ease-out"
-        style={{ height: boardHeight, width: boardWidth }}
+        className="relative flex ease-out"
         data-node-id={modal ? "43:4229" : "1:7286"}
         data-name="dashboard"
       >
-        <section className="absolute left-[68px] top-[32px] flex items-center gap-[10px]">
-          <img alt="" aria-hidden="true" className="size-[29px] object-contain" src={projectIcon} />
-          <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
-            {projectName || "Jira 칸반"}
-          </h1>
-        </section>
-        {loading ? (
-          <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#623FB5]">
-            Loading Jira board...
-          </div>
-        ) : null}
+      <section className="flex ml-[67px] gap-[7px] justify-center items-center">
+        <img alt="" className="w-8" src={projectIcon} />
+        <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
+          {projectName || "Jira 칸반"}
+        </h1>
+      </section>
         {error ? (
           <div className="absolute left-[68px] top-[72px] text-[14px] font-medium leading-[1.2] text-[#B42318]">
             {error}
@@ -444,13 +438,6 @@ export default function KanbanBoardPage() {
             tasks={tasksByColumn[column.id]}
             onAddTask={openAddModal}
             onEditTask={openEditModal}
-            onCardDragStart={handleCardDragStart}
-            onCardDragEnd={handleCardDragEnd}
-            onDropTask={handleDropTask}
-            draggingTaskId={draggingTask?.id ?? null}
-            isDragActive={draggingTask !== null}
-            canManage={canManageJira}
-            minHeight={maxColumnHeight}
           />
         )) : null}
       </section>
