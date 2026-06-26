@@ -208,7 +208,7 @@ export default function Header() {
     <header
       className={`w-full h-16 border-b border-[#E6E1E6] ${DESIGN.BACKGROUND_COLORS.white}`}
     >
-      <div className={`flex h-16 w-full items-center justify-end px-6 ${isAdmin ? "" : "max-w-[1504px] mx-auto"}`}>
+      <div className={`flex h-16 w-full items-center justify-end px-6 ${isAdmin ? "" : " mx-auto"}`}>
         <div className={`flex ${DESIGN.GAP_SIZES["xl"]}`}>
           {!isAdmin ? (
             <div

@@ -49,7 +49,7 @@ export default function ChangePasswordPage() {
     }
 
     if (next !== confirm) {
-      setConfirmError("새 비밀번호가 일치하지 않습니다.");
+      setConfirmError("새 비밀번호와 일치하지 않습니다.");
       hasError = true;
     }
 

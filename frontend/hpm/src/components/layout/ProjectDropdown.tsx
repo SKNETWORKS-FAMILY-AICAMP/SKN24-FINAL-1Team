@@ -78,7 +78,7 @@ export default function ProjectDropdown({ isCollapsed, toggleCollapse }: Project
               <img src={file} alt="" className="" />
             )}
           </span>
-          <span>프로젝트 목록</span>
+          <span onClick={(e) => { e.stopPropagation(); navigate("/projects"); }} className="cursor-pointer">프로젝트 목록</span>
         </div>
         <div className="flex items-center">
           <span
@@ -89,7 +89,7 @@ export default function ProjectDropdown({ isCollapsed, toggleCollapse }: Project
             title="프로젝트 추가"
             className="flex items-center justify-center transition"
           >
-            <img src={plus} alt="추가" className="" />
+            <img src={plus} alt="추가" className="w-3" />
           </span>
         </div>
       </button>
