@@ -111,7 +111,7 @@ export default function FloatingChatbot() {
 
           {/* 헤더 */}
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-            <span className="text-sm font-bold text-[#141414]">회의 챗봇</span>
+            <span className="text-sm text-[#141414]">프로젝트 챗봇</span>
             <button
               onClick={() => setIsOpen(false)}
               className="text-gray-400 hover:text-gray-600 transition text-lg leading-none"
@@ -194,7 +194,7 @@ export default function FloatingChatbot() {
         {isOpen ? (
           <span className="text-white text-lg leading-none">✕</span>
         ) : (
-          <img src={chatbotImg} alt="챗봇" className="w-4" />
+          <img src={chatbotImg} alt="챗봇" className="w-12" />
         )}
       </button>
     </>

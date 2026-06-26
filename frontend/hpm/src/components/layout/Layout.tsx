@@ -39,14 +39,17 @@ export default function Layout() {
     "/speaker-mapping", "/minutes", "/jira", "/email",
     "/jira-register", "/invite-email",
   ];
-  const isMeetingInProgress = meetingProgressPaths.some((p) =>
-    location.pathname.includes(p)
-  );
+
+  const isMeetingPage =
+    /^\/meetings\/\d+$/.test(location.pathname) ||
+    meetingProgressPaths.some(path => location.pathname.endsWith(path));
+
   const noChatbotPaths = ["/login", "/change-password", "/projects", "/projects/create", "/admin/users"];
+
   const showChatbot =
     !!user &&
     !noChatbotPaths.includes(location.pathname) &&
-    !isMeetingInProgress;
+    !isMeetingPage;
   const isNoLayout =
     noLayoutPaths.includes(location.pathname) ||
     (isChangePasswordPage && (requiresInitialPasswordChange || !user));
