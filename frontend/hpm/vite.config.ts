@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
+  cacheDir: `../../.runtime_vite_cache/frontend-hpm-${process.pid}`,
   plugins: [
     react(),
     tailwindcss(),
