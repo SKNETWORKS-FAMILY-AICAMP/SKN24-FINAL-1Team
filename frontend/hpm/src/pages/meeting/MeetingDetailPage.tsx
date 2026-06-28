@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useRecording } from "../../context/RecordingContext";
 import { useAuth } from "../../context/AuthContext";
@@ -22,6 +22,7 @@ import {
   type MeetingPreparation,
 } from "../../services/meeting";
 import * as DESIGN from "../../constants/design";
+import { dedupePreparationSources } from "../../utils/dedupeSources";
 
 type ChatMsg = { role: "user" | "bot"; content: string; source?: string };
 const MISSING_AUDIO_MESSAGE = "녹음 파일이 없습니다. 마이크 권한을 허용한 뒤 다시 녹음해주세요.";
@@ -65,6 +66,10 @@ export default function MeetingDetailPage() {
   const [editedAgendas, setEditedAgendas] = useState<string[]>([]);
 
   const [prepMaterial, setPrepMaterial] = useState<MeetingPreparation | null>(null);
+  const uniquePrepSources = useMemo(
+    () => dedupePreparationSources(prepMaterial?.sources),
+    [prepMaterial?.sources],
+  );
   const [isEditingPrep, setIsEditingPrep] = useState(false);
   const [editedPrep, setEditedPrep] = useState({
     purpose: "",
@@ -811,8 +816,8 @@ export default function MeetingDetailPage() {
                         <div>
                           <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
                           <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                            {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 ? (
-                              prepMaterial.sources.map((src, i) => (
+                            {uniquePrepSources.length > 0 ? (
+                              uniquePrepSources.map((src, i) => (
                                 <div key={i} className="flex items-center gap-2 text-[13px]">
                                   <span className="text-[#767676]">- {src.title}</span>
                                   {src.file_url ? (
@@ -888,8 +893,8 @@ export default function MeetingDetailPage() {
                             <div>
                               <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
-                                {prepMaterial.sources && prepMaterial.sources.length > 0 ? (
-                                  prepMaterial.sources.map((src, i) => (
+                                {uniquePrepSources.length > 0 ? (
+                                  uniquePrepSources.map((src, i) => (
                                     <div key={i} className="flex items-center gap-2 text-[13px]">
                                       <span className="text-[#141414]">- {src.title}</span>
                                       {src.file_url ? (

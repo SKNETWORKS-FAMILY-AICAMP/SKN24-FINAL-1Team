@@ -8,6 +8,7 @@ import mimetypes
 import os
 import re
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,6 +30,10 @@ from config import (
     STT_MODEL_ID,
     TEXT_MODEL_ID,
 )
+
+
+OPENAI_EMBED_MAX_RETRIES = int(os.getenv("OPENAI_EMBED_MAX_RETRIES", "5"))
+OPENAI_RETRY_BASE_SEC = float(os.getenv("OPENAI_RETRY_BASE_SEC", "2"))
 
 
 @dataclass
@@ -153,7 +158,20 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         kwargs: dict[str, Any] = {"model": EMBEDDING_MODEL_ID, "input": batch}
         if EMBEDDING_DIMENSIONS_INT:
             kwargs["dimensions"] = EMBEDDING_DIMENSIONS_INT
-        response = client.embeddings.create(**kwargs)
+        last_exc: Exception | None = None
+        for attempt in range(1, OPENAI_EMBED_MAX_RETRIES + 1):
+            try:
+                response = client.embeddings.create(**kwargs)
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= OPENAI_EMBED_MAX_RETRIES:
+                    raise RuntimeError(
+                        f"OpenAI embedding request failed after {OPENAI_EMBED_MAX_RETRIES} attempts: {exc}"
+                    ) from exc
+                time.sleep(min(OPENAI_RETRY_BASE_SEC * (2 ** (attempt - 1)), 30.0))
+        else:
+            raise RuntimeError(f"OpenAI embedding request failed: {last_exc}")
         vectors.extend(item.embedding for item in response.data)
     return vectors
 

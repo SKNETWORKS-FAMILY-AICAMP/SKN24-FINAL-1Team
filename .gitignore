@@ -7,8 +7,4 @@ __pycache__/
 db.sqlite3
 .git
 .vscode
-.venv-localcheck/
-.runtime_logs/
-.pydeps/
-.runtime_pydeps/
-.runtime_vite_cache/
+.vite-cache/

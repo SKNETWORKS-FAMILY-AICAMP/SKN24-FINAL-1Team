@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import sys
 import time
@@ -52,6 +53,26 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _batched(items: list[Any], batch_size: int) -> list[list[Any]]:
+    size = max(1, int(batch_size))
+    return [items[index : index + size] for index in range(0, len(items), size)]
+
+
+def _with_retries(label: str, operation: Any) -> Any:
+    max_retries = int(os.getenv("QDRANT_MAX_RETRIES", "5"))
+    base_seconds = float(os.getenv("QDRANT_RETRY_BASE_SEC", "2"))
+    last_exc: Exception | None = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return operation()
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= max_retries:
+                break
+            time.sleep(min(base_seconds * (2 ** (attempt - 1)), 30.0))
+    raise RuntimeError(f"{label} failed after {max_retries} attempts: {last_exc}") from last_exc
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -462,6 +483,49 @@ def _first_value(data: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _source_filename_keys(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    name = Path(text).name
+    return [item for item in [text, name] if item]
+
+
+def _merge_source_metadata(
+    chunks: list[dict[str, Any]],
+    metadata_by_source_filename: dict[str, dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if not metadata_by_source_filename:
+        return chunks
+
+    enriched: list[dict[str, Any]] = []
+    for chunk in chunks:
+        chunk_metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
+        per_file_metadata = None
+        for key in [
+            *_source_filename_keys(chunk_metadata.get("source_filename")),
+            *_source_filename_keys(chunk_metadata.get("source_pdf")),
+            *_source_filename_keys(chunk_metadata.get("file_name")),
+            *_source_filename_keys(chunk_metadata.get("title")),
+        ]:
+            per_file_metadata = metadata_by_source_filename.get(key)
+            if per_file_metadata:
+                break
+
+        if not per_file_metadata:
+            enriched.append(chunk)
+            continue
+
+        next_chunk = dict(chunk)
+        next_chunk["metadata"] = {
+            **chunk_metadata,
+            **per_file_metadata,
+            "chunk_id": chunk_metadata.get("chunk_id") or chunk.get("chunk_id"),
+        }
+        enriched.append(next_chunk)
+    return enriched
+
+
 def _canonical_chunk_payload(chunk: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     chunk_metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
     combined_metadata = {
@@ -538,6 +602,7 @@ def upsert_chunks_to_qdrant(
     qdrant_url: str | None = None,
     qdrant_api_key: str | None = None,
     collection: str | None = None,
+    upsert_batch_size: int | None = None,
 ) -> int:
     if not chunks:
         return 0
@@ -545,16 +610,23 @@ def upsert_chunks_to_qdrant(
 
     bundle = load_embedding_model()
     vectors = embed_texts([chunk["document"] for chunk in chunks])
-    client = QdrantClient(url=qdrant_url or QDRANT_URL, api_key=qdrant_api_key if qdrant_api_key is not None else QDRANT_API_KEY)
+    client = QdrantClient(
+        url=qdrant_url or QDRANT_URL,
+        api_key=qdrant_api_key if qdrant_api_key is not None else QDRANT_API_KEY,
+        timeout=float(os.getenv("QDRANT_TIMEOUT_SEC", "120")),
+    )
     collection_name = collection or qdrant_collection_for_project(metadata.get("project_id"))
     try:
         exists = bool(client.collection_exists(collection_name))
     except AttributeError:
         exists = collection_name in {item.name for item in client.get_collections().collections}
     if not exists:
-        client.create_collection(
-            collection_name=collection_name,
-            vectors_config=models.VectorParams(size=bundle.dimensions, distance=models.Distance.COSINE),
+        _with_retries(
+            "Qdrant create_collection",
+            lambda: client.create_collection(
+                collection_name=collection_name,
+                vectors_config=models.VectorParams(size=bundle.dimensions, distance=models.Distance.COSINE),
+            ),
         )
     ensure_payload_indexes(client, collection_name)
     points = []
@@ -566,7 +638,12 @@ def upsert_chunks_to_qdrant(
                 payload=_canonical_chunk_payload(chunk, metadata),
             )
         )
-    client.upsert(collection_name=collection_name, points=points)
+    batch_size = upsert_batch_size or int(os.getenv("QDRANT_UPSERT_BATCH_SIZE", "128"))
+    for batch in _batched(points, batch_size):
+        _with_retries(
+            "Qdrant upsert",
+            lambda batch=batch: client.upsert(collection_name=collection_name, points=batch, wait=True),
+        )
     return len(points)
 
 
@@ -576,13 +653,23 @@ def ingest_pdf_chunks(
     chunks_dir: Path,
     metadata: dict[str, Any],
     *,
+    metadata_by_source_filename: dict[str, dict[str, Any]] | None = None,
     require_cuda: bool = True,
     qdrant_url: str | None = None,
     qdrant_api_key: str | None = None,
     collection: str | None = None,
+    upsert_batch_size: int | None = None,
 ) -> dict[str, Any]:
     parser_info = run_parser(pdf_dir, parsed_dir, require_cuda=require_cuda)
     chunker_info = run_chunker(parsed_dir, pdf_dir, chunks_dir)
     chunks = read_chunks_jsonl(Path(str(chunker_info["output"])))
-    upserted = upsert_chunks_to_qdrant(chunks, metadata, qdrant_url=qdrant_url, qdrant_api_key=qdrant_api_key, collection=collection)
+    chunks = _merge_source_metadata(chunks, metadata_by_source_filename)
+    upserted = upsert_chunks_to_qdrant(
+        chunks,
+        metadata,
+        qdrant_url=qdrant_url,
+        qdrant_api_key=qdrant_api_key,
+        collection=collection,
+        upsert_batch_size=upsert_batch_size,
+    )
     return {"parser": parser_info, "chunker": chunker_info, "chunks": chunks, "upserted": upserted}

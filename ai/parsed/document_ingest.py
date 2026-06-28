@@ -373,6 +373,49 @@ def _first_value(data: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _source_filename_keys(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    name = Path(text).name
+    return [item for item in [text, name] if item]
+
+
+def _merge_source_metadata(
+    chunks: list[dict[str, Any]],
+    metadata_by_source_filename: dict[str, dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    if not metadata_by_source_filename:
+        return chunks
+
+    enriched: list[dict[str, Any]] = []
+    for chunk in chunks:
+        chunk_metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
+        per_file_metadata = None
+        for key in [
+            *_source_filename_keys(chunk_metadata.get("source_filename")),
+            *_source_filename_keys(chunk_metadata.get("source_pdf")),
+            *_source_filename_keys(chunk_metadata.get("file_name")),
+            *_source_filename_keys(chunk_metadata.get("title")),
+        ]:
+            per_file_metadata = metadata_by_source_filename.get(key)
+            if per_file_metadata:
+                break
+
+        if not per_file_metadata:
+            enriched.append(chunk)
+            continue
+
+        next_chunk = dict(chunk)
+        next_chunk["metadata"] = {
+            **chunk_metadata,
+            **per_file_metadata,
+            "chunk_id": chunk_metadata.get("chunk_id") or chunk.get("chunk_id"),
+        }
+        enriched.append(next_chunk)
+    return enriched
+
+
 def _canonical_chunk_payload(chunk: dict[str, Any], metadata: dict[str, Any]) -> dict[str, Any]:
     chunk_metadata = chunk.get("metadata") if isinstance(chunk.get("metadata"), dict) else {}
     combined_metadata = {
@@ -487,6 +530,7 @@ def ingest_pdf_chunks(
     chunks_dir: Path,
     metadata: dict[str, Any],
     *,
+    metadata_by_source_filename: dict[str, dict[str, Any]] | None = None,
     require_cuda: bool = True,
     qdrant_url: str | None = None,
     qdrant_api_key: str | None = None,
@@ -495,5 +539,6 @@ def ingest_pdf_chunks(
     parser_info = run_parser(pdf_dir, parsed_dir, require_cuda=require_cuda)
     chunker_info = run_chunker(parsed_dir, pdf_dir, chunks_dir)
     chunks = read_chunks_jsonl(Path(str(chunker_info["output"])))
+    chunks = _merge_source_metadata(chunks, metadata_by_source_filename)
     upserted = upsert_chunks_to_qdrant(chunks, metadata, qdrant_url=qdrant_url, qdrant_api_key=qdrant_api_key, collection=collection)
     return {"parser": parser_info, "chunker": chunker_info, "chunks": chunks, "upserted": upserted}

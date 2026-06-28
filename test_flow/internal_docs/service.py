@@ -65,12 +65,41 @@ def _decode_text(content: bytes) -> tuple[str, str]:
     raise ValueError(f"Unable to decode text file. Tried utf-8-sig, utf-8, cp949, euc-kr: {last_error}")
 
 
-def _file_metadata(base_metadata: dict[str, Any], upload: UploadedDocument, saved_path: Path) -> dict[str, Any]:
+def _document_entry_for_upload(base_metadata: dict[str, Any], upload: UploadedDocument, index: int) -> dict[str, Any]:
+    documents = base_metadata.get("documents") if isinstance(base_metadata.get("documents"), list) else []
+    for item in documents:
+        if not isinstance(item, dict):
+            continue
+        if _int_like(item.get("index")) == str(index):
+            return item
+
+    filename = str(upload.filename or "")
+    for item in documents:
+        if isinstance(item, dict) and str(item.get("filename") or "") == filename:
+            return item
+
+    document_map = base_metadata.get("document_map") if isinstance(base_metadata.get("document_map"), dict) else {}
+    document_id = document_map.get(filename)
+    if document_id not in (None, ""):
+        return {"filename": filename, "document_id": document_id}
+    return {}
+
+
+def _file_metadata(base_metadata: dict[str, Any], upload: UploadedDocument, saved_path: Path, index: int) -> dict[str, Any]:
     metadata = dict(base_metadata)
-    metadata.setdefault("title", upload.filename)
-    metadata.setdefault("source_filename", upload.filename)
-    metadata.setdefault("file_name", upload.filename)
-    metadata.setdefault("source_path", str(base_metadata.get("source_path") or base_metadata.get("document_path") or saved_path))
+    document_entry = _document_entry_for_upload(base_metadata, upload, index)
+    document_id = _int_like(document_entry.get("document_id"))
+    filename = str(document_entry.get("filename") or upload.filename)
+
+    metadata["title"] = filename
+    metadata["source_filename"] = filename
+    metadata["file_name"] = filename
+    metadata.setdefault("source_path", str(document_entry.get("path") or base_metadata.get("source_path") or base_metadata.get("document_path") or saved_path))
+    if document_id:
+        metadata["document_id"] = document_id
+        metadata["viewer_id"] = document_id
+    if document_entry.get("path"):
+        metadata["storage_key"] = str(document_entry.get("path"))
     metadata["source_sha256"] = file_sha256(saved_path)
     return metadata
 
@@ -105,6 +134,7 @@ def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path
     saved: list[dict[str, Any]] = []
     text_chunks: list[dict[str, Any]] = []
     conversions: list[dict[str, Any]] = []
+    metadata_by_source_filename: dict[str, dict[str, Any]] = {}
 
     for index, upload in enumerate(files, start=1):
         original_suffix = Path(upload.filename or "").suffix.lower()
@@ -114,6 +144,7 @@ def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path
         filename = _safe_filename(upload.filename, index, original_suffix)
         path = raw_dir / filename
         path.write_bytes(upload.content)
+        per_file_metadata = _file_metadata(metadata, upload, path, index)
         saved_record = {
             "original_filename": upload.filename,
             "saved_filename": filename,
@@ -126,9 +157,9 @@ def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path
             target = pdf_dir / filename
             shutil.copy2(path, target)
             saved_record["parser_input"] = str(target)
+            metadata_by_source_filename[target.name] = per_file_metadata
         elif original_suffix == ".docx":
             text = ocr_file_bytes(upload.content, upload.filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            per_file_metadata = _file_metadata(metadata, upload, path)
             per_file_metadata["parser"] = "docx"
             per_file_metadata["source_file_extension"] = ".docx"
             chunks = make_text_chunks(text, per_file_metadata)
@@ -136,7 +167,6 @@ def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path
             saved_record["chunks"] = len(chunks)
         elif original_suffix == ".txt":
             text, encoding = _decode_text(upload.content)
-            per_file_metadata = _file_metadata(metadata, upload, path)
             per_file_metadata["parser"] = "text"
             per_file_metadata["source_file_extension"] = ".txt"
             chunks = make_text_chunks(text, per_file_metadata)
@@ -146,7 +176,12 @@ def _prepare_uploads(files: list[UploadedDocument], raw_dir: Path, pdf_dir: Path
 
         saved.append(saved_record)
 
-    return {"saved_files": saved, "text_chunks": text_chunks, "conversions": conversions}
+    return {
+        "saved_files": saved,
+        "text_chunks": text_chunks,
+        "conversions": conversions,
+        "metadata_by_source_filename": metadata_by_source_filename,
+    }
 
 
 def ingest_uploaded_documents(
@@ -178,9 +213,9 @@ def ingest_uploaded_documents(
     work_root = Path(os.getenv("INTERNAL_DOCS_WORK_ROOT", tempfile.gettempdir())).resolve()
     work_root.mkdir(parents=True, exist_ok=True)
 
-    # Keep the public API shape stable. The vLLM-based ingest implementation
-    # uses environment/config values for embedding batch/model behavior.
-    _ = (embedding_provider, embedding_model, device, reset, skip_existing, embed_batch_size, upsert_batch_size)
+    # Keep the public API shape stable. Model/provider settings are resolved by
+    # the running core server, while batch size is used for Qdrant writes below.
+    _ = (embedding_provider, embedding_model, device, reset, skip_existing, embed_batch_size)
 
     with GPU_TASK_LOCK:
         job_dir = Path(tempfile.mkdtemp(prefix="hpm_internal_docs_", dir=str(work_root)))
@@ -203,10 +238,12 @@ def ingest_uploaded_documents(
                     parsed_dir=parsed_dir,
                     chunks_dir=chunks_dir,
                     metadata=metadata,
+                    metadata_by_source_filename=prepared["metadata_by_source_filename"],
                     require_cuda=require_cuda,
                     qdrant_url=qdrant_url,
                     qdrant_api_key=qdrant_api_key,
                     collection=collection_name,
+                    upsert_batch_size=upsert_batch_size,
                 )
                 parser_results.append(pdf_result["parser"])
                 chunker_results.append(pdf_result["chunker"])
@@ -221,6 +258,7 @@ def ingest_uploaded_documents(
                     qdrant_url=qdrant_url,
                     qdrant_api_key=qdrant_api_key,
                     collection=collection_name,
+                    upsert_batch_size=upsert_batch_size,
                 )
                 all_chunks.extend(text_chunks)
 
