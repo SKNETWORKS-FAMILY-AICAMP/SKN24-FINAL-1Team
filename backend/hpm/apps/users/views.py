@@ -384,7 +384,10 @@ def jira_oauth_callback(request):
     if resources_response.ok:
         resources = resources_response.json()
         if resources:
-            cloud_id = resources[0].get("id", "")  # 첫 번째 Jira 인스턴스
+            # Atlassian 동의 화면에서 "Use app on" 드롭다운으로 스페이스를 선택하면
+            # accessible-resources에 선택한 스페이스만 반환됨
+            # 선택 없이 Accept하면 전체가 내려오므로 그때는 첫 번째를 사용
+            cloud_id = resources[0].get("id", "") if resources else ""  # 첫 번째 Jira 인스턴스
 
     # DB에 토큰 저장
     try:
@@ -792,8 +795,16 @@ def admin_user_detail(request, users_id):
         return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
     
     if request.method == "DELETE":
-        user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception:
+            # Project.project_owner 또는 Meeting.creator 가 PROTECT FK 로 연결된 경우
+            # 해당 유저가 생성한 프로젝트/회의가 있으면 직접 삭제 불가
+            return Response(
+                {"error": "이 사용자는 프로젝트 또는 회의의 생성자로 등록되어 있어 삭제할 수 없습니다. 해당 프로젝트/회의를 먼저 삭제해 주세요."},
+                status=status.HTTP_409_CONFLICT,
+            )
     
     if request.method == "GET":
         return Response({
