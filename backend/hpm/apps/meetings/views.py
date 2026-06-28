@@ -67,6 +67,19 @@ def _is_project_member(project, user_id):
     return ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
 
 
+def _ocr_upload_document_response(document):
+    if document is None:
+        return {}
+    return {
+        "document_id": document.document_id,
+        "document": {
+            "document_id": document.document_id,
+            "name": document.title,
+            "path": document.path,
+        },
+    }
+
+
 def _minutes_payload(meeting, text):
     return {
         "text": text,
@@ -1189,11 +1202,10 @@ def generate_agenda(request, meeting_id):
         if not ocr_base_url:
             return Response({"error": "OCR 서버 주소가 설정되지 않았습니다."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         try:
-            file_bytes = uploaded_file.read()  
-
-            
+            file_bytes = uploaded_file.read()
+            document = None
             try:
-                _store_ocr_source_document(
+                document = _store_ocr_source_document(
                     meeting, uploaded_file, file_bytes, request.auth["user_id"], "agenda"
                 )
             except Exception as e:
@@ -1203,7 +1215,11 @@ def generate_agenda(request, meeting_id):
             ocr_res = requests.post(f"{ocr_base_url}/ocr/jobs", files=files, timeout=300)
             ocr_res.raise_for_status()
             job_id = ocr_res.json().get("job_id")
-            return Response({"status": "processing", "job_id": job_id}, status=status.HTTP_202_ACCEPTED)
+            return Response({
+                "status": "processing",
+                "job_id": job_id,
+                **_ocr_upload_document_response(document),
+            }, status=status.HTTP_202_ACCEPTED)
         except Exception as e:
             return Response({"error": f"OCR 처리 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
 
@@ -1420,11 +1436,10 @@ def generate_prep_material(request, meeting_id):
         if not ocr_base_url:
             return Response({"error": "OCR 서버 주소가 설정되지 않았습니다."}, status=status.HTTP_502_BAD_GATEWAY)
         try:
-            file_bytes = uploaded_file.read() 
-
-            
+            file_bytes = uploaded_file.read()
+            document = None
             try:
-                _store_ocr_source_document(
+                document = _store_ocr_source_document(
                     meeting, uploaded_file, file_bytes, request.auth["user_id"], "prep"
                 )
             except Exception as e:
@@ -1436,7 +1451,8 @@ def generate_prep_material(request, meeting_id):
             job_id = ocr_res.json().get("job_id")
             return Response({
                 "status": "processing",
-                "job_id": job_id
+                "job_id": job_id,
+                **_ocr_upload_document_response(document),
             }, status=status.HTTP_202_ACCEPTED)
         except Exception as e:
             return Response({"error": f"OCR 처리 실패: {str(e)}"}, status=status.HTTP_502_BAD_GATEWAY)
