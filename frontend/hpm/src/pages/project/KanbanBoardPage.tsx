@@ -15,6 +15,7 @@ import {
   getProjectJiraBoard,
   updateProjectJiraIssue,
   updateProjectJiraIssueStatus,
+  rankProjectJiraIssue,
   type JiraParentOption,
   type ProjectMember,
   type ProjectJiraBoard,
@@ -258,38 +259,69 @@ export default function KanbanBoardPage() {
   // 원인: handleDropTask 함수 선언부(`const handleDropTask = async (targetColumnId) => {`)가
   //       누락되어 함수 body가 전역 스코프에 노출된 상태였음
   // ─────────────────────────────────────────────────────────────────────────
-  const handleDropTask = async (targetColumnId: KanbanColumnId) => {
-    const task = draggingTask;
-    setDraggingTask(null);
-    if (!task || task.columnId === targetColumnId) return;
+  // 드래그한 카드를 targetColumn의 beforeTask 앞(없으면 맨 끝)에 놓고,
+  // 컬럼이 바뀌면 상태 변경, 위치가 바뀌면 순서(Rank) 변경을 Jira에 반영한다.
+  const reorderAndPersist = async (
+    task: KanbanTask,
+    targetColumnId: KanbanColumnId,
+    beforeTask: KanbanTask | null,
+  ) => {
     if (!projectId) return;
 
     const fromColumnId = task.columnId;
-    const targetStatusNames =
-      boardColumns.find((column) => column.id === targetColumnId)?.statusNames || [];
+    const snapshot = tasks; // 실패 시 롤백용
 
-    setTasks((current) =>
-      current.map((item) =>
-        item.id === task.id ? { ...item, columnId: targetColumnId } : item,
-      ),
-    );
+    // 1) 낙관적 UI 업데이트 (옮길 카드를 빼고 원하는 위치에 다시 삽입)
+    const without = tasks.filter((t) => t.id !== task.id);
+    const movingUpdated = { ...task, columnId: targetColumnId };
+    let next: KanbanTask[];
+    if (!beforeTask) {
+      next = [...without, movingUpdated]; // 컬럼 맨 끝
+    } else {
+      const idx = without.findIndex((t) => t.id === beforeTask.id);
+      next = [...without];
+      next.splice(idx, 0, movingUpdated); // beforeTask 앞
+    }
+    setTasks(next);
 
     try {
-      await updateProjectJiraIssueStatus(
-        projectId,
-        task.code,
-        targetColumnId,
-        targetStatusNames,
-      );
+      // 2) 컬럼(상태)이 바뀌었으면 상태 전환
+      if (fromColumnId !== targetColumnId) {
+        const targetStatusNames =
+          boardColumns.find((c) => c.id === targetColumnId)?.statusNames || [];
+        await updateProjectJiraIssueStatus(projectId, task.code, targetColumnId, targetStatusNames);
+      }
+
+      // 3) 순서(Rank) 반영 — 같은 컬럼 안 이웃 기준
+      const columnTasks = next.filter((t) => t.columnId === targetColumnId);
+      const idx = columnTasks.findIndex((t) => t.id === task.id);
+      const belowNeighbor = columnTasks[idx + 1]; // 내 아래 카드
+      const aboveNeighbor = columnTasks[idx - 1]; // 내 위 카드
+
+      if (belowNeighbor) {
+        await rankProjectJiraIssue(projectId, task.code, { beforeIssueKey: belowNeighbor.code });
+      } else if (aboveNeighbor) {
+        await rankProjectJiraIssue(projectId, task.code, { afterIssueKey: aboveNeighbor.code });
+      }
     } catch (error) {
-      console.error("Jira 상태 변경 실패:", error);
-      setTasks((current) =>
-        current.map((item) =>
-          item.id === task.id ? { ...item, columnId: fromColumnId } : item,
-        ),
-      );
-      alert("Jira 상태 변경에 실패했습니다.");
+      console.error("카드 이동 실패:", error);
+      setTasks(snapshot); // 롤백
+      alert("카드 이동에 실패했습니다.");
     }
+  };
+
+  const handleDropOnCard = (targetTask: KanbanTask) => {
+    const task = draggingTask;
+    setDraggingTask(null);
+    if (!task || task.id === targetTask.id) return;
+    reorderAndPersist(task, targetTask.columnId, targetTask);
+  };
+
+  const handleDropOnColumn = (columnId: KanbanColumnId) => {
+    const task = draggingTask;
+    setDraggingTask(null);
+    if (!task) return;
+    reorderAndPersist(task, columnId, null);
   };
 
   // ─── [BUG FIX] handleCardDragStart / handleCardDragEnd 선언 추가 ─────────
@@ -433,7 +465,8 @@ export default function KanbanBoardPage() {
             onEditTask={openEditModal}
             onCardDragStart={handleCardDragStart}
             onCardDragEnd={handleCardDragEnd}
-            onDropTask={handleDropTask}
+            onDropOnColumn={handleDropOnColumn}
+            onDropOnCard={handleDropOnCard}
             draggingTaskId={draggingTask?.id ?? null}
             canManage={canManageJira}
           />
