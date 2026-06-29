@@ -40,7 +40,7 @@ export default function SpeakerMappingCard({
       </div>
       <select
         aria-label={`${utterance.time} 발화 매핑`}
-        className="h-[38px] w-[230px] rounded-[8px] border border-[#e5e5e8] bg-[#fafafa] px-[13px] text-[12.5px] font-medium text-[#333338] outline-none transition-colors hover:border-[#cfcfd6] focus:border-[#623fb5]"
+        className="h-[38px] w-[230px] rounded-[8px] border border-[#e5e5e8] bg-[#fafafa] px-[13px] text-[12.5px] font-medium text-[#333338] outline-none transition-colors hover:border-[#cfcfd6] focus:border-[#6A1FEB]"
         onChange={(event) => onMappingChange(utterance.id, event.target.value)}
         value={utterance.mappedParticipantId}
       >

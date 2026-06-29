@@ -8,6 +8,9 @@ import Pagination from "../../components/ui/Pagination";
 import Button from "../../components/ui/Button";
 import { DateRangePicker, FilterSelect } from "../../components/ui/DatePickerBox";
 import searchIcon from "../../assets/meeting/search.png";
+import meetingArrow from "../../assets/meeting/arrow.png";
+import meetingArrowHover from "../../assets/meeting/arrowHover.png";
+import titleMeet from "../../assets/meeting/titleMeet.png";
 import * as DESIGN from "../../constants/design";
 
 const MEETING_STATUS_FILTER_OPTIONS = [
@@ -380,7 +383,7 @@ export default function MeetingListPage() {
           type="checkbox"
           checked={pagedMeetings.length > 0 && pagedMeetings.every((m) => selectedIds.has(m.meeting_id))}
           onChange={(e) => handleSelectAll(e.target.checked)}
-          className="w-4 h-4 cursor-pointer accent-[#623FB5]"
+          className="w-4 h-4 cursor-pointer accent-[#6A1FEB]"
         />
       ),
       width: "60px",
@@ -391,7 +394,7 @@ export default function MeetingListPage() {
           checked={selectedIds.has(row.meeting_id)}
           onChange={(e) => handleSelectRow(row.meeting_id, e.target.checked)}
           onClick={(e) => e.stopPropagation()} // 행 클릭 이벤트 전파 방지
-          className="w-4 h-4 cursor-pointer accent-[#623FB5]"
+          className="w-4 h-4 cursor-pointer accent-[#6A1FEB]"
         />
       ),
     },
@@ -408,15 +411,26 @@ export default function MeetingListPage() {
               navigate(`/meetings/${row.meeting_id}`);
             }
           }}
-          className="flex items-center text-start gap-1 font-medium text-[#141414] hover:text-[#623FB5] transition-colors"
+          className="flex items-center text-start gap-1 font-medium text-[#141414] hover:text-[#6A1FEB] transition-colors group"
         >
-          {row.title} <span className="text-[15px] text-gray-400 font-medium">&rsaquo;</span>
+          {row.title}
+          <img
+            src={meetingArrow}
+            alt=""
+            className="w-4 h-4 ml-1 block group-hover:hidden"
+          />
+          <img
+            src={meetingArrowHover}
+            alt=""
+            className="w-4 h-4 ml-1 hidden group-hover:block"
+          />
         </button>
       ),
     },
     {
       key: "location",
       header: "회의 장소",
+      width: "220px",
       align: "left",
       render: (row) => <span className={DESIGN.COLORS.gray}>{row.location || "-"}</span>,
     },
@@ -446,7 +460,7 @@ export default function MeetingListPage() {
                 e.stopPropagation();
                 navigate(`/meetings/${row.meeting_id}`, { state: { status: "in_progress" } });
               }}
-              className="px-4 py-1 text-[15px] font-medium rounded-[5px] inline-block w-[92px] text-center bg-[#623FB5] text-white hover:opacity-80 transition cursor-pointer whitespace-nowrap"
+              className="px-4 py-1 text-[15px] font-medium rounded-[5px] inline-block w-[92px] text-center bg-[#6A1FEB] text-white hover:opacity-80 transition cursor-pointer whitespace-nowrap"
             >
               진행 중
             </button>
@@ -480,6 +494,7 @@ export default function MeetingListPage() {
     {
       key: "participants",
       header: "참여자",
+      width: "200px",
       align: "left",
       render: (row) => {
         const list = row.participants || [];
@@ -516,13 +531,28 @@ export default function MeetingListPage() {
   ];
 
   return (
-    <div className="w-full flex flex-col py-6">
+    <div className="w-full flex flex-col pt-[21px] pb-[21px]">
       {/* 타이틀 영역 */}
-      <div className="mb-6">
-        <h1 className={`${DESIGN.FONT_SIZES.h2} ${DESIGN.COLORS.black}`}>회의 목록</h1>
-        <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.gray} mt-1`}>
-          회의를 등록하고 관리할 수 있습니다.
-        </p>
+      <div
+        className="w-full h-[200px] flex flex-col justify-center px-[64px] rounded-[15px] overflow-hidden mb-[45px]"
+        style={{
+          backgroundImage: `url(${titleMeet})`,
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="flex flex-col gap-[14px]">
+          <h1 className="text-[32px] font-medium text-[#141414] leading-tight">회의 목록</h1>
+          <div className="flex flex-col gap-[0px]">
+            <p className="text-[17px] text-[#969696] font-medium">
+              회의를 등록하고 관리해 보세요.
+            </p>
+            <p className="text-[17px] text-[#969696] font-normal">
+              회의 준비부터 회의록까지 한곳에서 관리하세요.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* 검색 및 상세 필터링 영역 */}
@@ -537,7 +567,7 @@ export default function MeetingListPage() {
               setPage(1);
             }}
             placeholder="회의 명이나 생성자를 입력해주세요"
-            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} pl-4 pr-12 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+            className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} pl-4 pr-12 py-2.5 outline-none focus:border-[#6A1FEB] focus:ring-1 focus:ring-[#6A1FEB]/10 transition`}
           />
 
           <button
@@ -562,7 +592,7 @@ export default function MeetingListPage() {
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {/* 상태 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>상태</span>
+              <span className={`${DESIGN.FONT_SIZES.md} text-[#141414] shrink-0`}>상태</span>
               <FilterSelect
                 ariaLabel="상태 필터"
                 value={statusFilter}
@@ -576,7 +606,7 @@ export default function MeetingListPage() {
 
             {/* 기간 필터 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>기간</span>
+              <span className={`${DESIGN.FONT_SIZES.md} text-[#141414] shrink-0`}>기간</span>
               <FilterSelect
                 ariaLabel="회의 기간 필터"
                 value={periodFilter}
@@ -606,7 +636,7 @@ export default function MeetingListPage() {
 
             {/* ?뺣젹 */}
             <div className="flex items-center gap-2">
-              <span className={`${DESIGN.FONT_SIZES.sm} text-[#141414] shrink-0`}>정렬</span>
+              <span className={`${DESIGN.FONT_SIZES.md} text-[#141414] shrink-0`}>정렬</span>
               <FilterSelect
                 ariaLabel="정렬"
                 value={sortOrder}
@@ -623,7 +653,7 @@ export default function MeetingListPage() {
           <div className="flex gap-2">
             <Button
               onClick={() => navigate("/meetings/create")}
-              className={`px-6 bg-[#623FB5] hover:bg-[#50309c] text-white ${DESIGN.FONT_SIZES.md}`}
+              className={`px-6 bg-[#6A1FEB] hover:bg-[#50309c] text-white ${DESIGN.FONT_SIZES.md}`}
             >
               회의 추가 +
             </Button>

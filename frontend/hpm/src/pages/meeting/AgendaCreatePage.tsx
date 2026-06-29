@@ -71,7 +71,7 @@ export default function AgendaCreatePage() {
 
   return (
     <div className="max-w-4xl mx-auto w-full py-10 px-6">
-      <h2 className="text-[24px] font-bold text-[#141414] mb-2">기초 안건</h2>
+      <h2 className="text-[24px] font-medium text-[#141414] mb-2">기초 안건</h2>
       <p className="text-[12px] text-[#969696] mb-8">
         회의에 필요한 기초안건입니다. 이메일 전송 및 준비자료 생성에 사용됩니다.
       </p>
@@ -89,7 +89,7 @@ export default function AgendaCreatePage() {
                 value={item.content}
                 onChange={e => updateContent(idx, e.target.value)}
                 placeholder="안건 내용을 입력하세요"
-                className="w-full border border-[#E6E1E6] rounded-lg px-4 py-2.5 text-[14px] text-[#141414] outline-none focus:border-[#623FB5] transition"
+                className="w-full border border-[#E6E1E6] rounded-lg px-4 py-2.5 text-[14px] text-[#141414] outline-none focus:border-[#6A1FEB] transition"
               />
             </div>
             <button
@@ -100,8 +100,8 @@ export default function AgendaCreatePage() {
               <svg width="24" height="24" viewBox="0 0 20 20" fill="none">
                 <circle
                   cx="10" cy="10" r="9"
-                  fill={item.checked ? "#623FB5" : "none"}
-                  stroke={item.checked ? "#623FB5" : "#D1D5DB"}
+                  fill={item.checked ? "#6A1FEB" : "none"}
+                  stroke={item.checked ? "#6A1FEB" : "#D1D5DB"}
                   strokeWidth="1.5"
                 />
                 <path
@@ -123,7 +123,7 @@ export default function AgendaCreatePage() {
           disabled={!canSubmit || submitting}
           className="px-8 py-2.5 text-white text-[14px] rounded-lg transition"
           style={{
-            backgroundColor: canSubmit ? "#623FB5" : "#969696",
+            backgroundColor: canSubmit ? "#6A1FEB" : "#969696",
             cursor: canSubmit ? "pointer" : "not-allowed",
           }}
         >

@@ -254,7 +254,7 @@ export default function SpeakerMappingPage() {
                 <button
                   className={`flex h-[45px] items-center gap-[6px] rounded-[8px] px-[12px] py-[11px] text-left transition-colors ${
                     active
-                      ? "bg-[#f2f0ff] text-[#623fb5]"
+                      ? "bg-[#f2f0ff] text-[#6A1FEB]"
                       : "border border-[#e6e1e6] bg-[#fffdfd] text-[#4c4c54] hover:bg-[#f8f7fc]"
                   }`}
                   key={segment.id}
@@ -264,7 +264,7 @@ export default function SpeakerMappingPage() {
                   <span className="whitespace-nowrap text-[13px] font-semibold">{segment.label}</span>
                   <span
                     className={`flex h-[22px] min-w-[22px] items-center justify-center rounded-[11px] px-[6px] text-center text-[11px] font-semibold leading-none ${
-                      active ? "bg-[#623fb5] text-white" : "bg-[#e6e1e6] text-[#141414]"
+                      active ? "bg-[#6A1FEB] text-white" : "bg-[#e6e1e6] text-[#141414]"
                     }`}
                   >
                     {segment.utteranceCount}
@@ -279,7 +279,7 @@ export default function SpeakerMappingPage() {
               <span className="text-[14px] text-[#808087]">현재 매핑</span>
               <select
                 aria-label="현재 매핑"
-                className="h-[42px] w-[190px] rounded-[8px] border border-[#e5e5e8] bg-[#fafafa] px-[14px] text-[14px] font-medium text-[#333338] outline-none focus:border-[#623fb5]"
+                className="h-[42px] w-[190px] rounded-[8px] border border-[#e5e5e8] bg-[#fafafa] px-[14px] text-[14px] font-medium text-[#333338] outline-none focus:border-[#6A1FEB]"
                 onChange={(event) => updateSegmentMapping(event.target.value)}
                 value={activeSegment.mappedParticipantId}
               >
@@ -290,7 +290,7 @@ export default function SpeakerMappingPage() {
                 ))}
               </select>
               <button
-                className="flex h-[42px] items-center justify-center rounded-[8px] bg-[#623fb5] px-[14px] text-[13px] font-semibold text-white transition-colors hover:bg-[#5635a8] active:scale-[0.98]"
+                className="flex h-[42px] items-center justify-center rounded-[8px] bg-[#6A1FEB] px-[14px] text-[13px] font-semibold text-white transition-colors hover:bg-[#5635a8] active:scale-[0.98]"
                 onClick={applyAll}
                 type="button"
               >
@@ -327,7 +327,7 @@ export default function SpeakerMappingPage() {
 
       <div className="mt-5 flex justify-end">
         <button
-          className="flex h-[48px] w-[150px] items-center justify-center rounded-[7px] bg-[#623fb5] text-[17px] font-medium text-[#fdfdfd] transition-colors hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
+          className="flex h-[48px] w-[150px] items-center justify-center rounded-[7px] bg-[#6A1FEB] text-[17px] font-medium text-[#fdfdfd] transition-colors hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
           disabled={saving || generating}
           onClick={goNext}
           type="button"

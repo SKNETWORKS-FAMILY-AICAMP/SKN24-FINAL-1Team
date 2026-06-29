@@ -23,7 +23,7 @@ function JiraTaskChip({
     <span
       className={cn(
         "inline-flex h-[22px] items-center rounded-[11px] border bg-[#fffdfd] px-[8px] text-[12px] font-normal leading-[1.2]",
-        active ? "border-[#623fb5] text-[#623fb5]" : "border-[#e6e1e6] text-[#141414]",
+        active ? "border-[#6A1FEB] text-[#6A1FEB]" : "border-[#e6e1e6] text-[#141414]",
       )}
     >
       {children}
@@ -36,7 +36,7 @@ function SelectionIcon({ selected }: { selected: boolean }) {
     <span
       className={cn(
         "flex size-[20px] items-center justify-center rounded-full border transition-colors",
-        selected ? "border-[#623fb5] bg-[#623fb5] text-white" : "border-[#141414] bg-white text-[#141414]",
+        selected ? "border-[#6A1FEB] bg-[#6A1FEB] text-white" : "border-[#141414] bg-white text-[#141414]",
       )}
     >
       <svg aria-hidden="true" className="size-[13px]" fill="none" viewBox="0 0 24 24">
@@ -66,9 +66,9 @@ function JiraTaskRow({
       type="button"
       onClick={() => onToggleTask(task.id)}
       className={cn(
-        "relative h-[75px] w-full rounded-[8px] border px-[13px] text-left transition-all duration-150 ease-out hover:border-[#623fb5] hover:bg-[#f4f1ff] active:scale-[0.995]",
+        "relative h-[75px] w-full rounded-[8px] border px-[13px] text-left transition-all duration-150 ease-out hover:border-[#6A1FEB] hover:bg-[#f4f1ff] active:scale-[0.995]",
         selected
-          ? "border-[#623fb5] bg-[#dcd0fe]"
+          ? "border-[#6A1FEB] bg-[#dcd0fe]"
           : "border-[#e0dedb] bg-[#f8f7f5]",
       )}
     >
@@ -133,7 +133,7 @@ export default function MeetingJiraRegisterPanel({
           className={cn(
             "flex h-[48px] w-[150px] items-center justify-center rounded-[7px] border-0 text-[17px] font-medium leading-[1.2] transition-all duration-150 ease-out",
             canRegister
-              ? "bg-[#623fb5] text-[#fffdfd] hover:bg-[#5635a8] active:scale-[0.98]"
+              ? "bg-[#6A1FEB] text-[#fffdfd] hover:bg-[#5635a8] active:scale-[0.98]"
               : "cursor-not-allowed bg-[#969696] text-[#fffdfd]",
           )}
         >

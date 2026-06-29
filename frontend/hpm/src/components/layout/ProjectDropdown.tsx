@@ -58,11 +58,7 @@ export default function ProjectDropdown({ isCollapsed, toggleCollapse }: Project
         onClick={() => setProjectOpen(v => !v)}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`flex items-center justify-between w-full ${DESIGN.PADDING_SIZES.sm} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.lg} transition ${DESIGN.COLORS.white} ${
-          projectOpen
-            ? DESIGN.BACKGROUND_COLORS.purpleHover
-            : `bg-transparent ${DESIGN.BACKGROUND_COLORS.purpleHoverState}`
-        }`}
+        className={`flex items-center justify-between w-full ${DESIGN.PADDING_SIZES.sm} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.lg} transition ${DESIGN.COLORS.white} bg-transparent ${DESIGN.BACKGROUND_COLORS.purpleHoverState}`}
       >
         <div className={`flex items-center ${DESIGN.GAP_SIZES.sm}`}>
           <span>
@@ -70,12 +66,12 @@ export default function ProjectDropdown({ isCollapsed, toggleCollapse }: Project
               <img
                 src={arrow}
                 alt=""
-                className={`transition-transform duration-200 ${
+                className={`w-4 h-4 transition-transform duration-200 ${
                   projectOpen ? "rotate-180" : "rotate-90"
                 }`}
               />
             ) : (
-              <img src={file} alt="" className="" />
+              <img src={file} alt="" className="w-4 h-4" />
             )}
           </span>
           <span onClick={(e) => { e.stopPropagation(); navigate("/projects"); }} className="cursor-pointer">프로젝트 목록</span>
@@ -96,6 +92,7 @@ export default function ProjectDropdown({ isCollapsed, toggleCollapse }: Project
 
       {projectOpen && (
         <div className="flex flex-col">
+          <p className={`${DESIGN.FONT_SIZES.md} text-gray-500 px-3 py-1 mb-[2px]`}>최신순</p>
           {projects.slice(0, 4).map(p => (
             <button
               key={p.project_id}

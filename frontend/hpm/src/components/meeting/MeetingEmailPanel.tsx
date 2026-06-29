@@ -16,7 +16,7 @@ interface MeetingEmailPanelProps {
 
 function PriorityBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex h-[26px] w-[50px] items-center justify-center rounded-[6px] bg-[#ede8ff] text-[12px] font-medium text-[#7361e5]">
+    <span className="inline-flex h-[26px] w-[50px] items-center justify-center rounded-[6px] bg-[#ede8ff] text-[15px] font-medium text-[#7361e5]">
       {label}
     </span>
   );
@@ -70,17 +70,17 @@ export default function MeetingEmailPanel({
   return (
     <section className="mx-auto w-full min-w-0 max-w-[1385px]" data-node-id="117:6414">
       <header>
-        <h1 className="m-0 text-[20px] font-bold leading-[1.2] text-black">
+        <h1 className="m-0 text-[20px] font-medium leading-[1.2] text-black">
           {content.heading}
         </h1>
-        <p className="mt-[4px] text-[12px] font-normal leading-[1.2] text-[rgba(0,0,0,0.53)]">
+        <p className="mt-[4px] text-[15px] font-normal leading-[1.2] text-[rgba(0,0,0,0.53)]">
           {content.subheading}
         </p>
       </header>
 
       <div className="mt-[18px] grid min-w-0 grid-cols-1 gap-[40px] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:gap-[52px]">
         <section className="h-[604px] w-full min-w-0 max-w-[640px] overflow-hidden rounded-[12px] border border-[#ebebed] bg-white px-[31px] py-[27px]">
-          <h2 className="m-0 text-[17px] font-bold leading-[1.2] text-[#1a1a1f]">
+          <h2 className="m-0 text-[17px] font-medium leading-[1.2] text-[#1a1a1f]">
             회의 제목(수정 불가)
           </h2>
           <p className="mt-[20px] text-[15px] font-normal leading-[1.2] text-[#404047]">
@@ -89,7 +89,7 @@ export default function MeetingEmailPanel({
 
           <div className="mt-[28px] h-px w-full bg-[#ededf0]" />
 
-          <h2 className="mt-[22px] text-[17px] font-bold leading-[1.2] text-[#1a1a1f]">
+          <h2 className="mt-[22px] text-[17px] font-medium leading-[1.2] text-[#1a1a1f]">
             회의 정보
           </h2>
           <dl className="mt-[25px] grid grid-cols-[120px_1fr] gap-y-[16px] text-[15px] leading-[1.2]">
@@ -101,7 +101,7 @@ export default function MeetingEmailPanel({
 
           <div className="mt-[28px] h-px w-full bg-[#ededf0]" />
 
-          <h2 className="mt-[22px] text-[17px] font-bold leading-[1.2] text-[#1a1a1f]">
+          <h2 className="mt-[22px] text-[17px] font-medium leading-[1.2] text-[#1a1a1f]">
             부여된 태스크
           </h2>
           <div className="mt-[24px] grid grid-cols-[minmax(0,1fr)_70px_112px_50px] items-center gap-x-[10px] border-b border-[#ededf0] pb-[14px] text-[13px] font-semibold leading-[1.2] text-[#66666e]">
@@ -126,7 +126,7 @@ export default function MeetingEmailPanel({
         </section>
 
         <section className="h-[614px] w-full min-w-0 max-w-[649px] overflow-hidden rounded-[12px] border border-[#ebebed] bg-white px-[31px] py-[27px]">
-          <h2 className="m-0 text-[17px] font-bold leading-[1.2] text-[#1a1a1f]">
+          <h2 className="m-0 text-[17px] font-medium leading-[1.2] text-[#1a1a1f]">
             이메일 미리보기
           </h2>
           <div className="mt-[28px] h-[514px] overflow-hidden rounded-[10px] border border-[#f0f0f2] bg-[#fafafb] px-[31px] py-[31px] text-[13px] leading-[24px] text-[#26262b]">
@@ -234,7 +234,7 @@ export default function MeetingEmailPanel({
                     </button>
                   ))
                 ) : (
-                  <p className="m-0 px-[14px] py-[12px] text-[12px] text-[#969696]">
+                  <p className="m-0 px-[14px] py-[12px] text-[15px] text-[#969696]">
                     검색 결과가 없습니다.
                   </p>
                 )}
@@ -247,12 +247,12 @@ export default function MeetingEmailPanel({
             type="button"
             disabled={recipients.length === 0}
             onClick={onSend}
-            className="flex h-[48px] w-[150px] items-center justify-center rounded-[7px] border-0 bg-[#623fb5] text-[17px] font-medium leading-[1.2] text-[#fffdfd] transition-all duration-150 ease-out hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
+            className="flex h-[48px] w-[150px] items-center justify-center rounded-[7px] border-0 bg-[#6A1FEB] text-[17px] font-medium leading-[1.2] text-[#fffdfd] transition-all duration-150 ease-out hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
           >
             이메일 발송
           </button>
           {mailSent ? (
-            <p className="m-0 text-[15px] text-[#623fb5]">
+            <p className="m-0 text-[15px] text-[#6A1FEB]">
               {recipientText}에게 이메일 발송 완료
             </p>
           ) : null}

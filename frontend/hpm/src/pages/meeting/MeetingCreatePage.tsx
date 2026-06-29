@@ -146,7 +146,7 @@ export default function MeetingCreatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed">{errorMessage}</p>
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed">{errorMessage}</p>
             </div>
             <div className="border-t border-gray-200">
               <button
@@ -174,7 +174,7 @@ export default function MeetingCreatePage() {
               </p>
               <button
                 onClick={handleJiraLink}
-                className="mt-5 text-[#623FB5] font-bold text-[15px] hover:underline"
+                className="mt-5 text-[#6A1FEB] font-bold text-[15px] hover:underline"
               >
                 JIRA 연동하기
               </button>
@@ -215,7 +215,7 @@ export default function MeetingCreatePage() {
                 onChange={e => setTitle(e.target.value)}
                 maxLength={30}
                 placeholder="회의 주제를 입력해주세요"
-                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#6A1FEB] focus:ring-1 focus:ring-[#6A1FEB]/10 transition`}
                 required
               />
               <p className={`text-right mt-1.5 ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>{title.length}/30</p>
@@ -234,7 +234,7 @@ export default function MeetingCreatePage() {
                 onChange={e => setLocation(e.target.value)}
                 maxLength={50}
                 placeholder="회의 장소를 입력해주세요"
-                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#6A1FEB] focus:ring-1 focus:ring-[#6A1FEB]/10 transition`}
               />
               <p className={`text-right mt-1.5 ${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>{location.length}/50</p>
             </div>
@@ -251,7 +251,7 @@ export default function MeetingCreatePage() {
                 value={meetingDate}
                 min={todayDate}
                 onChange={(e) => setMeetingDate(e.target.value)}
-                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] transition`}
+                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#6A1FEB] transition`}
                 required
               />
             </div>
@@ -265,7 +265,7 @@ export default function MeetingCreatePage() {
                 value={meetingTime}
                 min={minTime} // 시간 제약 추가
                 onChange={e => setMeetingTime(e.target.value)}
-                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#623FB5] transition`}
+                className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.md} px-4 py-3 outline-none focus:border-[#6A1FEB] transition`}
                 required
               />
             </div>
@@ -317,7 +317,7 @@ export default function MeetingCreatePage() {
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   placeholder="이름 또는 이메일 검색..."
-                  className={`w-full ${DESIGN.BACKGROUND_COLORS.white} border border-gray-200 rounded-md px-3 py-2 mb-2 ${DESIGN.FONT_SIZES.sm} outline-none focus:border-[#623FB5]`}
+                  className={`w-full ${DESIGN.BACKGROUND_COLORS.white} border border-gray-200 rounded-md px-3 py-2 mb-2 ${DESIGN.FONT_SIZES.sm} outline-none focus:border-[#6A1FEB]`}
                 />
                 <div className="space-y-0.5">
                   {filteredUsers.length > 0 ? (

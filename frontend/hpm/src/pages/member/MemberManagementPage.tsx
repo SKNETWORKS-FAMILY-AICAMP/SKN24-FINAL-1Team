@@ -121,8 +121,8 @@ export default function MemberManagementPage() {
   };
 
   return (
-    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
-      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[64px]">
+    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[45px] pb-[45px] font-pretendard">
+      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-0 pt-0">
         <MemberManagementPanel
           members={pagedMembers}
           canInvite={canInvite}

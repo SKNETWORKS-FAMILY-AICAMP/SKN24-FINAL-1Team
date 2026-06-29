@@ -14,11 +14,11 @@ function StepBar({ current }: { current: number }) {
           <div className="flex items-center w-full">
             <div className={`flex-1 h-0.5 mr-[32px] ${i === 0 ? "invisible" : "bg-gray-200"}`} />
             <div className={`w-4 h-4 rounded-full flex-shrink-0 z-10 transition-all
-              ${i === current ? "bg-[#623FB5] ring-2 ring-[#623FB5] ring-offset-2" : "bg-gray-300"}`}
+              ${i === current ? "bg-[#6A1FEB] ring-2 ring-[#6A1FEB] ring-offset-2" : "bg-gray-300"}`}
             />
             <div className={`flex-1 h-0.5 ml-[32px] ${i === STEPS.length - 1 ? "invisible" : "bg-gray-200"}`} />
           </div>
-          <span className={`text-xs mt-2 text-center font-medium ${i === current ? "text-[#623FB5]" : "text-gray-400"}`}>
+          <span className={`text-xs mt-2 text-center font-medium ${i === current ? "text-[#6A1FEB]" : "text-gray-400"}`}>
             {label}
           </span>
         </div>
@@ -204,7 +204,7 @@ export default function ProjectCreatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed">{errorMessage}</p>
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed">{errorMessage}</p>
             </div>
             <div className="border-t border-gray-200">
               <button
@@ -222,7 +222,7 @@ export default function ProjectCreatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] font-medium leading-relaxed">
+              <p className="text-[#6A1FEB] font-medium leading-relaxed">
                 Jira 계정 연동에 실패했습니다.<br />다시 시도 해주세요
               </p>
             </div>
@@ -256,19 +256,19 @@ export default function ProjectCreatePage() {
 
             {!checkingJiraStatus && step === 0 && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 text-center mb-8">
+                <h2 className="text-2xl font-medium text-gray-900 text-center mb-8">
                   jira 계정 연동
                 </h2>
 
                 <div className="bg-[#ECECF2] rounded-2xl p-10 flex flex-col items-center text-center mb-6">
                   <img src={jiraLogo} alt="Jira" className="h-16 object-contain mb-10" />
-                  <h3 className="text-2xl font-bold text-gray-900">팀의 개발 흐름을 한눈에</h3>
+                  <h3 className="text-2xl font-medium text-gray-900">팀의 개발 흐름을 한눈에</h3>
                   <p className="text-sm text-gray-400 mt-7 mb-10">
                     Jira 연동으로 프로젝트 업무 진행 상황을 한 곳에서 바로 확인하세요
                   </p>
                   <button
                     onClick={() => jiraConnected ? setStep(1) : handleJiraConnect()}
-                    className="px-8 py-3 bg-[#623FB5] text-white rounded-lg hover:opacity-90"
+                    className="px-8 py-3 bg-[#6A1FEB] text-white rounded-lg hover:opacity-90"
                   >
                     연동하기
                   </button>
@@ -290,7 +290,7 @@ export default function ProjectCreatePage() {
 
             {!checkingJiraStatus && step === 1 && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">프로젝트 선택</h2>
+                <h2 className="text-2xl font-medium text-gray-900 text-center mb-2">프로젝트 선택</h2>
                 <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
                   연결할 Jira 프로젝트를 선택하세요.
                 </p>
@@ -309,13 +309,13 @@ export default function ProjectCreatePage() {
                     <div className="mt-8 flex justify-center gap-3">
                       <button
                         onClick={() => navigate("/projects")}
-                        className="px-5 py-2.5 rounded-lg bg-[#EDE9FF] text-sm text-[#623FB5] hover:bg-[#ddd6ff]"
+                        className="px-5 py-2.5 rounded-lg bg-[#EDE9FF] text-sm text-[#6A1FEB] hover:bg-[#ddd6ff]"
                       >
                         프로젝트 목록으로 돌아가기
                       </button>
                       <button
                         onClick={handleJiraConnect}
-                        className="px-5 py-2.5 rounded-lg bg-[#623FB5] text-sm text-white hover:bg-[#512fa0]"
+                        className="px-5 py-2.5 rounded-lg bg-[#6A1FEB] text-sm text-white hover:bg-[#512fa0]"
                       >
                         Jira 다시 연동
                       </button>
@@ -333,7 +333,7 @@ export default function ProjectCreatePage() {
                         >
                           <span className="text-sm font-medium text-gray-700">{p.name}</span>
                           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <circle cx="10" cy="10" r="9" fill={isSelected ? "#623FB5" : "none"} stroke={isSelected ? "#623FB5" : "#D1D5DB"} strokeWidth="1.5" />
+                            <circle cx="10" cy="10" r="9" fill={isSelected ? "#6A1FEB" : "none"} stroke={isSelected ? "#6A1FEB" : "#D1D5DB"} strokeWidth="1.5" />
                             <path d="M6 10.5l2.5 2.5 5.5-5.5" stroke={isSelected ? "#ffffff" : "#D1D5DB"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           </svg>
                         </div>
@@ -349,7 +349,7 @@ export default function ProjectCreatePage() {
                     disabled={!selectedJiraProject}
                     className={`px-5 py-2.5 text-white rounded-lg text-sm transition ${
                       selectedJiraProject
-                        ? "bg-[#623FB5] hover:bg-[#512fa0] cursor-pointer"
+                        ? "bg-[#6A1FEB] hover:bg-[#512fa0] cursor-pointer"
                         : "bg-[#969696] cursor-not-allowed"
                     }`}
                   >
@@ -362,7 +362,7 @@ export default function ProjectCreatePage() {
 
             {!checkingJiraStatus && step === 2 && (
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 text-center mb-[7px]">구성원 추가하기</h2>
+                <h2 className="text-2xl font-medium text-gray-900 text-center mb-[7px]">구성원 추가하기</h2>
                 <p className="text-sm text-gray-400 text-center mb-6">
                   이름이나 이메일, 부서를 입력하여 프로젝트 구성원을 추가하세요
                 </p>
@@ -422,7 +422,7 @@ export default function ProjectCreatePage() {
                 <div className="flex justify-end gap-3">
                   <button
                     onClick={() => setStep(1)}
-                    className="px-6 py-2.5 bg-[#EDE9FF] text-[#623FB5] rounded-lg text-sm hover:bg-[#ddd6ff]"
+                    className="px-6 py-2.5 bg-[#EDE9FF] text-[#6A1FEB] rounded-lg text-sm hover:bg-[#ddd6ff]"
                   >
                     이전
                   </button>
@@ -431,7 +431,7 @@ export default function ProjectCreatePage() {
                     disabled={creating || members.length === 0}
                     className={`px-6 py-2.5 text-white rounded-lg text-sm transition
                       ${members.length > 0 && !creating
-                        ? "bg-[#623FB5] hover:bg-[#512fa0] cursor-pointer"
+                        ? "bg-[#6A1FEB] hover:bg-[#512fa0] cursor-pointer"
                         : "bg-[#969696] cursor-not-allowed"}`}
                   >
                     {creating ? "생성 중..." : "프로젝트 생성"}
@@ -442,13 +442,13 @@ export default function ProjectCreatePage() {
 
             {!checkingJiraStatus && step === 3 && (
               <div className="flex flex-col items-center text-center py-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-3">프로젝트 생성 완료</h2>
+                <h2 className="text-3xl font-medium text-gray-900 mb-3">프로젝트 생성 완료</h2>
                 <p className="text-sm text-gray-400 mb-12">자유롭게 프로젝트를 관리해 보세요!</p>
 
                 {/*활성화된 체크*/}
                 <div className="w-24 h-24 rounded-full bg-[#C4B5FD] flex items-center justify-center mb-12">
                   <svg width="40" height="32" viewBox="0 0 40 32" fill="none">
-                    <path d="M3 16L14 27L37 3" stroke="#623FB5" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M3 16L14 27L37 3" stroke="#6A1FEB" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
 
@@ -457,7 +457,7 @@ export default function ProjectCreatePage() {
                     if (createdProjectId) selectProject(createdProjectId, createdProjectName);
                     navigate("/projects");
                   }}
-                  className="px-8 py-3 bg-[#623FB5] text-white rounded-lg hover:bg-[#512fa0]"
+                  className="px-8 py-3 bg-[#6A1FEB] text-white rounded-lg hover:bg-[#512fa0]"
                 >
                   프로젝트로 이동
                 </button>

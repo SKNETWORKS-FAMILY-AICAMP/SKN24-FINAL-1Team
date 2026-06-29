@@ -13,6 +13,12 @@ import type { DocumentRecord } from "../../types/documentManagement";
 const DOCUMENTS_PER_PAGE = 10;
 
 function openInNewTab(url: string) {
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (opened) {
+    opened.opener = null;
+    return;
+  }
+
   const link = document.createElement("a");
   link.href = url;
   link.target = "_blank";
@@ -69,14 +75,6 @@ export default function DocumentManagementPage() {
   useEffect(() => {
     void loadDocuments();
   }, [loadDocuments]);
-
-  useEffect(() => {
-    const existingIds = new Set(documents.map((item) => item.id));
-    setSelectedIds((current) => {
-      const next = new Set([...current].filter((id) => existingIds.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [documents]);
 
   const creators = useMemo(
     () => [
@@ -184,10 +182,6 @@ export default function DocumentManagementPage() {
     if (!projectId || selectedIds.size === 0) return;
 
     const selectedDocs = documents.filter((item) => selectedIds.has(item.id));
-    if (selectedDocs.length === 0) {
-      setSelectedIds(new Set());
-      return;
-    }
     const currentUserId = Number(user?.users_id ?? user?.user_id);
     const hasUnauthorized = selectedDocs.some(
       (doc) => doc.uploaderId === undefined || Number(doc.uploaderId) !== currentUserId,
@@ -199,7 +193,7 @@ export default function DocumentManagementPage() {
 
     try {
       await Promise.all(
-        selectedDocs.map((doc) => deleteDocument(projectId, doc.id)),
+        Array.from(selectedIds).map((documentId) => deleteDocument(projectId, documentId)),
       );
       setSelectedIds(new Set());
       await loadDocuments();
@@ -218,14 +212,14 @@ export default function DocumentManagementPage() {
   };
 
   return (
-    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
+    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[45px] pb-[45px] font-pretendard">
       {showDeletePermissionModal && (
         <UploadWarningModal
           message="삭제 권한이 없습니다"
           onClose={() => setShowDeletePermissionModal(false)}
         />
       )}
-      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[47px]">
+      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-0 pt-0">
         <DocumentManagementPanel
           allVisibleSelected={allVisibleSelected}
           creatorFilter={creatorFilter}

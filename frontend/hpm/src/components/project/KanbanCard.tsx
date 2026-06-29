@@ -12,6 +12,23 @@ interface KanbanCardProps {
   onDropOnCard?: (task: KanbanTask) => void;
 }
 
+const formatKoreanDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  if (dateStr.includes("(")) return dateStr;
+
+  const days = ["일", "월", "화", "수", "목", "금", "토"];
+  const parts = dateStr.split("-");
+  if (parts.length !== 3) return dateStr;
+
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+
+  const date = new Date(year, month, day);
+  const dayOfWeek = days[date.getDay()];
+  return `${dateStr}(${dayOfWeek})`;
+};
+
 export default function KanbanCard({
   task,
   top,
@@ -24,25 +41,25 @@ export default function KanbanCard({
 }: KanbanCardProps) {
   const [isOver, setIsOver] = useState(false);
 
-  const handleDragStart = (event: DragEvent<HTMLElement>) => {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", task.code);
+  const handleDragStart = (e: DragEvent<HTMLElement>) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", task.code);
     onDragStart?.(task);
   };
 
-  const handleDragOver = (event: DragEvent<HTMLElement>) => {
+  const handleDragOver = (e: DragEvent<HTMLElement>) => {
     if (!canManage) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+    e.preventDefault(); // drop 허용
+    e.dataTransfer.dropEffect = "move";
     if (!isOver) setIsOver(true);
   };
 
   const handleDragLeave = () => setIsOver(false);
 
-  const handleDrop = (event: DragEvent<HTMLElement>) => {
+  const handleDrop = (e: DragEvent<HTMLElement>) => {
     if (!canManage) return;
-    event.preventDefault();
-    event.stopPropagation();
+    e.preventDefault();
+    e.stopPropagation(); // 컬럼 drop보다 카드(앞 삽입) 우선
     setIsOver(false);
     onDropOnCard?.(task);
   };
@@ -58,10 +75,10 @@ export default function KanbanCard({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`flex ml-[23px] w-[306px] mb-[18px] select-none rounded-[10px] border-2 p-[14px] text-left transition-all duration-150 ease-out
+      className={`flex ml-[23px] w-[306px] mb-[18px] select-none rounded-[10px] border p-[14px] text-left transition-all duration-150 ease-out
       ${canManage ? "cursor-grab active:cursor-grabbing" : ""}
       ${isDragging ? "opacity-40 ring-2 ring-[#623FB5]" : ""}
-      ${isOver ? "border-[#623FB5] bg-[#F2EEFB]" : "border-transparent bg-[#FFFDFD] hover:bg-[#F4F5F8]"}
+      ${isOver ? "border-[#623FB5] bg-[#F2EEFB]" : "border-[#CCCCCC] bg-[#FFFDFD] hover:bg-[#F4F5F8]"}
       focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5]`}
       style={{ top }}
       data-name="dashboard=card"
@@ -69,7 +86,7 @@ export default function KanbanCard({
       <button
         type="button"
         onClick={canManage ? onClick : undefined}
-        className={`rounded-[10px] border-0 bg-transparent p-0 text-left transition-all duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#623FB5] ${
+        className={`rounded-[10px] border-0 bg-transparent p-0 text-left transition-all duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6A1FEB] ${
           canManage ? "active:scale-[0.985]" : "cursor-default"
         }`}
       >
@@ -78,11 +95,11 @@ export default function KanbanCard({
             <p className="m-0 w-[270px] text-[15px] font-normal leading-[1.2] text-[#141414]">
               {task.title}
             </p>
-            <span className="flex h-[22px] items-center justify-center rounded-[20px] bg-[#DCD0FE] px-[8px] py-px text-[11px] font-normal leading-[1.2] text-[#623FB5]">
+            <span className="flex h-[22px] items-center justify-center rounded-[20px] bg-[#6A1FEB] px-[8px] py-px text-[11px] font-normal leading-[1.2] text-[#FFFDFD]">
               {task.category}
             </span>
             <p className="m-0 text-[12px] font-normal leading-[1.2] text-[#969696]">
-              {task.dueDate}
+              {formatKoreanDate(task.dueDate)}
             </p>
           </div>
           <div className="mt-[18px] flex w-full justify-between items-center">

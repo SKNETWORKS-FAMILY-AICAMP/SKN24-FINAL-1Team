@@ -196,14 +196,14 @@ export default function HeaderNotificationPopover({
         type="button"
         onClick={handleSelectAllClick}
         disabled={loading || visibleNotificationIds.length === 0}
-        className="absolute left-[200px] top-[15px] flex h-[24px] w-[68px] items-center justify-center rounded-[5px] border border-[#623FB5] bg-[#FFFDFD] text-[12px] font-normal leading-[1.2] text-[#623FB5] transition-all duration-150 ease-out hover:bg-[#F0ECFA] active:scale-[0.96] disabled:cursor-not-allowed disabled:border-[#C9C9C9] disabled:text-[#969696] disabled:hover:bg-[#FFFDFD]"
+        className="absolute left-[200px] top-[15px] flex h-[24px] w-[68px] items-center justify-center rounded-[5px] border border-[#6A1FEB] bg-[#FFFDFD] text-[12px] font-normal leading-[1.2] text-[#6A1FEB] transition-all duration-150 ease-out hover:bg-[#F0ECFA] active:scale-[0.96] disabled:cursor-not-allowed disabled:border-[#C9C9C9] disabled:text-[#969696] disabled:hover:bg-[#FFFDFD]"
       >
         전체 선택
       </button>
       <button
         type="button"
         onClick={handleDeleteClick}
-        className="absolute left-[276px] top-[15px] flex h-[24px] w-[61px] items-center justify-center rounded-[5px] border-0 bg-[#623FB5] text-[12px] font-normal leading-[1.2] text-[#FFFDFD] transition-all duration-150 ease-out hover:opacity-90 active:scale-[0.96]"
+        className="absolute left-[276px] top-[15px] flex h-[24px] w-[61px] items-center justify-center rounded-[5px] border-0 bg-[#6A1FEB] text-[12px] font-normal leading-[1.2] text-[#FFFDFD] transition-all duration-150 ease-out hover:opacity-90 active:scale-[0.96]"
       >
         삭제
       </button>
@@ -218,8 +218,8 @@ export default function HeaderNotificationPopover({
             className={cn(
               "relative flex h-[22px] w-[61px] items-center justify-center rounded-[5px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
               activeTab === tab
-                ? "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5] hover:bg-[#C4B6E5]"
-                : "border border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#623FB5] hover:bg-[#ECECF2] hover:text-[#623FB5]",
+                ? "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB] hover:bg-[#C4B6E5]"
+                : "border border-[#969696] bg-[#F4F5F8] text-[#969696] hover:border-[#6A1FEB] hover:bg-[#ECECF2] hover:text-[#6A1FEB]",
             )}
           >
             {tab}
@@ -246,12 +246,12 @@ export default function HeaderNotificationPopover({
                 type="button"
                 onClick={() => handleNotificationClick(notification)}
                 className={cn(
-                  "relative h-[70px] w-full shrink-0 rounded-[7px] border border-[#969696] px-[15px] py-[13px] text-left transition-all duration-150 ease-out hover:border-[#623FB5] hover:bg-[#ECECF2] active:scale-[0.99]",
+                  "relative h-[70px] w-full shrink-0 rounded-[7px] border border-[#969696] px-[15px] py-[13px] text-left transition-all duration-150 ease-out hover:border-[#6A1FEB] hover:bg-[#ECECF2] active:scale-[0.99]",
                   notification.is_read ? "bg-[#F4F5F8]" : "bg-[#F0ECFA]",
                 )}
               >
                 <div className="flex min-w-0 items-center gap-[8px] text-[12px] font-normal leading-[1.2]">
-                  <span className="shrink-0 text-[#623FB5]">
+                  <span className="shrink-0 text-[#6A1FEB]">
                     {meta?.kind || "알림"}
                   </span>
                   <span className="size-[2px] shrink-0 rounded-full bg-[#969696]" />
@@ -268,7 +268,7 @@ export default function HeaderNotificationPopover({
                     className={cn(
                       "absolute left-[265px] top-[25px] flex size-[20px] items-center justify-center rounded-full border",
                       selected
-                        ? "border-[#623FB5] bg-[#623FB5]"
+                        ? "border-[#6A1FEB] bg-[#6A1FEB]"
                         : "border-[#969696] bg-[#FFFDFD]",
                     )}
                   >

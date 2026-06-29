@@ -9,11 +9,11 @@ const PRIORITY_LABEL: Record<string, string> = {
 };
 
 const PRIORITY_COLOR: Record<string, string> = {
-  Highest: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
-  High: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
-  Medium: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
-  Low: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
-  Lowest: "border border-[#623FB5] bg-[#DCD0FE] text-[#623FB5]",
+  Highest: "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB]",
+  High: "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB]",
+  Medium: "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB]",
+  Low: "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB]",
+  Lowest: "border border-[#6A1FEB] bg-[#DCD0FE] text-[#6A1FEB]",
 };
 
 const STEP_LABELS = ["발화자 매핑", "회의록 검토 & 태스크 수정", "Jira 태스크 등록"];
@@ -96,7 +96,7 @@ export default function JiraTaskPage() {
           type="button"
           disabled={selected.size === 0 || registering}
           onClick={runRegister}
-          className="rounded-[8px] bg-[#623FB5] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
+          className="rounded-[8px] bg-[#6A1FEB] px-5 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
         >
           {registering ? "등록 중..." : `선택 등록 (${selected.size})`}
         </button>
@@ -124,8 +124,8 @@ export default function JiraTaskPage() {
                 onClick={() => toggle(task.meeting_task_id)}
                 className={`rounded-[12px] border p-4 text-left transition ${
                   isSelected
-                    ? "border-[#623FB5] bg-[#F4F1FF]"
-                    : "border-[#E6E1E6] bg-white hover:border-[#623FB5]"
+                    ? "border-[#6A1FEB] bg-[#F4F1FF]"
+                    : "border-[#E6E1E6] bg-white hover:border-[#6A1FEB]"
                 } ${isRegistered ? "cursor-not-allowed opacity-60" : ""}`}
               >
                 <div className="flex items-center justify-between gap-4">
@@ -144,7 +144,7 @@ export default function JiraTaskPage() {
                   </span>
                 </div>
                 {isRegistered ? (
-                  <p className="mt-2 text-xs text-[#623FB5]">이미 Jira에 등록되었습니다.</p>
+                  <p className="mt-2 text-xs text-[#6A1FEB]">이미 Jira에 등록되었습니다.</p>
                 ) : null}
               </button>
             );
@@ -166,7 +166,7 @@ export default function JiraTaskPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="w-80 overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="font-medium leading-relaxed text-[#623FB5]">
+              <p className="font-medium leading-relaxed text-[#6A1FEB]">
                 Jira 등록에 실패하였습니다.<br />재시도 하시겠습니까?
               </p>
             </div>

@@ -3,6 +3,7 @@ import Table from "../ui/Table";
 import type { TableColumn } from "../ui/Table";
 import Button from "../ui/Button";
 import Pagination from "../ui/Pagination";
+import meetingTitle from "../../assets/meeting/title.png";
 
 function PlusIcon() {
   return (
@@ -23,7 +24,7 @@ function AuthorityBadge({ authority }: { authority: MemberAuthority }) {
   return (
     <span
       className={`mx-auto flex h-[32px] w-[84px] items-center justify-center rounded-[7px] text-[15px] font-normal text-white ${
-        isCreator ? "bg-[#623fb5]" : "bg-[#969696]"
+        isCreator ? "bg-[#6A1FEB]" : "bg-[#969696]"
       }`}
     >
       {isCreator ? "생성자" : "팀원"}
@@ -88,26 +89,39 @@ export default function MemberManagementPanel({
   ];
 
   return (
-    <section className="mx-auto w-full max-w-[1149px]" data-node-id="128:7290">
-      <div className="flex items-end justify-between gap-[24px]">
-        <header>
-          <h1 className="m-0 text-[32px] font-medium leading-[1.2] text-[#141414]">
-            구성원 관리
-          </h1>
-          <p className="mt-[10px] text-[17px] font-normal leading-[1.2] text-[#969696]">
-            구성원을 등록하고 관리할 수 있습니다.
-          </p>
-        </header>
+    <section className="mx-auto w-full max-w-[1376px]" data-node-id="128:7290">
+      <div
+        className="w-full h-[200px] flex flex-col justify-center px-[64px] rounded-[15px] overflow-hidden mb-[45px]"
+        style={{
+          backgroundImage: `url(${meetingTitle})`,
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="flex flex-col gap-[18px]">
+          <h1 className="text-[32px] text-[#141414] font-medium leading-tight">구성원 관리</h1>
+          <div className="flex flex-col gap-[2px]">
+            <p className="text-[17px] text-[#969696] font-medium">
+              <span className="text-[#6A1FEB]">프로젝트 구성원</span>을 등록하고 관리해 보세요.
+            </p>
+            <p className="text-[17px] text-[#969696] font-normal">
+              등록된 구성원은 프로젝트 대시보드 및 회의록 등록, 칸반 보드 업무 할당 등에 함께할 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
 
+      <div className="flex justify-end mb-[31px]">
         {canInvite ? (
           <Button onClick={onInviteClick}>
-          구성원 초대
-          <PlusIcon />
+            구성원 초대
+            <PlusIcon />
           </Button>
         ) : null}
       </div>
 
-      <section className="mt-[31px] w-full">
+      <section className="w-full">
         <Table data={members} columns={columns} emptyMessage="등록된 구성원이 없습니다." />
       </section>
 

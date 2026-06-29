@@ -84,7 +84,7 @@ export default function Table<T>({
               <td colSpan={columns.length} className="py-12 text-center">
                 <div className="flex flex-col items-center justify-center gap-2">
                   {/* 심플한 로딩 스피너 */}
-                  <div className="w-8 h-8 border-4 border-[#623FB5]/20 border-t-[#623FB5] rounded-full animate-spin"></div>
+                  <div className="w-8 h-8 border-4 border-[#6A1FEB]/20 border-t-[#6A1FEB] rounded-full animate-spin"></div>
                   <span className={`${DESIGN.FONT_SIZES.sm} ${DESIGN.COLORS.gray}`}>로딩 중입니다...</span>
                 </div>
               </td>

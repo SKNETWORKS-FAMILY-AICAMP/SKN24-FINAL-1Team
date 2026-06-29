@@ -98,7 +98,7 @@ export default function FloatingChatbot() {
       {/* 채팅창 */}
       {isOpen && (
         <div
-          className="fixed bottom-20 right-6 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-50"
+          className="fixed bottom-27 right-6 bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col z-50"
           style={{ width: size.width, height: size.height }}
         >
           {/* 크기 조절 핸들 (좌상단 모서리) */}
@@ -142,7 +142,7 @@ export default function FloatingChatbot() {
                   <div
                     className={`text-xs px-3 py-2 rounded-2xl max-w-[85%] border break-all ${
                       msg.role === "user"
-                        ? "bg-[#F3F0FF] border-[#623FB5] text-[#141414] rounded-tr-sm"
+                        ? "bg-[#F3F0FF] border-[#6A1FEB] text-[#141414] rounded-tr-sm"
                         : "bg-[#FAF9F7] border-[#FAF9F7] text-[#141414] rounded-tl-sm"
                     }`}
                   >
@@ -170,7 +170,7 @@ export default function FloatingChatbot() {
                 onKeyDown={(e) => e.key === "Enter" && sendChat()}
                 disabled={!projectId || chatLoading}
                 placeholder={projectId ? "챗봇한테 질문해보세요" : "프로젝트를 먼저 선택해주세요"}
-                className="w-full text-xs pl-4 pr-10 py-3 border border-gray-200 rounded-xl outline-none focus:border-[#623FB5] disabled:bg-gray-50 disabled:text-gray-300 transition"
+                className="w-full text-xs pl-4 pr-10 py-3 border border-gray-200 rounded-xl outline-none focus:border-[#6A1FEB] disabled:bg-gray-50 disabled:text-gray-300 transition"
               />
               <button
                 onClick={sendChat}
@@ -188,13 +188,13 @@ export default function FloatingChatbot() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="fixed bottom-6 right-6 w-12 h-12 bg-[#623FB5] rounded-full shadow-lg flex items-center justify-center hover:bg-[#4f32a0] active:scale-95 transition z-50"
+        className="fixed bottom-6 right-6 w-16 h-16 bg-[#6A1FEB] rounded-full shadow-lg flex items-center justify-center hover:bg-[#4f32a0] active:scale-95 transition z-50"
         aria-label="챗봇 열기"
       >
         {isOpen ? (
           <span className="text-white text-lg leading-none">✕</span>
         ) : (
-          <img src={chatbotImg} alt="챗봇" className="w-12" />
+          <img src={chatbotImg} alt="챗봇" className="w-16" />
         )}
       </button>
     </>

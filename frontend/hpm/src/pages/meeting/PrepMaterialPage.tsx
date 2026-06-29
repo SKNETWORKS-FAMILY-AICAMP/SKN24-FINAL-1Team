@@ -1,9 +1,8 @@
-import { useRef, useState, useEffect, useMemo } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { getPrepMaterial, savePrepMaterial, generatePrepMaterial } from "../../services/meeting";
-import { dedupePreparationSources } from "../../utils/dedupeSources";
 
 const MAX = { purpose: 500, currentState: 1000, regulations: 1000, expected: 500 };
 
@@ -23,7 +22,6 @@ export default function PrepMaterialPage() {
   const [sources, setSources] = useState<{ document_id: number; title: string; file_url: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [generationError, setGenerationError] = useState("");
-  const uniqueSources = useMemo(() => dedupePreparationSources(sources), [sources]);
 
   useEffect(() => {
     let active = true;
@@ -99,7 +97,7 @@ export default function PrepMaterialPage() {
         { label: "프로젝트 현재 상태", value: currentState },
         { label: "관련 규정 및 제약사항", value: regulations },
         { label: "회의 종료 후 기대 결과", value: expected },
-        { label: "출처", value: uniqueSources.length > 0 ? uniqueSources.map(r => `- ${r.title}`).join("\n") : "- 출처가 없습니다." },
+        { label: "출처", value: sources && sources.length > 0 ? sources.map(r => `- ${r.title}`).join("\n") : "- 출처가 없습니다." },
       ];
 
       const wrapper = document.createElement("div");
@@ -198,10 +196,10 @@ export default function PrepMaterialPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] py-10 px-6">
         <div className="relative w-16 h-16 mb-6">
-          <div className="absolute inset-0 rounded-full border-4 border-[#623FB5]/20 animate-ping"></div>
-          <div className="absolute inset-0 rounded-full border-4 border-t-[#623FB5] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-[#6A1FEB]/20 animate-ping"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-t-[#6A1FEB] border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
         </div>
-        <h3 className="text-lg font-bold text-[#141414] mb-2">회의 준비 자료 생성 중</h3>
+        <h3 className="text-lg font-medium text-[#141414] mb-2">회의 준비 자료 생성 중</h3>
         <p className="text-xs text-[#969696] text-center max-w-sm">
           RunPod AI와 내부 문서를 기반으로 프로젝트 컨텍스트를 파악하여 회의 준비 자료를 자동 생성하고 있습니다. 잠시만 기다려 주세요.
         </p>
@@ -214,7 +212,7 @@ export default function PrepMaterialPage() {
       {/* 헤더 */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-[24px] font-bold text-[#141414] mb-1">회의 준비 자료 생성</h2>
+          <h2 className="text-[24px] font-medium text-[#141414] mb-1">회의 준비 자료 생성</h2>
           <p className="text-[12px] text-[#969696]">회의 준비에 참조할 수 있는 자료입니다.</p>
         </div>
         <div className="flex gap-2 mt-1">
@@ -227,7 +225,7 @@ export default function PrepMaterialPage() {
             }}
             className="px-4 py-2 text-[13px] rounded-lg border transition"
             style={isEditing
-              ? { backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }
+              ? { backgroundColor: "#6A1FEB", color: "#ffffff", borderColor: "#6A1FEB" }
               : { backgroundColor: "#ffffff", color: "#141414", borderColor: "#E6E1E6" }
             }
           >
@@ -237,7 +235,7 @@ export default function PrepMaterialPage() {
             onClick={handlePdfDownload}
             disabled={downloading}
             className="px-4 py-2 text-[13px] text-white rounded-lg transition disabled:opacity-60"
-            style={{ backgroundColor: "#623FB5" }}
+            style={{ backgroundColor: "#6A1FEB" }}
           >
             {downloading ? "생성 중..." : "pdf 다운로드"}
           </button>
@@ -254,7 +252,7 @@ export default function PrepMaterialPage() {
       <div ref={contentRef} className="space-y-6">
         {sections.map(({ label, value, onChange, max }) => (
           <div key={label}>
-            <p className="text-[14px] text-[#141414] font-bold mb-2">{label}</p>
+            <p className="text-[14px] text-[#141414] font-medium mb-2">{label}</p>
             <div className="relative">
               <textarea
                 value={value}
@@ -273,10 +271,10 @@ export default function PrepMaterialPage() {
 
         {/* 출처 */}
         <div>
-          <p className="text-[14px] text-[#141414] font-bold mb-2">출처</p>
+          <p className="text-[14px] text-[#141414] font-medium mb-2">출처</p>
           <div className="border border-[#E6E1E6] rounded-xl px-4 py-3 bg-white space-y-2">
-            {uniqueSources.length > 0 ? (
-              uniqueSources.map((src, i) => (
+            {sources && sources.length > 0 ? (
+              sources.map((src, i) => (
                 <div key={i} className="flex items-center gap-2 text-[13px]">
                   <span className="text-[#767676]">- {src.title}</span>
                   {src.file_url ? (
@@ -284,7 +282,7 @@ export default function PrepMaterialPage() {
                       href={src.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                      className="text-[#6A1FEB] hover:underline font-semibold cursor-pointer"
                     >
                       더보기
                     </a>
@@ -308,7 +306,7 @@ export default function PrepMaterialPage() {
             navigate(`/meetings/${meetingId}`);
           }}
           className="px-8 py-2.5 text-white text-[14px] rounded-lg transition"
-          style={{ backgroundColor: "#623FB5" }}
+          style={{ backgroundColor: "#6A1FEB" }}
         >
           다음
         </button>

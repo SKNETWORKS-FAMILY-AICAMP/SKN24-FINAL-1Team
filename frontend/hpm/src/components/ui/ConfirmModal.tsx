@@ -21,7 +21,7 @@ export default function ConfirmModal({
     <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/30">
       <div className="w-80 overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="px-8 py-10 text-center">
-          <p className="whitespace-pre-line text-[14px] font-medium leading-relaxed text-[#623FB5]">
+          <p className="whitespace-pre-line text-[14px] font-medium leading-relaxed text-[#6A1FEB]">
             {message}
           </p>
         </div>
@@ -38,7 +38,7 @@ export default function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className="flex-1 py-4 text-sm font-bold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 py-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? "처리 중..." : confirmText}
           </button>

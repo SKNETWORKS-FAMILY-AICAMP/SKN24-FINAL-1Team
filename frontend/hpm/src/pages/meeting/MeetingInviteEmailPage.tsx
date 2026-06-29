@@ -82,7 +82,7 @@ export default function MeetingInviteEmailPage() {
 
   return (
     <div className="max-w-5xl mx-auto w-full py-10 px-6">
-      <h2 className="text-[24px] font-bold text-[#141414] mb-1">이메일 확인</h2>
+      <h2 className="text-[24px] font-medium text-[#141414] mb-1">이메일 확인</h2>
       <p className="text-[12px] text-[#969696] mb-8">발송 전 이메일을 확인해주세요</p>
 
       <div className="flex gap-6 items-start">
@@ -91,7 +91,7 @@ export default function MeetingInviteEmailPage() {
 
           {/* 회의 제목 */}
           <div>
-            <p className="text-[13px] font-bold text-[#141414] mb-2">
+            <p className="text-[13px] font-medium text-[#141414] mb-2">
               회의 제목<span className="text-[12px] font-normal text-[#969696] ml-1">(수정 불가)</span>
             </p>
             <p className="text-[14px] text-[#141414]">{meeting?.title ?? ""}</p>
@@ -99,7 +99,7 @@ export default function MeetingInviteEmailPage() {
 
           {/* 회의 정보 */}
           <div>
-            <p className="text-[13px] font-bold text-[#141414] mb-3">회의 정보</p>
+            <p className="text-[13px] font-medium text-[#141414] mb-3">회의 정보</p>
             <div className="flex flex-col gap-2">
               <div className="flex gap-4">
                 <span className="text-[13px] text-[#969696] w-20 flex-shrink-0">회의 일시</span>
@@ -114,14 +114,14 @@ export default function MeetingInviteEmailPage() {
 
           {/* 기초 안건 */}
           <div>
-            <p className="text-[13px] font-bold text-[#141414] mb-3">기초 안건</p>
+            <p className="text-[13px] font-medium text-[#141414] mb-3">기초 안건</p>
             {agendas.length === 0 ? (
               <p className="text-[13px] text-[#969696]">등록된 안건이 없습니다.</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {agendas.map((a, i) => (
                   <li key={a.agenda_id ?? i} className="flex gap-2 text-[13px]">
-                    <span className="text-[#623FB5] font-medium flex-shrink-0">{i + 1}.</span>
+                    <span className="text-[#6A1FEB] font-medium flex-shrink-0">{i + 1}.</span>
                     <span className="text-[#141414]">{a.content}</span>
                   </li>
                 ))}
@@ -131,13 +131,13 @@ export default function MeetingInviteEmailPage() {
 
           {/* 인사말 */}
           <div>
-            <p className="text-[13px] font-bold text-[#141414] mb-2">인사말(이메일 본문)</p>
+            <p className="text-[13px] font-medium text-[#141414] mb-2">인사말(이메일 본문)</p>
             <div className="relative">
               <textarea
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value.slice(0, MAX_GREETING))}
                 rows={4}
-                className="w-full border border-[#E6E1E6] rounded-xl px-4 py-3 text-[13px] text-[#141414] resize-none outline-none focus:border-[#623FB5] transition"
+                className="w-full border border-[#E6E1E6] rounded-xl px-4 py-3 text-[13px] text-[#141414] resize-none outline-none focus:border-[#6A1FEB] transition"
               />
               <span className="absolute bottom-3 right-4 text-[11px] text-[#969696]">
                 {greeting.length}/{MAX_GREETING}
@@ -147,7 +147,7 @@ export default function MeetingInviteEmailPage() {
 
           {/* 메일 수신자 */}
           <div>
-            <p className="text-[13px] font-bold text-[#141414] mb-2">메일 수신자</p>
+            <p className="text-[13px] font-medium text-[#141414] mb-2">메일 수신자</p>
             <div className="min-h-[48px] border border-[#E6E1E6] rounded-xl px-3 py-2.5 flex flex-wrap gap-2 mb-2">
               {recipients.map((r) => (
                 <span
@@ -174,7 +174,7 @@ export default function MeetingInviteEmailPage() {
                 onFocus={() => setShowDropdown(true)}
                 onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
                 placeholder="이름으로 수신자 추가"
-                className="w-full border border-[#E6E1E6] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#623FB5] transition"
+                className="w-full border border-[#E6E1E6] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#6A1FEB] transition"
               />
               {showDropdown && filteredUsers.length > 0 && (
                 <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-[#E6E1E6] rounded-xl shadow-md max-h-40 overflow-y-auto">
@@ -194,16 +194,16 @@ export default function MeetingInviteEmailPage() {
         </div>
         {/* 오른쪽 이메일 미리보기 */}
         <div className="w-[380px] flex-shrink-0 bg-white border border-[#E6E1E6] rounded-2xl p-6 overflow-hidden">
-          <p className="text-[16px] font-bold text-[#141414] mb-5">이메일 미리보기</p>
+          <p className="text-[16px] font-medium text-[#141414] mb-5">이메일 미리보기</p>
           <div className="text-[13px] text-[#141414] leading-relaxed space-y-3 break-words">
             <p style={{ whiteSpace: "pre-line" }}>{greeting}</p>
-            <p className="font-bold">[회의 정보]</p>
+            <p className="font-medium">[회의 정보]</p>
             <p>• 회의 제목: {meeting?.title ?? ""}</p>
             <p>• 일시: {formatDate(meeting?.meeting_at)}</p>
             <p>• 장소: {meeting?.location ?? "-"}</p>
             {agendas.length > 0 && (
               <>
-                <p className="font-bold">[기초 안건]</p>
+                <p className="font-medium">[기초 안건]</p>
                 {agendas.map((a, i) => (
                   <p key={a.agenda_id ?? i}>{i + 1}. {a.content}</p>
                 ))}
@@ -218,7 +218,7 @@ export default function MeetingInviteEmailPage() {
         <button
           onClick={handleSend}
           disabled={sending || recipients.length === 0}
-          className="px-8 py-3 text-white text-[14px] font-semibold rounded-xl transition hover:opacity-90 disabled:opacity-60 bg-[#623FB5]"
+          className="px-8 py-3 text-white text-[14px] font-semibold rounded-xl transition hover:opacity-90 disabled:opacity-60 bg-[#6A1FEB]"
         >
           {sending ? "발송 중..." : "이메일 발송"}
         </button>

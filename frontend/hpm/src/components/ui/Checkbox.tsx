@@ -16,7 +16,7 @@ export default function Checkbox({
       <input
         type="checkbox"
         {...props}
-        className={`w-4 h-4 rounded accent-[#623FB5] cursor-pointer ${checkboxClassName}`}
+        className={`w-4 h-4 rounded accent-[#6A1FEB] cursor-pointer ${checkboxClassName}`}
       />
       {label && (
         <span className="text-[15px] text-[#0A0A0A]">{label}</span>

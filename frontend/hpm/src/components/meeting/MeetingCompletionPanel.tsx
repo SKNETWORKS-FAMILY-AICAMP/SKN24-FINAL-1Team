@@ -24,7 +24,7 @@ export default function MeetingCompletionPanel({
         {content.description}
       </p>
 
-      <div className="relative mx-auto mt-[74px] size-[120px] rounded-full bg-[#dcd0fe] text-[#623fb5]">
+      <div className="relative mx-auto mt-[74px] size-[120px] rounded-full bg-[#dcd0fe] text-[#6A1FEB]">
         <svg
           aria-hidden="true"
           className="absolute left-1/2 top-1/2 size-[72px] -translate-x-[52%] -translate-y-[47%]"
@@ -50,7 +50,7 @@ export default function MeetingCompletionPanel({
             className={cn(
               "flex h-[57px] w-[256px] items-center justify-center rounded-[7px] border-0 text-[24px] font-medium leading-[1.2] tracking-[-0.72px] transition-all duration-150 ease-out active:scale-[0.98]",
               action.variant === "primary"
-                ? "bg-[#623fb5] text-[#fffdfd] hover:bg-[#5635a8]"
+                ? "bg-[#6A1FEB] text-[#fffdfd] hover:bg-[#5635a8]"
                 : "bg-[#dcd0fe] text-[#141414] hover:bg-[#cfc0fb]",
             )}
           >

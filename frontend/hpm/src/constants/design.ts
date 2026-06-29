@@ -63,7 +63,7 @@ export const MARGIN_SIZES = {
 export const COLORS = {
   black: "text-[#141414]",
   gray: "text-[#969696]",
-  purple: "text-[#623FB5]",
+  purple: "text-[#6A1FEB]",
   purpleLight: "text-[#C4B6E5]",
   white: "text-[#FFFDFD]",
 } as const;
@@ -71,19 +71,20 @@ export const COLORS = {
 export const BACKGROUND_COLORS = {
   background: "bg-[#F6F5FA]",
   white: "bg-[#FFFDFD]",
-  purple: "bg-[#623FB5]",
+  purple: "bg-[#6A1FEB]",
   purpleLight: "bg-[#C4B6E5]",
-  purpleHover: "bg-[#623FB5]/40",
-  purpleHoverState: "hover:bg-[#623FB5]/40",
+  purpleHover: "bg-white/10",
+  purpleHoverState: "hover:bg-white/5",
   grayLight: "bg-[#F4F5F8]",
   grayLightHover: "hover:bg-[#F4F5F8]",
-  black: "bg-[#141414]"
+  black: "bg-[#141414]",
+  ivory: "bg-[#FFF8DD]",
 } as const;
 
 export const BORDER_COLORS = {
   lightGray: "border border-[#E6E1E6]",
   gray: "border border-[#969696]",
-  purple: "border border-[#623FB5]",
+  purple: "border border-[#6A1FEB]",
 } as const;
 
 export const GAP_SIZES = {

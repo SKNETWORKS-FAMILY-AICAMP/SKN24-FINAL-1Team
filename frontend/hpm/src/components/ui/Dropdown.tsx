@@ -38,7 +38,7 @@ export default function Dropdown({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center justify-between w-full px-4 py-3 rounded-md border border-[#E5E5E5] text-[15px] bg-white hover:border-[#623FB5] transition-colors"
+        className="flex items-center justify-between w-full px-4 py-3 rounded-md border border-[#E5E5E5] text-[15px] bg-white hover:border-[#6A1FEB] transition-colors"
       >
         <span className={value ? "text-[#0A0A0A]" : "text-[#969696]"}>
           {value || placeholder}

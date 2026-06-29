@@ -10,7 +10,7 @@ export default function MeetingCompletePage() {
       className="max-w-4xl mx-auto w-full px-6 flex flex-col items-center justify-center"
       style={{ minHeight: "70vh" }}
     >
-      <h1 className="text-[28px] font-bold text-[#141414] mb-3">회의 생성 완료</h1>
+      <h1 className="text-[28px] font-medium text-[#141414] mb-3">회의 생성 완료</h1>
       <p className="text-[15px] text-[#969696] mb-14">팀원들에게 회의를 공유하시겠습니까?</p>
 
       {/* 보라색 체크 원형 아이콘 */}
@@ -41,7 +41,7 @@ export default function MeetingCompletePage() {
         <button
           onClick={() => navigate(`/meetings/${meetingId}/invite-email`)}
           className="px-12 py-3.5 text-[15px] font-semibold rounded-lg transition hover:opacity-90"
-          style={{ backgroundColor: "#623FB5", color: "#ffffff" }}
+          style={{ backgroundColor: "#6A1FEB", color: "#ffffff" }}
         >
           확인
         </button>

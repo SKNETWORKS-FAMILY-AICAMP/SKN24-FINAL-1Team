@@ -112,7 +112,7 @@ export default function DocumentUploadPanel({
             onClick={() => document.getElementById("document-file-upload-input")?.click()}
             onDragOver={(event) => event.preventDefault()}
             onDrop={handleDrop}
-            className="flex h-[380px] w-full flex-col items-center justify-center rounded-[15px] border border-dashed border-[#969696] bg-[#fdfdfd] px-[28px] text-center transition-all duration-150 hover:border-[#623fb5] hover:bg-white active:scale-[0.99] lg:w-[430px]"
+            className="flex h-[380px] w-full flex-col items-center justify-center rounded-[15px] border border-dashed border-[#969696] bg-[#fdfdfd] px-[28px] text-center transition-all duration-150 hover:border-[#6A1FEB] hover:bg-white active:scale-[0.99] lg:w-[430px]"
           >
             <UploadIcon />
             <span className="mt-[28px] text-[15px] font-medium text-[#808080]">
@@ -135,7 +135,7 @@ export default function DocumentUploadPanel({
                 uploadedDocuments.map((item) => (
                   <div
                     key={item.id}
-                    className="flex h-[34px] items-center justify-between rounded-[6px] border border-[#e0dedb] bg-white px-[10px] py-[9px] text-[12px]"
+                    className="flex h-[34px] items-center justify-between rounded-[6px] border border-[#e0dedb] bg-white px-[10px] py-[9px] text-[15px]"
                   >
                     <span className="min-w-0 flex-1 truncate text-[#141414]">
                       {item.file.name}
@@ -166,7 +166,7 @@ export default function DocumentUploadPanel({
           <div className="w-full lg:w-[430px]">
             <div className="h-[16px] overflow-hidden rounded-[32px] border border-[#969696] bg-[#fdfdfd]">
               <div
-                className="h-full rounded-[32px] bg-[#623fb5] transition-all duration-200"
+                className="h-full rounded-[32px] bg-[#6A1FEB] transition-all duration-200"
                 style={{ width: `${uploadPercent}%` }}
               />
             </div>
@@ -175,7 +175,7 @@ export default function DocumentUploadPanel({
               <span>20MB</span>
             </div>
             {uploadMessage ? (
-              <p className="mt-[8px] text-[12px] text-[#e52e2e]">{uploadMessage}</p>
+              <p className="mt-[8px] text-[15px] text-[#e52e2e]">{uploadMessage}</p>
             ) : null}
           </div>
 
@@ -191,7 +191,7 @@ export default function DocumentUploadPanel({
               type="button"
               disabled={!hasUploadedDocuments || submitting}
               onClick={onComplete}
-              className="h-[48px] w-[150px] rounded-[7px] border-0 bg-[#623fb5] text-[17px] font-medium text-[#fdfdfd] transition-all duration-150 hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
+              className="h-[48px] w-[150px] rounded-[7px] border-0 bg-[#6A1FEB] text-[17px] font-medium text-[#fdfdfd] transition-all duration-150 hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
             >
               {submitting ? "업로드 중..." : "완료"}
             </button>

@@ -122,10 +122,10 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
           <img
             src={logo}
             alt="logo"
-            className="cursor-pointer"
+            className="cursor-pointer w-[75px]"
             onClick={() => navigate("/dashboard")}
           />
-          <p onClick={() => navigate("/dashboard")} className={`${DESIGN.FONT_SIZES.sm} mt-1`}>회의피하지마</p>
+          <p onClick={() => navigate("/dashboard")} className={`${DESIGN.FONT_SIZES.lg} mt-1`}>회의피하지마</p>
           <button
             onClick={toggleCollapse}
             className="absolute top-1 right-3 p-1 hover:bg-white/10 rounded transition"
@@ -202,7 +202,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         >
           <span
             className="font-bold tabular-nums transition-colors duration-200"
-            style={{ color: timerHovered ? "#623FB5" : "#ffffff", fontSize: "28px", letterSpacing: "0.04em" }}
+            style={{ color: timerHovered ? "#6A1FEB" : "#ffffff", fontSize: "28px", letterSpacing: "0.04em" }}
           >
             {fmt(elapsed)}
           </span>
