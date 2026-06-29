@@ -1,0 +1,20 @@
+export interface User {
+  user_id: number;
+  users_id: number;
+  email: string;
+  name?: string;
+  account_status?: number;
+  role?: string;
+  jira_connected?: boolean;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  isLoading: boolean; // 화면 깜빡임 방지용 로딩 상태
+  projectId: number | null;
+  projectName: string;
+  login: (user: User) => void;
+  logout: () => Promise<void>;
+  selectProject: (id: number, name: string) => void;
+  clearProject: () => void;
+}

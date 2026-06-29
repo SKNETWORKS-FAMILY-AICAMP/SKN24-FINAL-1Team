@@ -1,0 +1,85 @@
+# ================================================================
+# docker-compose.yml
+# 역할: db + backend + frontend + nginx를 한 번에 실행하는 파일
+#
+# 실행: docker-compose up --build   (처음 실행 시 빌드 포함)
+#       docker-compose up            (이후 실행)
+#       docker-compose down          (전체 종료)
+#
+# 접속: http://localhost             (nginx → 자동 분기)
+# 접속(변경 사항) :http://EC2_퍼블릭_IP
+# ================================================================
+
+services:
+
+  # # ── MySQL DB ────────────────────────────────────────────────
+  # # 역할: 회의, 유저, 태스크 등 모든 데이터를 저장하는 데이터베이스
+  # db:
+  #   image: mysql:8.0                 # MySQL 8.0 공식 이미지 사용
+  #   container_name: hpm_db
+  #   restart: unless-stopped          # 에러로 꺼지면 자동 재시작
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: dlsrb124  # .env의 DB_PASSWORD와 동일
+  #     MYSQL_DATABASE: hpm_db         # .env의 DB_NAME과 동일
+  #     TZ: Asia/Seoul                 # 한국 시간대 설정
+  #   ports:
+  #     - "3307:3306"                  # 내 컴퓨터 3307 → 컨테이너 3306
+  #   volumes:
+  #     - db_data:/var/lib/mysql       # DB 데이터 영속화
+  #                                    # (컨테이너 꺼져도 데이터 유지)
+  #   healthcheck:                     # DB가 완전히 뜰 때까지 확인
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pdlsrb124"]
+  #     interval: 5s                   # 5초마다 확인
+  #     timeout: 5s                    # 5초 안에 응답 없으면 실패
+  #     retries: 10                    # 10번까지 재시도
+
+
+  # ── Django 백엔드 ────────────────────────────────────────────
+  # 역할: API 처리, DB 조회, RunPod AI 서버 호출 등
+  backend:
+    build:
+      context: .         # 루트 폴더 기준(소스코드 위치)
+      dockerfile: Dockerfile.backend  # 사용할 Dockerfile
+    container_name: hpm_backend
+    restart: unless-stopped
+    env_file:
+      - .env                         # 기존 .env 파일 그대로 사용
+    environment:
+                                     # Docker 안에서는 컨테이너 이름이 주소가 됨
+      DB_PORT: "3306"
+    ports:
+      - "8000:8000"                  # 내 컴퓨터 8000 → 컨테이너 8000
+                                     # nginx가 /api/ 요청을 여기로 전달
+    volumes:
+      - ./backend/hpm/media:/app/media  # 업로드 파일 영속화
+                                        # (녹음파일, 문서 등 컨테이너 꺼져도 유지)
+    # depends_on:
+    #   db:
+    #     condition: service_healthy   # DB 완전히 뜬 다음에 backend 시작
+
+
+  # ── React 프론트엔드 + nginx ──────────────────────────────────
+  # 역할: React 파일을 빌드하고 nginx로 사용자에게 서빙
+  #       /api/ 요청은 backend로 전달, 나머지는 React 파일 전달
+  frontend:
+    build:
+      context: .       # 소스코드 위치
+      dockerfile: Dockerfile.frontend  # 사용할 Dockerfile
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+    container_name: hpm_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"                      # 내 컴퓨터 80 → 컨테이너 80
+      - "443:443"
+    depends_on:
+      - backend                      # backend 뜬 다음에 frontend 시작
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro  # ← 인증서 마운트 추가
+
+
+# # ── 볼륨 ──────────────────────────────────────────────────────
+# # 역할: 컨테이너가 꺼져도 데이터를 유지하는 저장 공간
+# volumes:
+#   db_data:                           # DB 데이터 저장 볼륨

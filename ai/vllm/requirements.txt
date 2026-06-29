@@ -1,0 +1,39 @@
+# Keep vLLM and its torch stack in requirements-vllm.txt. Gemma 4 Unified
+# support currently needs the newer vLLM/Transformers stack, so the core API
+# requirements should not pin torch or transformers lower.
+
+# API server
+fastapi[standard]>=0.115.0,<0.137.0
+uvicorn[standard]>=0.30.0,<0.50.0
+pydantic>=2.12.0,<3.0.0
+python-multipart>=0.0.20,<1.0.0
+
+# OpenAI-compatible clients and API providers
+openai>=2.0.0,<3.0.0
+cohere>=5.0.0,<8.0.0
+
+# Hugging Face model loading, embeddings, and quantized OCR path
+transformers>=4.41.0,<5.0
+tokenizers>=0.21.1,<0.23.0
+accelerate>=1.10.0,<2.0.0
+bitsandbytes>=0.47.0,<0.49.0
+safetensors>=0.6.2,<1.0.0
+hf-transfer
+sentence-transformers==5.5.1
+qwen-vl-utils>=0.0.11,<0.1.0
+
+# RAG / vector search
+qdrant-client>=1.15.0,<2.0.0
+rank-bm25==0.2.2
+tiktoken>=0.7.0,<1.0.0
+
+# Common runtime dependencies used by the ingestion and retrieval code
+numpy>=1.26.0,<3.0.0
+scipy>=1.11.0,<2.0.0
+scikit-learn>=1.5.0,<2.0.0
+pillow>=10.0.0,<13.0.0
+requests>=2.32.0,<3.0.0
+python-dotenv>=1.1.0,<2.0.0
+tqdm>=4.66.0,<5.0.0
+protobuf>=5.29.0,<7.0.0
+PyYAML>=6.0.0,<7.0.0
