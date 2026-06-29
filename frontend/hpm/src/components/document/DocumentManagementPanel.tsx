@@ -11,6 +11,7 @@ import Pagination from "../ui/Pagination";
 import { DateRangePicker, FilterSelect } from "../ui/DatePickerBox";
 import searchIcon from "../../assets/meeting/search.png";
 import downloadIcon from "../../assets/document/download.png";
+import titleDoc from "../../assets/meeting/titleDoc.png";
 
 interface DocumentManagementPanelProps {
   allVisibleSelected: boolean;
@@ -80,8 +81,8 @@ function DocumentCheckButton({
       className={cn(
         "mx-auto flex size-[18px] items-center justify-center rounded-[4px] border transition-all duration-150 active:scale-95",
         checked
-          ? "border-[#623fb5] bg-[#623fb5]"
-          : "border-[#8c8794] bg-[#fffdfd] hover:border-[#623fb5]",
+          ? "border-[#6A1FEB] bg-[#6A1FEB]"
+          : "border-[#8c8794] bg-[#fffdfd] hover:border-[#6A1FEB]",
       )}
     >
       {checked ? (
@@ -199,16 +200,29 @@ export default function DocumentManagementPanel({
 
   return (
     <section className="mx-auto w-full max-w-[1376px]" data-node-id="1:1397">
-      <header>
-        <h1 className="m-0 text-[32px] font-medium leading-[1.2] text-[#141414]">
-          문서 관리
-        </h1>
-        <p className="mt-[12px] text-[15px] font-normal leading-[1.2] text-[#969696]">
-          사내 문서를 등록하고 관리할 수 있습니다.
-        </p>
-      </header>
+      <div
+        className="w-full h-[200px] flex flex-col justify-center px-[64px] rounded-[15px] overflow-hidden mb-[45px]"
+        style={{
+          backgroundImage: `url(${titleDoc})`,
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center",
+        }}
+      >
+        <div className="flex flex-col gap-[18px]">
+          <h1 className="text-[32px] font-medium text-[#141414] leading-tight">내부문서 관리</h1>
+          <div className="flex flex-col gap-[0px]">
+            <p className="text-[17px] text-[#969696] font-medium">
+              <span className="text-[#6A1FEB]">프로젝트 문서</span>를 등록하고 관리해 보세요.
+            </p>
+            <p className="text-[17px] text-[#969696] font-normal">
+              등록한 문서는 회의 준비 자료 생성과 챗봇 검색에 활용됩니다.
+            </p>
+          </div>
+        </div>
+      </div>
 
-        <div className="mt-8 flex flex-col gap-4">
+        <div className="mt-0 flex flex-col gap-4">
         <div className="flex flex-col gap-[16px] xl:flex-row xl:items-center xl:justify-between">
           <div className="relative w-full max-w-md">
             <input
@@ -216,7 +230,7 @@ export default function DocumentManagementPanel({
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="문서명, 파일명, 작성자로 검색하세요"
-              className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-10 py-2.5 outline-none focus:border-[#623FB5] focus:ring-1 focus:ring-[#623FB5]/10 transition`}
+              className={`w-full ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.BORDER_COLORS.gray} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.sm} pl-4 pr-10 py-2.5 outline-none focus:border-[#6A1FEB] focus:ring-1 focus:ring-[#6A1FEB]/10 transition`}
             />
             <span className="absolute right-3 top-1/2 -translate-y-1/2">
               <img src={searchIcon} alt="검색" className="w-5 h-5" />

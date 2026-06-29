@@ -43,10 +43,10 @@ function CandidateOption({
         active ? "bg-[#e4e3eb]" : "bg-transparent hover:bg-[#f4f4f8]",
       )}
     >
-      <span className="text-[12px] font-normal leading-[1.2] text-[#141414]">
+      <span className="text-[15px] font-normal leading-[1.2] text-[#141414]">
         {candidate.name} {candidate.role}({candidate.email})
       </span>
-      <span className="mt-[6px] text-[12px] font-normal leading-[1.2] text-[#6b6b6b]">
+      <span className="mt-[6px] text-[15px] font-normal leading-[1.2] text-[#6b6b6b]">
         {candidate.department}
       </span>
     </button>
@@ -121,7 +121,7 @@ export default function MemberInviteModal({
             {selectedMembers.map((member) => (
               <span
                 key={member.id}
-                className="flex h-[32px] w-[121px] items-center justify-between rounded-[8px] border border-[#e0dedb] bg-[#f6f5fa] px-[9px] text-[12px] text-[#141414]"
+                className="flex h-[32px] w-[121px] items-center justify-between rounded-[8px] border border-[#e0dedb] bg-[#f6f5fa] px-[9px] text-[15px] text-[#141414]"
               >
                 <span className="truncate">
                   {member.name} {member.role}
@@ -163,7 +163,7 @@ export default function MemberInviteModal({
         <div className="mt-[7px] rounded-[7px] border border-[#969696] bg-[#fffdfd] overflow-hidden" style={{ height: "164px" }}>
           <div className="h-full overflow-y-auto p-[7px]">
             {loading ? (
-              <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
+              <p className="m-0 px-[8px] py-[12px] text-[15px] text-[#6b6b6b]">
                 구성원을 불러오는 중입니다.
               </p>
             ) : matchingMembers.length > 0 ? (
@@ -178,7 +178,7 @@ export default function MemberInviteModal({
                 ))}
               </div>
             ) : (
-              <p className="m-0 px-[8px] py-[12px] text-[12px] text-[#6b6b6b]">
+              <p className="m-0 px-[8px] py-[15px] text-[15px] text-[#6b6b6b]">
                 검색 결과가 없습니다.
               </p>
             )}
@@ -190,7 +190,7 @@ export default function MemberInviteModal({
             type="button"
             disabled={selectedMembers.length === 0 || submitting}
             onClick={handleSubmit}
-            className="h-[42px] w-[120px] rounded-[7px] border-0 bg-[#623fb5] text-[15px] font-medium text-[#fdfdfd] transition-all duration-150 hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
+            className="h-[42px] w-[120px] rounded-[7px] border-0 bg-[#6A1FEB] text-[15px] font-medium text-[#fdfdfd] transition-all duration-150 hover:bg-[#5635a8] active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#969696]"
           >
             {submitting ? "추가 중" : "추가하기"}
           </button>

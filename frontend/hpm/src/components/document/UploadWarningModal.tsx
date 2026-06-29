@@ -11,7 +11,7 @@ export default function UploadWarningModal({ message, onClose }: UploadWarningMo
       <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
         <div className="px-8 pt-10 pb-6 flex flex-col items-center text-center">
           <img src={warningIcon} alt="경고" className="w-14 h-14 mb-5" />
-          <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+          <p className="text-[#6A1FEB] text-[14px] leading-relaxed whitespace-pre-line">
             {message}
           </p>
         </div>

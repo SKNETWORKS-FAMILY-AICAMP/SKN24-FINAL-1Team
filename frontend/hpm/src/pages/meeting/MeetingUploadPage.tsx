@@ -122,7 +122,7 @@ export default function MeetingUploadPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">{errorMessage}</p>
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed whitespace-pre-line">{errorMessage}</p>
             </div>
             <div className="border-t border-gray-200">
               <button
@@ -135,7 +135,7 @@ export default function MeetingUploadPage() {
           </div>
         </div>
       )}
-      <h2 className="text-[24px] font-bold text-[#141414] mb-2">
+      <h2 className="text-[24px] font-medium text-[#141414] mb-2">
         자료 업로드
       </h2>
       <p className="text-[12px] text-[#969696] mb-8 leading-relaxed">
@@ -154,7 +154,7 @@ export default function MeetingUploadPage() {
             onDrop={handleDrop}
             onClick={() => inputRef.current?.click()}
             className={`flex-1 bg-[#FFFDFD] border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition
-              ${dragging ? "border-[#623FB5] bg-[#623FB5]/5" : "border-gray-300 hover:border-[#623FB5]"}`}
+              ${dragging ? "border-[#6A1FEB] bg-[#6A1FEB]/5" : "border-gray-300 hover:border-[#6A1FEB]"}`}
           >
             <input
               ref={inputRef}
@@ -223,7 +223,7 @@ export default function MeetingUploadPage() {
         <div className="mt-6">
           <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
             <div
-              className="absolute left-0 top-0 h-full bg-[#623FB5] rounded-full transition-all"
+              className="absolute left-0 top-0 h-full bg-[#6A1FEB] rounded-full transition-all"
               style={{ width: `${Math.min((totalMb / MAX_TOTAL_MB) * 100, 100)}%` }}
             />
           </div>
@@ -239,7 +239,7 @@ export default function MeetingUploadPage() {
           <button
             onClick={handleNext}
             disabled={uploading}
-            className="px-8 py-2.5 bg-[#623FB5] text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-60 transition"
+            className="px-8 py-2.5 bg-[#6A1FEB] text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-60 transition"
           >
             {uploading ? "업로드 중..." : "다음"}
           </button>
@@ -251,7 +251,7 @@ export default function MeetingUploadPage() {
         <button
           onClick={handleSkip}
           disabled={uploading}
-          className="text-[12px] text-[#623FB5] hover:underline disabled:opacity-60"
+          className="text-[12px] text-[#6A1FEB] hover:underline disabled:opacity-60"
         >
           {uploading ? (type === "prep" ? "준비 자료 생성 중..." : "안건 생성 중...") : "자료 업로드를 건너뛰시겠습니까?"}
         </button>

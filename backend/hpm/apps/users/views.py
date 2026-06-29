@@ -727,9 +727,8 @@ def admin_user_list(request):
 
         if len(email) > 50:
             return Response({"error": "이메일은 50자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
-        local, _, domain = email.partition("@")
-        if not re.match(r'^[a-zA-Z0-9]+$', local):
-            return Response({"error": "이메일 @ 앞은 영문과 숫자만 가능합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if not re.match(r'^[^\s@]+@[^\s@]+\.[^\s@]+$', email):
+            return Response({"error": "이메일 형식이 올바르지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
 
 
         if len(name) > 30:

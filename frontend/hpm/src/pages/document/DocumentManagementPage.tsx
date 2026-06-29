@@ -212,14 +212,14 @@ export default function DocumentManagementPage() {
   };
 
   return (
-    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[64px] font-pretendard">
+    <div className="-m-6 min-h-screen overflow-x-hidden bg-[#fffdfd] pt-[45px] pb-[45px] font-pretendard">
       {showDeletePermissionModal && (
         <UploadWarningModal
           message="삭제 권한이 없습니다"
           onClose={() => setShowDeletePermissionModal(false)}
         />
       )}
-      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-[72px] pt-[47px]">
+      <section className="min-h-[1016px] w-full min-w-0 px-[32px] pb-0 pt-0">
         <DocumentManagementPanel
           allVisibleSelected={allVisibleSelected}
           creatorFilter={creatorFilter}

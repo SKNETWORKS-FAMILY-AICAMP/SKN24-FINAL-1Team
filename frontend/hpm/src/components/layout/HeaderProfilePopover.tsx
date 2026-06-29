@@ -1,5 +1,5 @@
-import keyIcon from "../../assets/key.svg";
-import logoutIcon from "../../assets/logout.svg";
+import keyIcon from "../../assets/key.png";
+import logoutIcon from "../../assets/logout.png";
 import jiraIcon from "../../assets/jira.png";
 
 interface HeaderProfilePopoverProps {
@@ -58,7 +58,7 @@ export default function HeaderProfilePopover({
                 {loading ? "..." : name ? `${name}님` : "-"}
               </p>
               <a
-                className="mt-[14px] block text-[15px] font-normal leading-[1.2] text-[#623FB5] underline"
+                className="mt-[14px] block text-[15px] font-normal leading-[1.2] text-[#6A1FEB] underline"
                 href={email ? `mailto:${email}` : undefined}
               >
                 {displayValue(email, loading)}
@@ -90,7 +90,7 @@ export default function HeaderProfilePopover({
                 className={`flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] transition-all duration-150 ease-out ${
                   jiraDisabled
                     ? "cursor-default text-[#969696]"
-                    : "text-[#141414] hover:text-[#623FB5] active:scale-[0.98]"
+                    : "text-[#141414] hover:text-[#6A1FEB] active:scale-[0.98]"
                 }`}
               >
                 <img src={jiraIcon} alt="" className="size-[20px] shrink-0 object-contain" />
@@ -106,7 +106,7 @@ export default function HeaderProfilePopover({
                 <button
                   type="button"
                   onClick={onJiraReconnect}
-                  className="text-[13px] text-[#969696] hover:text-[#623FB5] transition-colors underline"
+                  className="text-[13px] text-[#969696] hover:text-[#6A1FEB] transition-colors underline"
                 >
                   재연동
                 </button>
@@ -116,7 +116,7 @@ export default function HeaderProfilePopover({
         <button
           type="button"
           onClick={onChangePassword}
-          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
+          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#6A1FEB] active:scale-[0.98]"
         >
           <img src={keyIcon} alt="" className="size-[20px] shrink-0" />
           <span>비밀번호 변경</span>
@@ -124,7 +124,7 @@ export default function HeaderProfilePopover({
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#623FB5] active:scale-[0.98]"
+          className="flex items-center gap-[10px] rounded-[5px] border-0 bg-transparent p-0 text-[15px] font-normal leading-[1.2] text-[#141414] transition-all duration-150 ease-out hover:text-[#6A1FEB] active:scale-[0.98]"
         >
           <img src={logoutIcon} alt="" className="size-[20px] shrink-0" />
           <span>로그아웃</span>

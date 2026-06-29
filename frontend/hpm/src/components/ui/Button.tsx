@@ -39,10 +39,10 @@ export default function Button({
   let sizeClass = "";
   switch (size) {
     case "sm":
-      sizeClass = `px-3 py-1.5 text-xs ${DESIGN.RADIUS_SIZES.sm}`;
+      sizeClass = `px-3 py-1.5 text-[15px] ${DESIGN.RADIUS_SIZES.sm}`;
       break;
     case "md":
-      sizeClass = `px-4 py-2 ${DESIGN.FONT_SIZES.sm} ${DESIGN.RADIUS_SIZES.sm}`;
+      sizeClass = `px-4 py-2 ${DESIGN.FONT_SIZES.md} ${DESIGN.RADIUS_SIZES.sm}`;
       break;
     case "lg":
       sizeClass = `${DESIGN.PADDING_SIZES.sm} ${DESIGN.FONT_SIZES.lg} ${DESIGN.RADIUS_SIZES.md}`;

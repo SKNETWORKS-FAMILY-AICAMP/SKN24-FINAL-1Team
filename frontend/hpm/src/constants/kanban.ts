@@ -14,7 +14,7 @@ export {
 } from "./calendar";
 
 export const KANBAN_BOARD_MIN_HEIGHT = 780;
-export const KANBAN_COLUMN_TOP = 91;
+export const KANBAN_COLUMN_TOP = 45;
 export const KANBAN_COLUMN_BODY_TOP = 51;
 export const KANBAN_FIRST_CARD_TOP = 10;
 export const KANBAN_CARD_GAP = 160;
@@ -24,8 +24,8 @@ export const KANBAN_EMPTY_COLUMN_HEIGHT = 226;
 
 export const KANBAN_COLUMNS: KanbanColumnConfig[] = [
   { id: "todo", label: "할 일", left: 68, height: 742 },
-  { id: "progress", label: "진행중", left: 452, height: 742 },
-  { id: "done", label: "완료", left: 836, height: 742 },
+  { id: "progress", label: "진행중", left: 436, height: 742 },
+  { id: "done", label: "완료", left: 804, height: 742 },
 ];
 
 export const KANBAN_PRIORITIES: KanbanPriority[] = [

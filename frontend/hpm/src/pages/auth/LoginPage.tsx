@@ -7,6 +7,7 @@ import api from "../../services/meeting";
 import Input from "../../components/ui/Input";
 import Button from "../../components/ui/Button";
 import ServiceLogo from "../../components/ui/ServiceLogo"
+import bg from "../../assets/login/background.png";
 
 
 export default function LoginPage() {
@@ -62,7 +63,14 @@ const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
 };
 
   return (
-    <div className={`${DESIGN.BACKGROUND_COLORS.background} min-h-screen flex justify-center items-center`}>
+      <div
+        className={`${DESIGN.BACKGROUND_COLORS.ivory} min-h-screen flex justify-center items-center bg-no-repeat`}
+        style={{
+          backgroundImage: `url(${bg})`,
+          backgroundSize: "100% auto",
+          backgroundPosition: "center 11.5vh", // 아래로 50px
+        }}
+      >
       <div className="w-[480px]">
         <ServiceLogo/>
         <div className={`${DESIGN.PADDING_SIZES["2xl"]} ${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.MARGIN_TOP_SIZES["5xl"]} ${DESIGN.RADIUS_SIZES["2xl"]} flex justify-center items-center flex-col`}>

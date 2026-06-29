@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import projectIcon from "../../assets/project/folderBig.png";
+import title from "../../assets/kanban/title.png";
 import KanbanColumn from "../../components/project/KanbanColumn";
 import KanbanTaskModal from "../../components/project/KanbanTaskModal";
 import {
@@ -9,7 +10,7 @@ import {
   toKanbanFormValues,
 } from "../../constants/kanban";
 import { useAuth } from "../../context/AuthContext";
-import {
+import api, {
   createProjectJiraIssue,
   getProjectDetail,
   getProjectJiraBoard,
@@ -64,7 +65,7 @@ const toKanbanColumns = (columns: JiraBoardColumn[]): KanbanColumnConfig[] => {
   return columns.map((column, index) => ({
     id: column.id,
     label: column.label,
-    left: 68 + index * 384,
+    left: 68 + index * 372,
     height: 742,
     statusNames: column.status_names,
   }));
@@ -112,6 +113,7 @@ export default function KanbanBoardPage() {
   const [draggingTask, setDraggingTask] = useState<KanbanTask | null>(null);
   const [canManageJira, setCanManageJira] = useState(false);
   const [jiraParentOptions, setJiraParentOptions] = useState<JiraParentOption[]>([]);
+  const [startDate, setStartDate] = useState<string>("");
 
   useEffect(() => {
     if (!user || !projectId) {
@@ -121,6 +123,7 @@ export default function KanbanBoardPage() {
       setCanManageJira(false);
       setLoading(false);
       setError(null);
+      setStartDate("");
       return;
     }
 
@@ -151,6 +154,19 @@ export default function KanbanBoardPage() {
       .finally(() => {
         setLoading(false);
       });
+
+    api.get("/projects/", {
+      params: {
+        user_id: user.users_id,
+      },
+    })
+      .then((res) => {
+        const currentProject = res.data.find((p: any) => p.project_id === projectId);
+        if (currentProject) {
+          setStartDate(currentProject.startDate || "");
+        }
+      })
+      .catch(console.error);
   }, [projectId, user]);
 
   useEffect(() => {
@@ -431,19 +447,34 @@ export default function KanbanBoardPage() {
 
   return (
     <div className="flex flex-col bg-[#FFFDFD] pb-[32px] pt-[32px]">
-      <section className="flex flex-col justify-center items-start ml-[67px] gap-[7px] ">
-        <div className="flex justify-center items-center gap-[7px]">
-          <img alt="" className="w-8" src={projectIcon} />
-          <h1 className="m-0 whitespace-nowrap text-[24px] font-medium leading-[1.2] text-[#141414]">
-            {projectName || "Jira 칸반"}
-          </h1>
-        </div>
-          {!canManageJira && !loading && !error ? (
-            <div className="text-[14px] font-medium text-[#969696]">
-              Jira 미연동 계정은 조회만 가능합니다. 업무 추가와 이동은 Jira 연동 및 프로젝트 접근 권한이 필요합니다.
+      <div className="mx-[68px] mb-[12px]">
+        <div
+          className="w-full h-[200px] flex flex-col justify-center px-[64px] rounded-[15px] overflow-hidden"
+          style={{
+            backgroundImage: `url(${title})`,
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="flex flex-col gap-[14px]">
+              <h1 className="text-[32px] font-medium text-[#141414]">대시보드</h1>
+            <div className="flex flex-col gap-[0px]">
+              <p className="text-[17px] text-[#141414]">
+                현재 프로젝트
+              </p>
+              <p className="text-[20px] text-[#6A1FEB] font-medium">
+                {projectName || "프로젝트 없음"}
+              </p>
             </div>
-          ) : null}
-      </section>
+          </div>
+        </div>
+        {!canManageJira && !loading && !error ? (
+          <div className="text-[14px] font-medium text-[#969696] mt-[12px]">
+            Jira 미연동 계정은 조회만 가능합니다. 업무 추가와 이동은 Jira 연동 및 프로젝트 접근 권한이 필요합니다.
+          </div>
+        ) : null}
+      </div>
 
       {/* ─── [BUG FIX] JSX 구조 버그 수정 ────────────────────────────────────
           원본: error div와 canManageJira div가 </section> 닫힘 없이 떠있었고

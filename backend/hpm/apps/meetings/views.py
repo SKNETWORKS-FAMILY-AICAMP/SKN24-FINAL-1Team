@@ -1477,7 +1477,7 @@ def generate_prep_material(request, meeting_id):
         "participants": participants,
         "agendas": agendas,
         "max_previous_meetings": 5,
-        "ocr_context": ""
+        "ocr_text": ""
     }
     print("회의 준비 자료 내용 잘 들어감?", payload)
     base_url = settings.RUNPOD_BASE_URL
@@ -1610,7 +1610,7 @@ def check_prep_status(request, meeting_id):
         "participants": participants,
         "agendas": agendas,
         "max_previous_meetings": 5,
-        "ocr_context": ocr_context
+        "ocr_text": ocr_context
     }
 
     base_url = settings.RUNPOD_BASE_URL
@@ -1618,7 +1618,6 @@ def check_prep_status(request, meeting_id):
         response = requests.post(f"{base_url}/generate-preparation", json=payload, timeout=300)
         response.raise_for_status()
         response.encoding = "utf-8"
-        resp_data = response.json()
         resp_data = response.json()
 
         print("=== RUNPOD RESPONSE ===")
@@ -1635,7 +1634,10 @@ def check_prep_status(request, meeting_id):
     prep.purpose = result_data.get("purpose") or ""
     prep.project_status = result_data.get("project_status") or ""
     prep.rule = result_data.get("rule") or ""
-    prep.effect = result_data.get("effect") or ""
+    import json
+    effect_val = result_data.get("effect") or ""
+    raw_sources_str = json.dumps(result_data.get("sources", []), ensure_ascii=False)
+    prep.effect = f"{effect_val}\n\n__RAW_SOURCES__\n{raw_sources_str}"
     prep.save()
 
     meeting.meeting_document = _compile_prep_markdown(prep)

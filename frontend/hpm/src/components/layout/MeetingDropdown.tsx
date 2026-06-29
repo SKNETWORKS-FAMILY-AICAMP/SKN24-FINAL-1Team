@@ -80,8 +80,6 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
         className={`flex items-center justify-between w-full ${DESIGN.PADDING_SIZES.sm} ${DESIGN.RADIUS_SIZES.md} ${DESIGN.FONT_SIZES.lg} transition ${DESIGN.COLORS.white} ${
           isActive("/meeting") || isActive("/meetings")
             ? DESIGN.BACKGROUND_COLORS.purple
-            : meetingOpen
-            ? DESIGN.BACKGROUND_COLORS.purpleHover
             : `bg-transparent ${DESIGN.BACKGROUND_COLORS.purpleHoverState}`
         }`}
       >
@@ -117,7 +115,7 @@ export default function MeetingDropdown({ isCollapsed, toggleCollapse }: Meeting
 
       {meetingOpen && (
         <div className="flex flex-col">
-          <p className={`${DESIGN.FONT_SIZES.md} text-gray-500 px-3 py-1`}>최신순</p>
+          <p className={`${DESIGN.FONT_SIZES.md} text-gray-500 px-3 py-1 mb-[2px]`}>최신순</p>
           {recentMeetings.map(m => (
             <button
               key={m.meeting_id}

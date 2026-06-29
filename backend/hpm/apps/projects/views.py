@@ -716,8 +716,11 @@ def project_jira_board_issue_rank(request, project_id, issue_key):
         return Response({"error": "before_issue_key 또는 after_issue_key가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
     result = rank_jira_issue(
-        issue_key, access_token, user.jira_cloud_id,
-        before_issue_key=before_issue_key, after_issue_key=after_issue_key,
+        issue_key,
+        access_token,
+        user.jira_cloud_id,
+        before_issue_key=before_issue_key,
+        after_issue_key=after_issue_key,
     )
     if not result.get("success"):
         return Response({"error": "Jira 순서 변경에 실패했습니다.", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)

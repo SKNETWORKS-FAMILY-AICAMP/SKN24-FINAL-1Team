@@ -30,8 +30,8 @@ function PriorityChip({
       className={cn(
         "h-[22px] rounded-[20px] border px-[8px] py-[2px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
         selected
-          ? "border-[#623FB5] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
-          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#623FB5] hover:bg-[#F4F1FF] hover:text-[#623FB5]",
+          ? "border-[#6A1FEB] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
+          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#6A1FEB] hover:bg-[#F4F1FF] hover:text-[#6A1FEB]",
       )}
     >
       {priority}
@@ -55,8 +55,8 @@ function OptionChip({
       className={cn(
         "h-[22px] max-w-[170px] truncate rounded-[20px] border px-[8px] py-[2px] text-[12px] font-normal leading-[1.2] transition-all duration-150 ease-out active:scale-[0.96]",
         selected
-          ? "border-[#623FB5] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
-          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#623FB5] hover:bg-[#F4F1FF] hover:text-[#623FB5]",
+          ? "border-[#6A1FEB] bg-[#DCD0FE] text-[#141414] hover:bg-[#C4B6E5]"
+          : "border-[#969696] bg-[#FFFDFD] text-[#969696] hover:border-[#6A1FEB] hover:bg-[#F4F1FF] hover:text-[#6A1FEB]",
       )}
     >
       {label}
@@ -188,7 +188,7 @@ export default function KanbanTaskModal({
               assignee: selected?.label || "",
             });
           }}
-          className="absolute left-[32px] top-[374px] h-[36px] w-[170px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#623FB5]"
+          className="absolute left-[32px] top-[374px] h-[36px] w-[170px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#6A1FEB]"
         >
           <option value="">담당자 없음</option>
           {assigneeOptions.map((option) => (
@@ -206,7 +206,7 @@ export default function KanbanTaskModal({
           onChange={(event: ChangeEvent<HTMLInputElement>) =>
             update("dueDate", event.target.value)
           }
-          className="absolute left-[244px] top-[374px] h-[36px] w-[135px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#623FB5]"
+          className="absolute left-[244px] top-[374px] h-[36px] w-[135px] rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-[10px] text-[12px] font-normal leading-[1.2] text-[#141414] outline-none transition focus:border-[#6A1FEB]"
         />
 
         <label className="absolute left-[32px] top-[436px] text-[15px] font-medium leading-[1.2] text-[#141414]">
@@ -262,7 +262,7 @@ export default function KanbanTaskModal({
           className={cn(
             "absolute left-[208px] top-[582px] flex h-[48px] w-[150px] items-center justify-center rounded-[7px] border-0 text-[17px] font-medium leading-[1.2] transition-all duration-150 ease-out",
             canSubmit
-              ? "bg-[#623FB5] text-[#FFFDFD] hover:opacity-90 active:scale-[0.98]"
+              ? "bg-[#6A1FEB] text-[#FFFDFD] hover:opacity-90 active:scale-[0.98]"
               : "cursor-not-allowed bg-[#969696] text-[#FFFDFD]",
           )}
         >

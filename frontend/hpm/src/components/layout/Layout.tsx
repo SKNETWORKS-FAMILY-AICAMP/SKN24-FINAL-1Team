@@ -7,6 +7,7 @@ import GlobalLoginModal from "../ui/GlobalLoginModal";
 import { useAuth } from "../../context/AuthContext";
 import { useAuthStore } from "../../constants/auth";
 import FloatingChatbot from "../ui/FloatingChatbot";
+import loginBg from "../../assets/login/background.png";
 
 export default function Layout() {
   const { user } = useAuth();
@@ -56,8 +57,20 @@ export default function Layout() {
 
   if (isNoLayout) {
       const showHeader = location.pathname === "/projects" || location.pathname === "/admin/users";
+      const isChangePassword = location.pathname === "/change-password";
       return (
-        <div className="w-full min-h-screen bg-[#F6F5FA] flex flex-col">
+        <div
+          className={`w-full min-h-screen ${DESIGN.BACKGROUND_COLORS.ivory} flex flex-col bg-no-repeat`}
+          style={
+            isChangePassword
+              ? {
+                  backgroundImage: `url(${loginBg})`,
+                  backgroundSize: "100% auto",
+                  backgroundPosition: "center 11.5vh",
+                }
+              : undefined
+          }
+        >
           {showHeader && <Header />}
           <div className="flex-1">
             <Outlet />

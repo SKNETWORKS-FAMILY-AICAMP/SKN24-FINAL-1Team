@@ -226,7 +226,7 @@ export default function MeetingMinutesPage() {
                 onClick={handleReviewComplete}
                 disabled={requested}
                 className="px-5 py-2 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-80"
-                style={{ backgroundColor: "#623FB5" }}
+                style={{ backgroundColor: "#6A1FEB" }}
               >
                 {requested ? "처리 중..." : "검토 완료"}
               </button>
@@ -288,7 +288,7 @@ export default function MeetingMinutesPage() {
           <textarea
             value={meeting.meeting_document || ""}
             onChange={e => setMeeting(m => m ? { ...m, meeting_document: e.target.value } : m)}
-            className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed min-h-[320px] resize-y outline-none focus:border-[#623FB5]"
+            className="w-full border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed min-h-[320px] resize-y outline-none focus:border-[#6A1FEB]"
             placeholder="회의 내용이 없습니다."
           />
         </div>
@@ -330,14 +330,14 @@ export default function MeetingMinutesPage() {
                   <input
                     defaultValue={task.title}
                     onBlur={e => handleTaskUpdate(task, "title", e.target.value)}
-                    className="h-9 flex-1 rounded-[7px] border border-[#E6E1E6] px-3 text-[13px] font-medium text-[#141414] outline-none transition focus:border-[#623FB5]"
+                    className="h-9 flex-1 rounded-[7px] border border-[#E6E1E6] px-3 text-[13px] font-medium text-[#141414] outline-none transition focus:border-[#6A1FEB]"
                     placeholder="업무명을 입력하세요"
                   />
                   <button
                     type="button"
                     onClick={() => toggleCollapse(task.meeting_task_id)}
                     className="text-xs font-medium whitespace-nowrap hover:underline"
-                    style={{ color: "#623FB5" }}
+                    style={{ color: "#6A1FEB" }}
                   >
                     {isCollapsed ? "펼치기 ▼" : "접기 ▲"}
                   </button>
@@ -347,15 +347,15 @@ export default function MeetingMinutesPage() {
                       onClick={() => setOpenAssigneeDropdown(
                         openAssigneeDropdown === task.meeting_task_id ? null : task.meeting_task_id
                       )}
-                      className="flex h-9 w-full items-center justify-between rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-3 text-left text-[13px] font-semibold text-[#141414] outline-none transition hover:border-[#623FB5] hover:bg-[#F4F1FF]"
+                      className="flex h-9 w-full items-center justify-between rounded-[7px] border border-[#969696] bg-[#FFFDFD] px-3 text-left text-[13px] font-semibold text-[#141414] outline-none transition hover:border-[#6A1FEB] hover:bg-[#F4F1FF]"
                     >
                       <span className="truncate">{task.owner || "미배정"}</span>
-                      <span className="ml-1 text-[12px] text-[#623FB5]">▾</span>
+                      <span className="ml-1 text-[12px] text-[#6A1FEB]">▾</span>
                     </button>
                     {openAssigneeDropdown === task.meeting_task_id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenAssigneeDropdown(null)} />
-                        <div className="absolute z-20 top-full mt-1 right-0 w-44 overflow-hidden rounded-[7px] border border-[#623FB5] bg-white py-1 shadow-lg shadow-[#623FB5]/10">
+                        <div className="absolute z-20 top-full mt-1 right-0 w-44 overflow-hidden rounded-[7px] border border-[#6A1FEB] bg-white py-1 shadow-lg shadow-[#6A1FEB]/10">
                           {meeting.participants?.map(p => (
                             <button
                               key={p.user_id}
@@ -365,8 +365,8 @@ export default function MeetingMinutesPage() {
                               }}
                               className={`w-full px-4 py-2.5 text-left text-[13px] font-medium transition
                                 ${task.owner === p.name
-                                  ? "bg-[#DCD0FE] text-[#623FB5] font-semibold"
-                                  : "text-[#141414] hover:bg-[#F4F1FF] hover:text-[#623FB5]"}`}
+                                  ? "bg-[#DCD0FE] text-[#6A1FEB] font-semibold"
+                                  : "text-[#141414] hover:bg-[#F4F1FF] hover:text-[#6A1FEB]"}`}
                             >
                               {p.name}
                             </button>
@@ -376,7 +376,7 @@ export default function MeetingMinutesPage() {
                               handleTaskAssigneeUpdate(task);
                               setOpenAssigneeDropdown(null);
                             }}
-                            className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-[#969696] hover:bg-[#F4F1FF] hover:text-[#623FB5]"
+                            className="w-full px-4 py-2.5 text-left text-[13px] font-medium text-[#969696] hover:bg-[#F4F1FF] hover:text-[#6A1FEB]"
                           >
                             미배정
                           </button>
@@ -389,23 +389,23 @@ export default function MeetingMinutesPage() {
                     type="date"
                     defaultValue={task.due_date || ""}
                     onBlur={e => handleTaskUpdate(task, "due_date", e.target.value)}
-                    className="h-9 w-32 rounded-[7px] border border-[#E6E1E6] px-2 text-[13px] font-medium text-[#141414] outline-none transition focus:border-[#623FB5]"
+                    className="h-9 w-32 rounded-[7px] border border-[#E6E1E6] px-2 text-[13px] font-medium text-[#141414] outline-none transition focus:border-[#6A1FEB]"
                   />
                   {/* 우선순위 커스텀 드롭다운 */}
                   <div className="relative w-28">
                     <button
                       onClick={() => setOpenPriorityDropdown(isPriorityOpen ? null : task.meeting_task_id)}
-                      className="flex h-9 w-full items-center justify-between rounded-[7px] border border-[#623FB5] bg-[#DCD0FE] px-3 text-left text-[13px] font-semibold text-[#623FB5] outline-none transition hover:bg-[#C4B6E5]"
+                      className="flex h-9 w-full items-center justify-between rounded-[7px] border border-[#6A1FEB] bg-[#DCD0FE] px-3 text-left text-[13px] font-semibold text-[#6A1FEB] outline-none transition hover:bg-[#C4B6E5]"
                     >
                       <span>{PRIORITY_LABEL[task.priority] || task.priority}</span>
-                      <span className="text-[12px] text-[#623FB5]">▾</span>
+                      <span className="text-[12px] text-[#6A1FEB]">▾</span>
                     </button>
                     {isPriorityOpen && (
                       <>
                         {/* 닫기 오버레이 */}
                         <div className="fixed inset-0 z-10" onClick={() => setOpenPriorityDropdown(null)} />
                         {/* 드롭다운 목록 */}
-                        <div className="absolute z-20 top-full mt-1 right-0 w-32 overflow-hidden rounded-[7px] border border-[#623FB5] bg-white py-1 shadow-lg shadow-[#623FB5]/10">
+                        <div className="absolute z-20 top-full mt-1 right-0 w-32 overflow-hidden rounded-[7px] border border-[#6A1FEB] bg-white py-1 shadow-lg shadow-[#6A1FEB]/10">
                           {[
                             { value: "Highest", label: "매우 높음" },
                             { value: "High", label: "높음" },
@@ -421,8 +421,8 @@ export default function MeetingMinutesPage() {
                               }}
                               className={`w-full px-3 py-2.5 text-left text-[13px] font-medium transition
                                 ${task.priority === opt.value
-                                  ? "mx-1 w-[calc(100%-8px)] rounded-[7px] bg-[#DCD0FE] text-[#623FB5] font-semibold"
-                                  : "text-[#141414] hover:bg-[#F4F1FF] hover:text-[#623FB5]"}`}
+                                  ? "mx-1 w-[calc(100%-8px)] rounded-[7px] bg-[#DCD0FE] text-[#6A1FEB] font-semibold"
+                                  : "text-[#141414] hover:bg-[#F4F1FF] hover:text-[#6A1FEB]"}`}
                             >
                               {opt.label}
                             </button>
@@ -445,7 +445,7 @@ export default function MeetingMinutesPage() {
                   <textarea
                     defaultValue={task.content || ""}
                     onBlur={e => handleTaskUpdate(task, "content", e.target.value)}
-                    className="mt-2 min-h-[72px] w-full resize-y rounded-[7px] border border-[#E6E1E6] bg-[#F4F5F8] px-3 py-2 text-[12px] text-[#555] outline-none transition focus:border-[#623FB5] focus:bg-white"
+                    className="mt-2 min-h-[72px] w-full resize-y rounded-[7px] border border-[#E6E1E6] bg-[#F4F5F8] px-3 py-2 text-[12px] text-[#555] outline-none transition focus:border-[#6A1FEB] focus:bg-white"
                     placeholder="업무 내용을 입력하세요"
                   />
                 )}
@@ -458,7 +458,7 @@ export default function MeetingMinutesPage() {
             type="button"
             onClick={handleAddTask}
             disabled={addingTask}
-            className="text-sm font-medium text-gray-700 hover:text-[#623FB5] disabled:cursor-not-allowed disabled:opacity-60"
+            className="text-sm font-medium text-gray-700 hover:text-[#6A1FEB] disabled:cursor-not-allowed disabled:opacity-60"
           >
             + 추가 하기
           </button>
@@ -475,7 +475,7 @@ export default function MeetingMinutesPage() {
               navigate(`/meetings/${meetingId}/jira`);
             }}
             className="px-5 py-2 text-white rounded-lg text-sm font-semibold"
-            style={{ backgroundColor: "#623FB5" }}
+            style={{ backgroundColor: "#6A1FEB" }}
           >
             Jira 등록 →
           </button>

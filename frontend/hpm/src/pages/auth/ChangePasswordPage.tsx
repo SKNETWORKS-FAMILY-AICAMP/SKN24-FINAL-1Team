@@ -79,7 +79,7 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-120px)] flex justify-center items-center">
+    <div className={`${(isFirstLogin || !user) ? "min-h-screen" : "min-h-[calc(100vh-120px)]"} flex justify-center items-center`}>
       <div className="w-[480px]">
         <ServiceLogo />
 

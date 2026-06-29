@@ -16,7 +16,7 @@ export default function GlobalLoginModal() {
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#969696]">
       <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
         <div className="px-8 py-10 text-center">
-          <p className="text-[#623FB5] text-[14px] leading-relaxed">로그인이 필요한 서비스입니다.</p>
+          <p className="text-[#6A1FEB] text-[14px] leading-relaxed">로그인이 필요한 서비스입니다.</p>
         </div>
         <div className="border-t border-gray-200">
           <button

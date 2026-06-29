@@ -24,7 +24,7 @@ function AddTaskButton({ className, onClick, style }: AddTaskButtonProps) {
       onClick={onClick}
       style={style}
       className={cn(
-        "mt-[23px] ml-[23px] flex items-center gap-[8px] rounded-[5px] border-0 bg-transparent p-0 transition-all duration-150 ease-out hover:text-[#623FB5] hover:opacity-80 active:scale-[0.97]",
+        "mt-[23px] ml-[23px] flex items-center gap-[8px] rounded-[5px] border-0 bg-transparent p-0 transition-all duration-150 ease-out hover:text-[#6A1FEB] hover:opacity-80 active:scale-[0.97]",
         className,
       )}
     >
@@ -45,7 +45,7 @@ function EmptyAddCard({ onClick }: EmptyAddCardProps) {
     <button
       type="button"
       onClick={onClick}
-      className=" flex ml-[23px] h-[142px] w-[306px] flex-col items-center justify-center gap-[12px] rounded-[10px] border border-dashed border-[#C4B6E5] bg-[#FFFDFD] p-0 text-center transition-all duration-150 ease-out hover:border-[#623FB5] hover:bg-[#F4F5F8] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985]"
+      className=" flex ml-[23px] h-[142px] w-[306px] flex-col items-center justify-center gap-[12px] rounded-[10px] border border-dashed border-[#C4B6E5] bg-[#FFFDFD] p-0 text-center transition-all duration-150 ease-out hover:border-[#6A1FEB] hover:bg-[#F4F5F8] hover:shadow-[1px_1px_14px_4px_rgba(98,63,181,0.18)] active:scale-[0.985]"
     >
       <img alt="" aria-hidden="true" className="size-[14px] object-contain" src={plusIcon} />
       <span className="text-[15px] font-normal leading-[1.2] text-[#141414]">
@@ -105,13 +105,13 @@ export default function KanbanColumn({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`absolute rounded-[12px] mt-[-20px] transition-all`}
+      className={`absolute rounded-[12px] mt-[-20px] mb-[45px] transition-all`}
       style={{
         left: column.left,
         top: KANBAN_COLUMN_TOP,
         width: 352,
         height: "auto",
-        backgroundColor: isOver ? "#E3DBF7" : "#ECECF2",
+        backgroundColor: "#ECECF2",
       }}
       data-name="dashboard-card-group"
     >

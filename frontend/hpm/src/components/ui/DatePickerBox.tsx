@@ -76,7 +76,7 @@ export default function DatePickerBox({
         }
       }}
       className={cn(
-        "relative flex w-[100px] cursor-pointer items-center justify-between overflow-hidden rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] text-[#141414] transition hover:border-[#623FB5] focus:border-[#623FB5] focus:outline-none",
+        "relative flex w-[100px] cursor-pointer items-center justify-between overflow-hidden rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] text-[#141414] transition hover:border-[#6A1FEB] focus:border-[#6A1FEB] focus:outline-none",
         className,
       )}
     >
@@ -109,7 +109,7 @@ export function FilterSelect({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
-        "w-[100px] cursor-pointer appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] text-[#141414] outline-none transition focus:border-[#623FB5]",
+        "w-[100px] cursor-pointer appearance-none rounded-md border border-gray-300 bg-white px-3 py-2 text-[12px] text-[#141414] outline-none transition focus:border-[#6A1FEB]",
         className,
       )}
     >

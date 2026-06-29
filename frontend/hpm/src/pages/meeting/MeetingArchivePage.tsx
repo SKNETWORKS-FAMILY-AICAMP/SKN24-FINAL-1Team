@@ -325,7 +325,7 @@ export default function MeetingArchivePage() {
 
   return (
     <div className="max-w-6xl mx-auto w-full py-10 px-6">
-      <h2 className="text-[22px] font-bold mb-6" style={{ color: "#141414" }}>
+      <h2 className="text-[22px] font-medium mb-6" style={{ color: "#141414" }}>
         {meeting.title}
       </h2>
 
@@ -337,8 +337,8 @@ export default function MeetingArchivePage() {
             onClick={() => setTab(t.key)}
             className="px-5 py-2.5 text-[14px] font-medium transition-colors"
             style={{
-              color: tab === t.key ? "#623FB5" : "#969696",
-              borderBottom: tab === t.key ? "2px solid #623FB5" : "2px solid transparent",
+              color: tab === t.key ? "#6A1FEB" : "#969696",
+              borderBottom: tab === t.key ? "2px solid #6A1FEB" : "2px solid transparent",
               marginBottom: "-1px",
             }}
           >
@@ -354,7 +354,7 @@ export default function MeetingArchivePage() {
             <button
               onClick={handlePdfDownload}
               disabled={downloading}
-              className="px-5 py-2 text-[13px] text-white rounded-lg bg-[#623FB5] transition-colors duration-150 hover:bg-[#5635A8] active:bg-[#4B2F93] disabled:cursor-not-allowed disabled:bg-[#969696] disabled:opacity-60"
+              className="px-5 py-2 text-[13px] text-white rounded-lg bg-[#6A1FEB] transition-colors duration-150 hover:bg-[#5635A8] active:bg-[#4B2F93] disabled:cursor-not-allowed disabled:bg-[#969696] disabled:opacity-60"
             >
               {downloading ? "생성 중..." : "PDF 다운로드"}
             </button>
@@ -363,7 +363,7 @@ export default function MeetingArchivePage() {
           {/* 회의록 카드 */}
           <div className="rounded-xl border mb-6" style={{ borderColor: "#E6E1E6" }}>
             <div className="px-6 py-4 border-b" style={{ borderColor: "#E6E1E6" }}>
-              <span className="text-[15px] font-bold" style={{ color: "#141414" }}>회의록</span>
+              <span className="text-[15px] font-medium" style={{ color: "#141414" }}>회의록</span>
             </div>
 
             <table className="w-full text-[13px]" style={{ borderCollapse: "collapse" }}>
@@ -443,7 +443,7 @@ export default function MeetingArchivePage() {
                   <span style={{ fontSize: "13px", color: "#141414" }}>{task.title}</span>
                   <button
                     onClick={() => toggleExpand(task.meeting_task_id)}
-                    style={{ color: "#623FB5", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", justifySelf: "center" }}
+                    style={{ color: "#6A1FEB", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap", justifySelf: "center" }}
                   >
                     {expandedIds.has(task.meeting_task_id) ? "접기 ▲" : "펼치기 ▼"}
                   </button>
@@ -467,7 +467,7 @@ export default function MeetingArchivePage() {
       {/* 녹음 원문 탭 */}
       {tab === "record" && (
         <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
-          <div className="px-6 py-4 border-b font-bold text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
+          <div className="px-6 py-4 border-b font-medium text-[15px]" style={{ borderColor: "#E6E1E6", color: "#141414" }}>
             녹음 원문
           </div>
           <div className="px-6 py-5 flex flex-col gap-4">
@@ -480,7 +480,7 @@ export default function MeetingArchivePage() {
                     {item.time}
                   </span>
                   <div className="flex-1">
-                    <span className="text-[12px] font-semibold" style={{ color: "#623FB5" }}>
+                    <span className="text-[12px] font-semibold" style={{ color: "#6A1FEB" }}>
                       {item.meeting_user_name || item.speaker}
                     </span>
                     <div className="mt-1 rounded-lg px-4 py-3 text-[13px] leading-relaxed" style={{ backgroundColor: "#F9F9FB", color: "#333" }}>
@@ -537,7 +537,7 @@ export default function MeetingArchivePage() {
               disabled={!hasMeetingMaterial}
               className={`px-5 py-2 text-[13px] text-white rounded-lg transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-60 ${
                 hasMeetingMaterial
-                  ? "bg-[#623FB5] hover:bg-[#5635A8] active:bg-[#4B2F93]"
+                  ? "bg-[#6A1FEB] hover:bg-[#5635A8] active:bg-[#4B2F93]"
                   : "bg-[#969696]"
               }`}
             >
@@ -547,7 +547,7 @@ export default function MeetingArchivePage() {
 
           {/* 기초안건 */}
           <div className="mb-5">
-            <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>기초 안건</p>
+            <p className="text-[14px] font-medium mb-2" style={{ color: "#141414" }}>기초 안건</p>
             <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
               {agenda.length === 0 ? (
                 <p style={{ color: "#969696" }}>{EMPTY_MATERIAL_TEXT}</p>
@@ -568,7 +568,7 @@ export default function MeetingArchivePage() {
               { label: "회의 종료 후 기대 결과", value: prep?.effect },
             ].map(section => (
               <div key={section.label}>
-                <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>{section.label}</p>
+                <p className="text-[14px] font-medium mb-2" style={{ color: "#141414" }}>{section.label}</p>
                 <div className="border rounded-xl px-5 py-4 text-[13px] whitespace-pre-line leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
                   {section.value ? (
                     section.value
@@ -580,13 +580,13 @@ export default function MeetingArchivePage() {
             ))}
 
             <div>
-              <p className="text-[14px] font-bold mb-2" style={{ color: "#141414" }}>참고 자료</p>
+              <p className="text-[14px] font-medium mb-2" style={{ color: "#141414" }}>참고 자료</p>
               <div className="border rounded-xl px-5 py-3 space-y-1" style={{ borderColor: "#E6E1E6" }}>
                 {prep?.sources?.length ? (
                   prep.sources.map((src, i) => (
                     <p key={i} className="text-[13px]">
                       <span style={{ color: "#141414" }}>- {src.title} </span>
-                      <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#623FB5" }}>더보기</a>
+                      <a href={src.file_url} target="_blank" rel="noreferrer" className="cursor-pointer hover:underline" style={{ color: "#6A1FEB" }}>더보기</a>
                     </p>
                   ))
                 ) : (
@@ -604,7 +604,7 @@ export default function MeetingArchivePage() {
           <p className="text-[13px] mb-4" style={{ color: "#969696" }}>요약 이메일입니다.</p>
 
           {emailSent && (
-            <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-lg text-[13px] font-medium" style={{ backgroundColor: "#F2F0FF", color: "#623FB5" }}>
+            <div className="flex items-center gap-2 mb-4 px-4 py-3 rounded-lg text-[13px] font-medium" style={{ backgroundColor: "#F2F0FF", color: "#6A1FEB" }}>
               메일이 발송되었습니다.
             </div>
           )}
@@ -620,7 +620,7 @@ export default function MeetingArchivePage() {
 
                   {/* 회의 정보 */}
                   <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
-                    <p className="px-5 pt-4 pb-2 text-[13px] font-bold" style={{ color: "#141414" }}>회의 정보</p>
+                    <p className="px-5 pt-4 pb-2 text-[13px] font-medium" style={{ color: "#141414" }}>회의 정보</p>
                     <div className="px-5 pb-4 flex flex-col gap-2 text-[13px]">
                       <div className="flex gap-3">
                         <span style={{ color: "#969696", minWidth: "70px" }}>회의 일시</span>
@@ -635,7 +635,7 @@ export default function MeetingArchivePage() {
 
                   {/* 부여된 태스크 */}
                   <div className="rounded-xl border" style={{ borderColor: "#E6E1E6" }}>
-                    <p className="px-5 pt-4 pb-2 text-[13px] font-bold" style={{ color: "#141414" }}>부여된 태스크</p>
+                    <p className="px-5 pt-4 pb-2 text-[13px] font-medium" style={{ color: "#141414" }}>부여된 태스크</p>
                     <table className="w-full text-[12px]" style={{ borderCollapse: "collapse" }}>
                       <thead>
                         <tr style={{ backgroundColor: "#F4F5F8", borderTop: "1px solid #E6E1E6", borderBottom: "1px solid #E6E1E6" }}>
@@ -652,7 +652,7 @@ export default function MeetingArchivePage() {
                             <td className="px-4 py-3 whitespace-nowrap" style={{ color: "#555" }}>{task.owner || "미배정"}</td>
                             <td className="px-4 py-3 whitespace-nowrap" style={{ color: "#555" }}>{task.due_date || "-"}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <span className="px-2 py-0.5 rounded-full text-[11px]" style={{ backgroundColor: "#F2F0FF", color: "#623FB5" }}>
+                              <span className="px-2 py-0.5 rounded-full text-[11px]" style={{ backgroundColor: "#F2F0FF", color: "#6A1FEB" }}>
                                 {PRIORITY_LABEL[task.priority] || task.priority}
                               </span>
                             </td>
@@ -664,7 +664,7 @@ export default function MeetingArchivePage() {
 
                   {/* 이메일 수신자 */}
                   <div className="rounded-xl border p-4" style={{ borderColor: "#E6E1E6" }}>
-                    <p className="text-[13px] font-bold mb-3" style={{ color: "#141414" }}>이메일 수신자</p>
+                    <p className="text-[13px] font-medium mb-3" style={{ color: "#141414" }}>이메일 수신자</p>
                     <div className="rounded-xl border bg-white p-3" style={{ borderColor: "#E6E1E6" }}>
                       <div className="flex flex-wrap items-center gap-2">
                         {recipients.map(r => (
@@ -733,14 +733,14 @@ export default function MeetingArchivePage() {
 
                 {/* 이메일 미리보기 */}
                 <div className="w-[440px] flex-shrink-0">
-                  <p className="text-[14px] font-bold mb-3" style={{ color: "#141414" }}>이메일 미리보기</p>
+                  <p className="text-[14px] font-medium mb-3" style={{ color: "#141414" }}>이메일 미리보기</p>
                   <div className="rounded-xl border px-6 py-5 text-[13px] leading-relaxed" style={{ borderColor: "#E6E1E6", color: "#333" }}>
                     <p className="mb-4">안녕하세요, OOO.</p>
                     <p className="mb-4">회의록이 확정되었습니다. 아래 태스크가 회원님께 부여되었으니 기한 내에 처리해 주세요.</p>
-                    <p className="font-bold mb-1">[회의 정보]</p>
+                    <p className="font-medium mb-1">[회의 정보]</p>
                     <p>• 회의 제목: {meeting.title}</p>
                     <p className="mb-4">• 회의 일시: {formatDate(meeting.meeting_at)}</p>
-                    <p className="font-bold mb-1">[부여된 태스크]</p>
+                    <p className="font-medium mb-1">[부여된 태스크]</p>
                     {tasks.map((task, i) => (
                       <p key={task.meeting_task_id}>
                         {i + 1}. {task.title} (담당자: {task.owner}, 기한: {task.due_date || "-"}, 우선순위: {PRIORITY_LABEL[task.priority] || task.priority})
@@ -758,7 +758,7 @@ export default function MeetingArchivePage() {
                   onClick={() => setShowEmailConfirmModal(true)}
                   disabled={emailSending || recipients.length === 0}
                   className="px-8 py-3 text-[14px] text-white rounded-lg font-semibold disabled:opacity-50"
-                  style={{ backgroundColor: "#623FB5" }}
+                  style={{ backgroundColor: "#6A1FEB" }}
                 >
                   {emailSending ? "발송 중..." : "이메일 발송"}
                 </button>
@@ -782,7 +782,7 @@ export default function MeetingArchivePage() {
                   </button>
                   <button
                     onClick={() => { setShowEmailConfirmModal(false); handleEmailSend(); }}
-                    className="flex-1 py-4 text-sm font-bold text-[#623FB5] hover:bg-gray-50 transition"
+                    className="flex-1 py-4 text-sm font-medium text-[#6A1FEB] hover:bg-gray-50 transition"
                   >
                     확인
                   </button>

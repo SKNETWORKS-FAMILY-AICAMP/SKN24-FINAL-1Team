@@ -19,13 +19,13 @@ export default function SpeakerMappingStepper({ steps }: SpeakerMappingStepperPr
           <div key={step.id}>
             <div
               className={`absolute top-[4px] size-[26px] rounded-full ${
-                isActive ? "bg-[#623fb5] shadow-[0_0_0_4px_rgba(98,63,181,0.14)]" : "bg-[#969696]"
+                isActive ? "bg-[#6A1FEB] shadow-[0_0_0_4px_rgba(98,63,181,0.14)]" : "bg-[#969696]"
               }`}
               style={{ left }}
             />
             <p
               className={`absolute top-[44px] -translate-x-1/2 whitespace-nowrap text-center text-[15px] font-normal ${
-                isActive ? "text-[#623fb5]" : "text-[#969696]"
+                isActive ? "text-[#6A1FEB]" : "text-[#969696]"
               }`}
               style={{ left: labelLeft + 49 }}
             >

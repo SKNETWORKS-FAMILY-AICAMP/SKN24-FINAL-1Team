@@ -284,14 +284,14 @@ export default function UserManagementPage() {
   }: { message: React.ReactNode; onConfirm: () => void; onCancel: () => void }) => (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div className="bg-white rounded-xl p-10 w-[560px] shrink-0">
-        <p className="text-[16px] text-[#623FB5] font-medium text-center leading-relaxed mb-10">{message}</p>
+        <p className="text-[16px] text-[#6A1FEB] font-medium text-center leading-relaxed mb-10">{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel}
             className="flex-1 py-3 border border-[#E5E5E5] rounded-md text-[15px] text-[#0A0A0A] hover:bg-[#F6F5FA] transition-colors">
             취소
           </button>
           <button onClick={onConfirm}
-            className="flex-1 py-3 bg-[#623FB5] text-white rounded-md text-[15px] hover:opacity-90 transition-opacity">
+            className="flex-1 py-3 bg-[#6A1FEB] text-white rounded-md text-[15px] hover:opacity-90 transition-opacity">
             확인
           </button>
         </div>
@@ -335,7 +335,7 @@ export default function UserManagementPage() {
             <div className="flex gap-2 ml-auto">
               <button
                 onClick={() => setShowRegisterModal(true)}
-                className="px-5 py-3 bg-[#623FB5] text-white text-[15px] rounded-md hover:opacity-90 transition-opacity"
+                className="px-5 py-3 bg-[#6A1FEB] text-white text-[15px] rounded-md hover:opacity-90 transition-opacity"
               >
                 등록
               </button>
@@ -343,7 +343,7 @@ export default function UserManagementPage() {
                 onClick={() => selectedIds.length > 0 && setShowDeleteModal(true)}
                 className={`px-5 py-3 text-[15px] rounded-md text-white transition-all ${
                   selectedIds.length > 0
-                    ? "bg-[#623FB5] hover:opacity-90 cursor-pointer"
+                    ? "bg-[#6A1FEB] hover:opacity-90 cursor-pointer"
                     : "bg-[#969696] cursor-not-allowed"
                 }`}
               >
@@ -457,13 +457,13 @@ export default function UserManagementPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowSaveModal(true)}
-                    className="px-4 py-2 bg-[#623FB5] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
+                    className="px-4 py-2 bg-[#6A1FEB] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
                   >
                     저장
                   </button>
                   <button
                     onClick={() => setShowResetPwModal(true)}
-                    className="flex items-center gap-1 px-3 py-2 bg-[#623FB5] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1 px-3 py-2 bg-[#6A1FEB] text-white text-[13px] rounded-md hover:opacity-90 transition-opacity"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -479,18 +479,18 @@ export default function UserManagementPage() {
               <div className="flex flex-col gap-[7px]">
                 <label className="text-[13px] text-[#0A0A0A]">사원번호</label>
                 <input value={editForm.emp_no} onChange={(e) => setEditForm({ ...editForm, emp_no: e.target.value })}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
               </div>
               <div className="flex gap-[33px] mt-[32px]">
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">이름</label>
                   <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">이메일</label>
                   <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 </div>
               </div>
 
@@ -511,7 +511,7 @@ export default function UserManagementPage() {
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">직무</label>
                   <input value={editForm.work} onChange={(e) => setEditForm({ ...editForm, work: e.target.value })}
-                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                    className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 </div>
                 <div className="flex flex-col gap-[7px] flex-1">
                   <label className="text-[13px] text-[#0A0A0A]">재직 상태</label>
@@ -570,10 +570,10 @@ export default function UserManagementPage() {
                 <input value={registerForm.emp_no}
                   onChange={(e) => setRegisterForm({ ...registerForm, emp_no: e.target.value })}
                   placeholder="예: 2026-HR-3" maxLength={20}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 <div className="flex justify-between items-center">
-                  <span className="text-[12px] text-blue-500">{registerErrors.emp_no}</span>
-                  <span className="text-[12px] text-[#969696]">{registerForm.emp_no.length}/20</span>
+                  <span className="text-[15px] text-blue-500">{registerErrors.emp_no}</span>
+                  <span className="text-[15px] text-[#969696]">{registerForm.emp_no.length}/20</span>
                 </div>
               </div>
 
@@ -583,10 +583,10 @@ export default function UserManagementPage() {
                 <input value={registerForm.name}
                   onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
                   placeholder="이름" maxLength={30}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 <div className="flex justify-between items-center">
-                  <span className="text-[12px] text-blue-500">{registerErrors.name}</span>
-                  <span className="text-[12px] text-[#969696]">{registerForm.name.length}/30</span>
+                  <span className="text-[15px] text-blue-500">{registerErrors.name}</span>
+                  <span className="text-[15px] text-[#969696]">{registerForm.name.length}/30</span>
                 </div>
               </div>
 
@@ -597,12 +597,12 @@ export default function UserManagementPage() {
                   <input value={registerForm.emailPrefix}
                     onChange={(e) => setRegisterForm({ ...registerForm, emailPrefix: e.target.value })}
                     placeholder="예: hpm123" maxLength={50}
-                    className="flex-1 px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                    className="flex-1 px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                   <span className="text-[15px] text-[#0A0A0A] whitespace-nowrap">@company.com</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-[12px] text-blue-500">{registerErrors.email}</span>
-                  <span className="text-[12px] text-[#969696]">{registerForm.emailPrefix.length}/50</span>
+                  <span className="text-[15px] text-blue-500">{registerErrors.email}</span>
+                  <span className="text-[15px] text-[#969696]">{registerForm.emailPrefix.length}/50</span>
                 </div>
               </div>
 
@@ -619,10 +619,10 @@ export default function UserManagementPage() {
                 <input value={registerForm.dept}
                   onChange={(e) => setRegisterForm({ ...registerForm, dept: e.target.value })}
                   placeholder="예: 개발팀" maxLength={50}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 <div className="flex justify-between items-center">
-                  <span className="text-[12px] text-blue-500">{registerErrors.dept}</span>
-                  <span className="text-[12px] text-[#969696]">{registerForm.dept.length}/50</span>
+                  <span className="text-[15px] text-blue-500">{registerErrors.dept}</span>
+                  <span className="text-[15px] text-[#969696]">{registerForm.dept.length}/50</span>
                 </div>
               </div>
 
@@ -632,7 +632,7 @@ export default function UserManagementPage() {
                 <input value={registerForm.rank}
                   onChange={(e) => setRegisterForm({ ...registerForm, rank: e.target.value })}
                   placeholder="예: 대리" maxLength={5}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 <div className="flex justify-between items-center">
                   <span className="text-[12px] text-blue-500">{registerErrors.rank}</span>
                   <span className="text-[12px] text-[#969696]">{registerForm.rank.length}/5</span>
@@ -645,7 +645,7 @@ export default function UserManagementPage() {
                 <input value={registerForm.work}
                   onChange={(e) => setRegisterForm({ ...registerForm, work: e.target.value })}
                   placeholder="예: 백엔드 개발" maxLength={30}
-                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#623FB5] transition-colors" />
+                  className="w-full px-4 py-3 border border-[#E5E5E5] rounded-md text-[15px] outline-none focus:border-[#6A1FEB] transition-colors" />
                 <div className="flex justify-between items-center">
                   <span className="text-[12px] text-blue-500">{registerErrors.work}</span>
                   <span className="text-[12px] text-[#969696]">{registerForm.work.length}/30</span>
@@ -666,7 +666,7 @@ export default function UserManagementPage() {
                 취소
               </button>
               <button onClick={handleRegisterSubmit}
-                className="flex-1 py-3 rounded-md text-[15px] text-white bg-[#623FB5] hover:opacity-90 transition-opacity">
+                className="flex-1 py-3 rounded-md text-[15px] text-white bg-[#6A1FEB] hover:opacity-90 transition-opacity">
                 사용자 등록
               </button>
             </div>

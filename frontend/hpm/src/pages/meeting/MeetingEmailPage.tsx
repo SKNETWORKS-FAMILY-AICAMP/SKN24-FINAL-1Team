@@ -118,12 +118,12 @@ export default function MeetingEmailPage() {
 
       {sent ? (
         <div className="rounded-xl border border-[#E6E1E6] bg-white px-8 py-14 text-center">
-          <p className="text-[15px] font-semibold text-[#623FB5]">메일이 참여자 전체에게 발송되었습니다.</p>
+          <p className="text-[15px] font-semibold text-[#6A1FEB]">메일이 참여자 전체에게 발송되었습니다.</p>
           <div className="mt-6 flex justify-center gap-3">
             <button
               type="button"
               onClick={() => navigate(`/meetings/${meetingId}/archive`)}
-              className="rounded-lg bg-[#623FB5] px-5 py-2 text-sm font-semibold text-white"
+              className="rounded-lg bg-[#6A1FEB] px-5 py-2 text-sm font-semibold text-white"
             >
               회의 후 상세보기
             </button>
@@ -146,7 +146,7 @@ export default function MeetingEmailPage() {
               </div>
 
               <div className="rounded-xl border border-[#E6E1E6] bg-white">
-                <p className="px-5 pb-2 pt-4 text-[13px] font-bold text-[#141414]">회의 정보</p>
+                <p className="px-5 pb-2 pt-4 text-[13px] font-medium text-[#141414]">회의 정보</p>
                 <div className="flex flex-col gap-2 px-5 pb-4 text-[13px]">
                   <div className="flex gap-3">
                     <span className="min-w-[70px] text-[#969696]">회의 일시</span>
@@ -162,7 +162,7 @@ export default function MeetingEmailPage() {
               </div>
 
               <div className="rounded-xl border border-[#E6E1E6] bg-white">
-                <p className="px-5 pb-2 pt-4 text-[13px] font-bold text-[#141414]">부여된 태스크</p>
+                <p className="px-5 pb-2 pt-4 text-[13px] font-medium text-[#141414]">부여된 태스크</p>
                 <table className="w-full border-collapse text-[12px]">
                   <thead>
                     <tr className="border-y border-[#E6E1E6] bg-[#F4F5F8]">
@@ -183,7 +183,7 @@ export default function MeetingEmailPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-[#555]">{task.owner || "미배정"}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-[#555]">{task.due_date || "-"}</td>
                         <td className="whitespace-nowrap px-4 py-3">
-                          <span className="rounded-full bg-[#F2F0FF] px-2 py-0.5 text-[11px] text-[#623FB5]">
+                          <span className="rounded-full bg-[#F2F0FF] px-2 py-0.5 text-[11px] text-[#6A1FEB]">
                             {PRIORITY_LABEL[task.priority] || task.priority || "중간"}
                           </span>
                         </td>
@@ -194,7 +194,7 @@ export default function MeetingEmailPage() {
               </div>
 
               <div className="rounded-xl border border-[#E6E1E6] bg-white p-4">
-        <p className="mb-3 text-[13px] font-bold text-[#141414]">이메일 수신자</p>
+        <p className="mb-3 text-[13px] font-medium text-[#141414]">이메일 수신자</p>
         <div className="min-h-[48px] border border-[#E6E1E6] rounded-xl px-3 py-2.5 flex flex-wrap gap-2 mb-2">
           {recipients.map((r) => (
             <span
@@ -221,7 +221,7 @@ export default function MeetingEmailPage() {
             onFocus={() => setShowDropdown(true)}
             onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
             placeholder="이름으로 수신자 추가"
-            className="w-full border border-[#E6E1E6] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#623FB5] transition"
+            className="w-full border border-[#E6E1E6] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#6A1FEB] transition"
           />
           {showDropdown && filteredUsers.length > 0 && (
             <ul className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-[#E6E1E6] rounded-xl shadow-md max-h-40 overflow-y-auto">
@@ -241,14 +241,14 @@ export default function MeetingEmailPage() {
             </div>
 
             <div className="w-[440px] shrink-0">
-              <p className="mb-3 text-[14px] font-bold text-[#141414]">이메일 미리보기</p>
+              <p className="mb-3 text-[14px] font-medium text-[#141414]">이메일 미리보기</p>
               <div className="rounded-xl border border-[#E6E1E6] bg-white px-6 py-5 text-[13px] leading-relaxed text-[#333]">
                 <p className="mb-4">안녕하세요, OOO.</p>
                 <p className="mb-4">회의록이 확정되었습니다. 아래 태스크가 부여되었으니 기한 내에 처리해 주세요.</p>
-                <p className="mb-1 font-bold">[회의 정보]</p>
+                <p className="mb-1 font-medium">[회의 정보]</p>
                 <p>• 회의 제목: {meeting.title}</p>
                 <p className="mb-4">• 회의 일시: {formatDate(meeting.meeting_at)}</p>
-                <p className="mb-1 font-bold">[부여된 태스크]</p>
+                <p className="mb-1 font-medium">[부여된 태스크]</p>
                 {tasks.length === 0 ? (
                   <p>등록된 태스크가 없습니다.</p>
                 ) : tasks.map((task, index) => (
@@ -267,7 +267,7 @@ export default function MeetingEmailPage() {
               type="button"
               onClick={handleSend}
               disabled={sending || recipients.length === 0}
-              className="rounded-lg bg-[#623FB5] px-8 py-3 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
+              className="rounded-lg bg-[#6A1FEB] px-8 py-3 text-[14px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#969696]"
             >
               {sending ? "발송 중..." : "이메일 발송"}
             </button>

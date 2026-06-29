@@ -506,7 +506,7 @@ export default function MeetingDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed whitespace-pre-line">
                 {"5분 미만의 녹음은 회의록이\n생성되지 않습니다. 종료하시겠습니까?"}
               </p>
             </div>
@@ -519,7 +519,7 @@ export default function MeetingDetailPage() {
               </button>
               <button
                 onClick={() => { setShowShortRecordingModal(false); finishWithoutMinutes(); }}
-                className="flex-1 py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+                className="flex-1 py-4 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
               >
                 확인
               </button>
@@ -533,14 +533,14 @@ export default function MeetingDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed whitespace-pre-line">
                 {"회의 녹음 최대 시간은 2시간입니다.\n10분 후 회의가 종료될 예정입니다."}
               </p>
             </div>
             <div className="border-t border-gray-200">
               <button
                 onClick={() => setShowTenMinWarningModal(false)}
-                className="w-full py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+                className="w-full py-4 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
               >
                 확인
               </button>
@@ -554,14 +554,14 @@ export default function MeetingDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
           <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
             <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
+              <p className="text-[#6A1FEB] text-[14px] leading-relaxed whitespace-pre-line">
                 {"회의가 최대 시간에 도달하였습니다.\n회의를 종료합니다."}
               </p>
             </div>
             <div className="border-t border-gray-200">
               <button
                 onClick={() => { setShowMaxTimeModal(false); doEndMeeting(); }}
-                className="w-full py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+                className="w-full py-4 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
               >
                 확인
               </button>
@@ -576,7 +576,7 @@ export default function MeetingDetailPage() {
           className={`flex flex-col md:flex-row items-center justify-between p-6 ${DESIGN.BORDER_COLORS.lightGray} ${DESIGN.RADIUS_SIZES.xl} ${DESIGN.BACKGROUND_COLORS.white} shadow-sm gap-6`}
         >
           <div className="flex-1">
-            <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-bold mb-2`}>
+            <h1 className={`${DESIGN.FONT_SIZES.h3} ${DESIGN.COLORS.black} font-medium mb-2`}>
               {meeting.title}
             </h1>
 
@@ -602,7 +602,7 @@ export default function MeetingDetailPage() {
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="text-[32px] font-bold tabular-nums text-gray-900 leading-none">
+            <div className="text-[32px] font-medium tabular-nums text-gray-900 leading-none">
               {isInProgress ? fmt(elapsed) : "00:00:00"}
             </div>
 
@@ -626,7 +626,7 @@ export default function MeetingDetailPage() {
                     type="button"
                     onClick={handleEnd}
                     disabled={endLoading}
-                    className="rounded-[8px] bg-[#623FB5] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
+                    className="rounded-[8px] bg-[#6A1FEB] px-4 py-2 text-sm font-semibold text-white disabled:bg-[#969696]"
                   >
                     회의 종료
                   </button>
@@ -661,18 +661,18 @@ export default function MeetingDetailPage() {
                             key={idx}
                             className={`${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.RADIUS_SIZES.md} p-4 border border-[#E6E1E6] flex gap-3 items-center`}
                           >
-                            <span className="text-[#623FB5] font-bold text-[15px] flex-shrink-0">{idx + 1}.</span>
+                            <span className="text-[#6A1FEB] font-medium text-[15px] flex-shrink-0">{idx + 1}.</span>
                             <input
                               type="text"
                               value={content}
                               onChange={(e) => handleAgendaChange(idx, e.target.value)}
-                              className="flex-1 border border-[#E6E1E6] rounded-lg px-3 py-2 text-sm text-[#141414] outline-none focus:border-[#623FB5] transition"
+                              className="flex-1 border border-[#E6E1E6] rounded-lg px-3 py-2 text-sm text-[#141414] outline-none focus:border-[#6A1FEB] transition"
                               placeholder="안건 내용을 입력하세요"
                             />
                             <button
                               type="button"
                               onClick={() => removeAgendaItem(idx)}
-                              className="text-gray-400 hover:text-red-500 font-bold text-lg px-2"
+                              className="text-gray-400 hover:text-red-500 font-medium text-lg px-2"
                             >
                               ×
                             </button>
@@ -681,7 +681,7 @@ export default function MeetingDetailPage() {
                         <button
                           type="button"
                           onClick={addAgendaItem}
-                          className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-sm hover:border-[#623FB5] hover:text-[#623FB5] transition"
+                          className="w-full py-2.5 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 text-sm hover:border-[#6A1FEB] hover:text-[#6A1FEB] transition"
                         >
                           + 안건 추가
                         </button>
@@ -690,7 +690,7 @@ export default function MeetingDetailPage() {
                             type="button"
                             onClick={saveEditedAgendas}
                             className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold"
-                            style={{ backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }}
+                            style={{ backgroundColor: "#6A1FEB", color: "#ffffff", borderColor: "#6A1FEB" }}
                           >
                             완료
                           </button>
@@ -703,7 +703,7 @@ export default function MeetingDetailPage() {
                             key={idx}
                             className={`${DESIGN.BACKGROUND_COLORS.white} ${DESIGN.RADIUS_SIZES.md} p-4 border border-[#E6E1E6] flex gap-3 items-start`}
                           >
-                            <span className="text-[#623FB5] font-bold text-[15px]">{idx + 1}.</span>
+                            <span className="text-[#6A1FEB] font-medium text-[15px]">{idx + 1}.</span>
                             <div>
                               <p className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>
                                 {item.content}
@@ -739,7 +739,7 @@ export default function MeetingDetailPage() {
 
                   <button
                     onClick={() => navigate(`/meetings/${meetingId}/upload`, { state: { showAgenda: true, showPrepMaterial } })}
-                    className="px-4 py-2 rounded-lg bg-[#623FB5] text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition"
+                    className="px-4 py-2 rounded-lg bg-[#6A1FEB] text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition"
                   >
                     기초 안건 생성
                   </button>
@@ -772,44 +772,44 @@ export default function MeetingDetailPage() {
                     {isEditingPrep ? (
                       <>
                         <div>
-                          <p className="font-bold text-sm text-[#141414] mb-2">회의 목적</p>
+                          <p className="font-medium text-sm text-[#141414] mb-2">회의 목적</p>
                           <textarea
                             value={editedPrep.purpose}
                             onChange={(e) => setEditedPrep(prev => ({ ...prev, purpose: e.target.value }))}
                             rows={3}
-                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#6A1FEB] resize-none transition"
                           />
                         </div>
 
                         <div>
-                          <p className="font-bold text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
+                          <p className="font-medium text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
                           <textarea
                             value={editedPrep.project_status}
                             onChange={(e) => setEditedPrep(prev => ({ ...prev, project_status: e.target.value }))}
                             rows={5}
-                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#6A1FEB] resize-none transition"
                           />
                         </div>
 
                         <div>
-                          <p className="font-bold text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
+                          <p className="font-medium text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
                           <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6]">
                             <p className="whitespace-pre-wrap text-[13px] text-[#767676]">{editedPrep.rule || "-"}</p>
                           </div>
                         </div>
 
                         <div>
-                          <p className="font-bold text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
+                          <p className="font-medium text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
                           <textarea
                             value={editedPrep.effect}
                             onChange={(e) => setEditedPrep(prev => ({ ...prev, effect: e.target.value }))}
                             rows={3}
-                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#623FB5] resize-none transition"
+                            className="w-full bg-white rounded-xl p-4 border border-[#E6E1E6] text-sm text-[#141414] outline-none focus:border-[#6A1FEB] resize-none transition"
                           />
                         </div>
 
                         <div>
-                          <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                          <p className="font-medium text-sm text-[#141414] mb-2">출처</p>
                           <div className="bg-gray-50 rounded-xl p-4 border border-[#E6E1E6] space-y-2">
                             {prepMaterial && prepMaterial.sources && prepMaterial.sources.length > 0 ? (
                               prepMaterial.sources.map((src, i) => (
@@ -820,7 +820,7 @@ export default function MeetingDetailPage() {
                                       href={src.file_url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                                      className="text-[#6A1FEB] hover:underline font-semibold cursor-pointer"
                                     >
                                       더보기
                                     </a>
@@ -847,7 +847,7 @@ export default function MeetingDetailPage() {
                             type="button"
                             onClick={saveEditedPrep}
                             className="px-4 py-2 text-[13px] rounded-lg border transition font-semibold"
-                            style={{ backgroundColor: "#623FB5", color: "#ffffff", borderColor: "#623FB5" }}
+                            style={{ backgroundColor: "#6A1FEB", color: "#ffffff", borderColor: "#6A1FEB" }}
                           >
                             완료
                           </button>
@@ -858,35 +858,35 @@ export default function MeetingDetailPage() {
                         {prepMaterial ? (
                           <>
                             <div>
-                              <p className="font-bold text-sm text-[#141414] mb-2">회의 목적</p>
+                              <p className="font-medium text-sm text-[#141414] mb-2">회의 목적</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
                                 <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.purpose || "-"}</p>
                               </div>
                             </div>
 
                             <div>
-                              <p className="font-bold text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
+                              <p className="font-medium text-sm text-[#141414] mb-2">프로젝트 현재 상태</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
                                 <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.project_status || "-"}</p>
                               </div>
                             </div>
 
                             <div>
-                              <p className="font-bold text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
+                              <p className="font-mediumum text-sm text-[#141414] mb-2">관련 규정 및 제약사항</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
                                 <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.rule || "-"}</p>
                               </div>
                             </div>
 
                             <div>
-                              <p className="font-bold text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
+                              <p className="font-medium text-sm text-[#141414] mb-2">회의 종료 후 기대 결과</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6]">
                                 <p className="whitespace-pre-wrap text-[13px] text-[#555555]">{prepMaterial.effect || "-"}</p>
                               </div>
                             </div>
 
                             <div>
-                              <p className="font-bold text-sm text-[#141414] mb-2">출처</p>
+                              <p className="font-medium text-sm text-[#141414] mb-2">출처</p>
                               <div className="bg-white rounded-xl p-4 border border-[#E6E1E6] space-y-2">
                                 {prepMaterial.sources && prepMaterial.sources.length > 0 ? (
                                   prepMaterial.sources.map((src, i) => (
@@ -897,7 +897,7 @@ export default function MeetingDetailPage() {
                                           href={src.file_url}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-[#623FB5] hover:underline font-semibold cursor-pointer"
+                                          className="text-[#6A1FEB] hover:underline font-semibold cursor-pointer"
                                         >
                                           더보기
                                         </a>
@@ -947,7 +947,7 @@ export default function MeetingDetailPage() {
                     onClick={() => navigate(`/meetings/${meetingId}/upload`, {
                       state: { type: "prep", projectId: meeting.project, showAgenda, showPrepMaterial }
                     })}
-                    className="px-4 py-2 rounded-lg bg-[#623FB5] text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition"
+                    className="px-4 py-2 rounded-lg bg-[#6A1FEB] text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition"
                   >
                     회의 준비 자료 생성
                   </button>
@@ -960,7 +960,7 @@ export default function MeetingDetailPage() {
 
       <div className="w-[320px] flex-shrink-0 bg-white border-l border-gray-100 flex flex-col h-full">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-bold`}>회의 챗봇</span>
+          <span className={`${DESIGN.FONT_SIZES.md} ${DESIGN.COLORS.black} font-medium`}>회의 챗봇</span>
         </div>
 
         <div ref={chatRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-3">
@@ -978,7 +978,7 @@ export default function MeetingDetailPage() {
                 <div
                   className={`text-xs px-3 py-2 rounded-2xl max-w-[85%] border break-all ${
                     msg.role === "user"
-                      ? "bg-[#F3F0FF] border-[#623FB5] text-[#141414] rounded-tr-sm"
+                      ? "bg-[#F3F0FF] border-[#6A1FEB] text-[#141414] rounded-tr-sm"
                       : "bg-[#FAF9F7] border-[#FAF9F7] text-[#141414] rounded-tl-sm"
                   }`}
                 >
@@ -1006,7 +1006,7 @@ export default function MeetingDetailPage() {
               onKeyDown={(e) => e.key === "Enter" && sendChat()}
               disabled={!isChatEnabled}
               placeholder={isChatEnabled ? "챗봇한테 질문해보세요" : "회의 시작 후 사용 가능합니다"}
-              className="w-full text-xs pl-4 pr-10 py-3 border border-gray-200 rounded-xl outline-none focus:border-[#623FB5] disabled:bg-gray-50 disabled:text-gray-300 transition"
+              className="w-full text-xs pl-4 pr-10 py-3 border border-gray-200 rounded-xl outline-none focus:border-[#6A1FEB] disabled:bg-gray-50 disabled:text-gray-300 transition"
             />
 
             <button

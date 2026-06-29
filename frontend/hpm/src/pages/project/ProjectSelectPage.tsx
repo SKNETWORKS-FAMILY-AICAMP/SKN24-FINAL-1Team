@@ -6,6 +6,7 @@ import ProjectCard from "../../components/project/ProjectCard";
 import ProjectAdd from "../../components/project/ProjectAdd";
 import * as DESIGN from "../../constants/design";
 import warningIcon from "../../assets/meeting/warning.png";
+import title from "../../assets/project/projectTitle.png";
 
 interface Project {
   project_id: number;
@@ -96,7 +97,7 @@ export default function ProjectSelectPage() {
           <div className="w-[384px] overflow-hidden rounded-[10px] bg-white shadow-[0_16px_40px_rgba(20,20,20,0.18)]">
             <div className="px-[32px] pb-[24px] pt-[26px] text-center">
               <img src={warningIcon} alt="" className="mx-auto mb-[18px] h-[38px] w-[38px]" />
-              <p className="text-[16px] font-medium leading-[1.6] text-[#623FB5]">
+              <p className="text-[16px] font-medium leading-[1.6] text-[#6A1FEB]">
                 프로젝트를 정말로 삭제하시겠습니까?<br />
                 삭제시 데이터 복구 불가합니다.
               </p>
@@ -126,13 +127,33 @@ export default function ProjectSelectPage() {
         </div>
       ) : null}
 
-      <div className="flex-1 px-10 pb-10 pt-24 max-w-[1584px] mx-auto w-full">
-        <h1 className={`${DESIGN.FONT_SIZES.h2} ${DESIGN.MARGIN_BOTTOM_SIZES.sm}`}>프로젝트</h1>
-        <p className={`${DESIGN.FONT_SIZES.lg} ${DESIGN.MARGIN_BOTTOM_SIZES["3xl"]} ${DESIGN.COLORS.gray}`}>회의를 생성할 프로젝트를 선택해주세요.</p>
+      <div className="flex-1 px-10 pb-0 pt-[32px] max-w-[1584px] mx-auto w-full">
+        <div
+          className="w-full max-w-[1584px] h-[200px] flex flex-col justify-center px-[64px] rounded-[15px] overflow-hidden"
+          style={{
+            backgroundImage: `url(${title})`,
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        >
+          <div className="flex flex-col gap-[14px]">
+              <h1 className="text-[32px] font-medium text-[#141414] leading-tight">프로젝트</h1>
+            <div className="flex flex-col gap-[2px]">
+              <p className="text-[17px] font-medium text-[#141414]">
+                안녕하세요 <span className="text-[#6A1FEB]">{user?.name || "사용자"}</span>님!
+              </p>
+              <p className="text-[17px] text-[#969696]">
+                프로젝트를 선택하거나 새로 생성해주세요.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {loading ? (
-          <div className="text-sm text-gray-400">불러오는 중...</div>
+          <div className="text-sm text-gray-400 mt-[32px]">불러오는 중...</div>
         ) : (
-          <div className={`grid grid-cols-[repeat(auto-fit,352px)] ${DESIGN.GAP_SIZES["4xl"]} justify-start`}>
+          <div className={`grid grid-cols-[repeat(auto-fit,352px)] ${DESIGN.GAP_SIZES["4xl"]} justify-start mt-[32px]`}>
           {projects.map(p => (
             <ProjectCard 
               key={p.project_id}

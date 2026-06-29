@@ -36,7 +36,7 @@ export default function CalendarPopover({
           onClick={() =>
             onMonthChange(shiftCalendarMonth(displayMonth.year, displayMonth.month, -1))
           }
-          className="flex size-[24px] items-center justify-center rounded-full border-0 bg-transparent p-0 text-[18px] leading-none text-[#141414] transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:text-[#623FB5] active:scale-[0.92]"
+          className="flex size-[24px] items-center justify-center rounded-full border-0 bg-transparent p-0 text-[18px] leading-none text-[#141414] transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:text-[#6A1FEB] active:scale-[0.92]"
         >
           ‹
         </button>
@@ -49,7 +49,7 @@ export default function CalendarPopover({
           onClick={() =>
             onMonthChange(shiftCalendarMonth(displayMonth.year, displayMonth.month, 1))
           }
-          className="flex size-[24px] items-center justify-center rounded-full border-0 bg-transparent p-0 text-[18px] leading-none text-[#141414] transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:text-[#623FB5] active:scale-[0.92]"
+          className="flex size-[24px] items-center justify-center rounded-full border-0 bg-transparent p-0 text-[18px] leading-none text-[#141414] transition-all duration-150 ease-out hover:bg-[#F4F5F8] hover:text-[#6A1FEB] active:scale-[0.92]"
         >
           ›
         </button>
@@ -77,10 +77,10 @@ export default function CalendarPopover({
               className={cn(
                 "flex size-[32.55px] items-center justify-center rounded-full border-0 bg-transparent p-0 text-[13.95px] font-medium leading-[17px] transition-all duration-150 ease-out active:scale-[0.92]",
                 selected
-                  ? "bg-[#623FB5] text-[#FFFDFD] hover:bg-[#56379F]"
+                  ? "bg-[#6A1FEB] text-[#FFFDFD] hover:bg-[#56379F]"
                   : cell.muted
-                    ? "text-[#969696] hover:bg-[#F4F5F8] hover:text-[#623FB5]"
-                    : "text-[#141414] hover:bg-[#F4F5F8] hover:text-[#623FB5]",
+                    ? "text-[#969696] hover:bg-[#F4F5F8] hover:text-[#6A1FEB]"
+                    : "text-[#141414] hover:bg-[#F4F5F8] hover:text-[#6A1FEB]",
               )}
             >
               {cell.day}

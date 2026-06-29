@@ -15,9 +15,9 @@ export default function StepBar({ steps, activeStep }: StepBarProps) {
           <div key={i} className="flex items-start gap-3">
             <div className="flex flex-col items-center" style={{ minWidth: 130 }}>
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium
                   ${isCompleted || isActive
-                    ? "bg-[#623FB5] text-white"
+                    ? "bg-[#6A1FEB] text-white"
                     : "border-2 border-gray-300 text-gray-400 bg-white"}`}
               >
                 {isCompleted ? (
@@ -30,7 +30,7 @@ export default function StepBar({ steps, activeStep }: StepBarProps) {
               </div>
               <span
                 className={`text-xs mt-1.5 text-center leading-snug
-                  ${isActive ? "text-[#623FB5] font-semibold" : isCompleted ? "text-[#C4B6E5]" : "text-gray-400"}`}
+                  ${isActive ? "text-[#6A1FEB] font-semibold" : isCompleted ? "text-[#C4B6E5]" : "text-gray-400"}`}
               >
                 {label}
               </span>

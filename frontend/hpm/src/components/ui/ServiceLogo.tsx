@@ -12,7 +12,7 @@ export default function ProjectAdd({ className = "", ...props }: ProjectAddProps
       {...props}
       className=""
     >
-      <div className={`flex justify-center items-center ${DESIGN.GAP_SIZES.xl}`}><img src={logo} alt="" /><p className={DESIGN.FONT_SIZES.h2}>회의피하지마</p></div>
+      <div className={`flex justify-center items-center ${DESIGN.GAP_SIZES.xl}`}><img src={logo} alt="" className="w-[45px]" /><p className={DESIGN.FONT_SIZES.h2}>회의피하지마</p></div>
     </div>
   );
 }

@@ -8,7 +8,7 @@ export default function NotFoundPage() {
       {/* 404 Illustration wrapper with floating micro-animation */}
       <div className="relative mb-6 animate-bounce" style={{ animationDuration: "3s" }}>
         {/* SVG Decorative Background Circle */}
-        <div className="absolute inset-0 m-auto w-40 h-40 bg-[#623FB5]/5 rounded-full blur-xl"></div>
+        <div className="absolute inset-0 m-auto w-40 h-40 bg-[#6A1FEB]/5 rounded-full blur-xl"></div>
       </div>
 
       {/* Large Gradient Heading */}
@@ -37,8 +37,8 @@ export default function NotFoundPage() {
         </button>
         <button
           onClick={() => navigate("/dashboard")}
-          className="px-6 py-3 text-sm font-semibold rounded-xl text-white shadow-md shadow-[#623FB5]/10 transition hover:bg-[#52339d] active:scale-[0.98] cursor-pointer"
-          style={{ backgroundColor: "#623FB5" }}
+          className="px-6 py-3 text-sm font-semibold rounded-xl text-white shadow-md shadow-[#6A1FEB]/10 transition hover:bg-[#52339d] active:scale-[0.98] cursor-pointer"
+          style={{ backgroundColor: "#6A1FEB" }}
         >
           메인 대시보드로
         </button>
