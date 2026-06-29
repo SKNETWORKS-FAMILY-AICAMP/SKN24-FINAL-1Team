@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from apps.users.models import Users
 from apps.users.views import get_valid_access_token
-from apps.meetings.jira_client import create_jira_issue_for_board, update_jira_issue, update_jira_issue_status
+from apps.meetings.jira_client import create_jira_issue_for_board, update_jira_issue, update_jira_issue_status, rank_jira_issue
 from apps.notifications.models import Notification
 from .models import Project, ProjectUsers
 from .serializers import ProjectSerializer, ProjectUsersSerializer
@@ -684,6 +684,48 @@ def project_jira_board_issue_status(request, project_id, issue_key):
         )
 
     return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(["PATCH"])
+def project_jira_board_issue_rank(request, project_id, issue_key):
+    user_id = _request_user_id(request)
+
+    try:
+        project = Project.objects.get(project_id=project_id)
+    except Project.DoesNotExist:
+        return Response({"error": "프로젝트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    is_member = ProjectUsers.objects.filter(project=project, user_id=user_id).exists()
+    if project.project_owner_id != user_id and not is_member:
+        return Response({"error": "프로젝트 구성원이 아닙니다."}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = Users.objects.get(users_id=user_id)
+    except Users.DoesNotExist:
+        return Response({"error": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+    access_token = get_valid_access_token(user)
+    if not access_token:
+        return Response({"error": "Jira 연동이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+    if not user.jira_cloud_id:
+        return Response({"error": "Jira 클라우드 ID가 없습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    before_issue_key = request.data.get("before_issue_key")
+    after_issue_key = request.data.get("after_issue_key")
+    if not before_issue_key and not after_issue_key:
+        return Response({"error": "before_issue_key 또는 after_issue_key가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+    result = rank_jira_issue(
+        issue_key,
+        access_token,
+        user.jira_cloud_id,
+        before_issue_key=before_issue_key,
+        after_issue_key=after_issue_key,
+    )
+    if not result.get("success"):
+        return Response({"error": "Jira 순서 변경에 실패했습니다.", "detail": result}, status=status.HTTP_502_BAD_GATEWAY)
+    return Response(result, status=status.HTTP_200_OK)
+
 
 @api_view(["GET", "PATCH", "DELETE"])
 def project_detail(request, project_id):

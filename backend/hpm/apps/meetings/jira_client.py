@@ -86,6 +86,44 @@ def create_jira_project(project_name: str, access_token: str, cloud_id: str) -> 
         return {"success": False, "error": str(e), "detail": error_detail}
 
 
+def rank_jira_issue(
+    issue_key: str,
+    access_token: str,
+    cloud_id: str,
+    *,
+    before_issue_key: str | None = None,
+    after_issue_key: str | None = None,
+) -> dict:
+    """이슈를 기준 이슈의 앞(before) 또는 뒤(after)로 순서 이동(Rank)."""
+    if not before_issue_key and not after_issue_key:
+        return {"success": False, "error": "기준 이슈(before/after)가 필요합니다."}
+
+    url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/agile/1.0/issue/rank"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    payload = {"issues": [issue_key]}
+    if before_issue_key:
+        payload["rankBeforeIssue"] = before_issue_key
+    else:
+        payload["rankAfterIssue"] = after_issue_key
+
+    try:
+        response = requests.put(url, json=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        return {"success": True, "issue_key": issue_key}
+    except requests.RequestException as e:
+        error_detail = ""
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                error_detail = e.response.json()
+            except Exception:
+                error_detail = e.response.text
+        return {"success": False, "error": str(e), "detail": error_detail}
+
+
 def get_jira_config():
     return {
         "client_id": os.getenv("JIRA_CLIENT_ID", ""),

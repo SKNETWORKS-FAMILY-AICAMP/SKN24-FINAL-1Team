@@ -13,7 +13,6 @@ import {
   pauseMeeting,
   resumeMeeting,
   endMeeting,
-  completeMeetingRawTranscriptOnly,
   sendChatMessage,
   saveAgendaList,
   getPrepMaterial,
@@ -55,7 +54,6 @@ export default function MeetingDetailPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [endLoading, setEndLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [showShortRecordingModal, setShowShortRecordingModal] = useState(false);
   const [showTenMinWarningModal, setShowTenMinWarningModal] = useState(false);
   const [showMaxTimeModal, setShowMaxTimeModal] = useState(false);
   const [agendaOpen, setAgendaOpen] = useState(true);
@@ -373,25 +371,7 @@ export default function MeetingDetailPage() {
     }
   };
 
-  const finishWithoutMinutes = async () => {
-    setEndLoading(true);
-    try {
-      clearLocalRecordingState();
-      await completeMeetingRawTranscriptOnly(meetingId);
-      navigate(`/meetings/${meetingId}/archive`, { replace: true });
-    } catch (error) {
-      console.error("회의 원문 저장 종료 실패:", error);
-      alert("회의 종료 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setEndLoading(false);
-    }
-  };
-
   const handleEnd = async () => {
-    if (elapsed < 300) {
-      setShowShortRecordingModal(true);
-      return;
-    }
     await doEndMeeting();
   };
 
@@ -506,33 +486,6 @@ export default function MeetingDetailPage() {
 
   return (
     <>
-      {/* 5분 미만 종료 확인 모달 */}
-      {showShortRecordingModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-2xl w-80 overflow-hidden shadow-xl">
-            <div className="px-8 py-10 text-center">
-              <p className="text-[#623FB5] text-[14px] leading-relaxed whitespace-pre-line">
-                {"5분 미만의 녹음은 회의록이\n생성되지 않습니다. 종료하시겠습니까?"}
-              </p>
-            </div>
-            <div className="border-t border-gray-200 flex">
-              <button
-                onClick={() => setShowShortRecordingModal(false)}
-                className="flex-1 py-4 text-sm text-gray-700 hover:bg-gray-50 transition border-r border-gray-200"
-              >
-                취소
-              </button>
-              <button
-                onClick={() => { setShowShortRecordingModal(false); finishWithoutMinutes(); }}
-                className="flex-1 py-4 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 10분 후 종료 예정 경고 모달 */}
       {showTenMinWarningModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
