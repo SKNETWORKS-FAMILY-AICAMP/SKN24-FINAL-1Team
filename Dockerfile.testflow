@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # .env가 이미지에 들어가지 않도록 필요한 소스만 선별 복사한다.
 COPY test_flow/*.py ./
+COPY test_flow/stt_terms.json ./stt_terms.json
 COPY test_flow/feature_chat ./feature_chat
 COPY test_flow/internal_docs ./internal_docs
 
